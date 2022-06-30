@@ -7,6 +7,7 @@ version = "0.1.0"
 [deps]
 AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
 msolve_jll = "6d01cc9a-e8f6-580e-8c54-544227e08205"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 julia = "1.6"
