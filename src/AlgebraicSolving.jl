@@ -63,7 +63,7 @@ import AbstractAlgebra:
     symbols,
     total_degree
 
-export PolynomialRing, QQ, ZZ, FiniteField, GF, characteristic
+export PolynomialRing, MPolyRing, QQ, ZZ, FiniteField, GF, characteristic
 
 include("interfaces/abstract-algebra.jl")
 
