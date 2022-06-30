@@ -2,7 +2,9 @@ module AlgebraicSolving
 
 greet() = print("AlgebraicSolving -- a package for algebraic solving based on msolve")
 
-import AbstractAlgebra
+using msolve_jll
+
+using AbstractAlgebra
 
 import AbstractAlgebra:
     @attr,
@@ -13,6 +15,7 @@ import AbstractAlgebra:
     base_ring,
     canonical_unit,
     codomain,
+    characteristic,
     data,
     degree,
     dim,
@@ -34,6 +37,7 @@ import AbstractAlgebra:
     gens,
     get_attribute,
     get_attribute!,
+    GF,
     Ideal,
     Map,
     map,
@@ -58,5 +62,9 @@ import AbstractAlgebra:
     SetMap,
     symbols,
     total_degree
+
+export PolynomialRing, QQ, ZZ, FiniteField, GF, characteristic
+
+include("interfaces/abstract-algebra.jl")
 
 end # module AlgebraicSolving
