@@ -1,17 +1,18 @@
+import AbstractAlgebra: GF
 import msolve_jll: libneogb
 
 export groebner_basis
 
 @doc Markdown.doc"""
-    groebner_basis(I::MPolyIdeal, <keyword arguments>)
+    groebner_basis(F::Vector{T} where T <: MPolyElem, <keyword arguments>)
 
 Compute a Groebner basis of the given ideal `I` w.r.t. to the degree reverse lexicographical monomial ordering using Faugère's F4 algorithm.
-See [Fau99](@cite) for more information.
+At the moment the underlying algorithm is based on variants of Faugère's F4 Algorithm.
 
 **Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` are supported.
 
 # Arguments
-- `Ì::MPolyIdeal`: input ideal.
+- `F::Vector{T} where T <: MPolyElem`: input generators.
 - `initial_hts::Int=17`: initial hash table size `log_2`.
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
@@ -22,8 +23,8 @@ See [Fau99](@cite) for more information.
 
 # Examples
 ```jldoctest
-julia> R,(x,y,z) = PolynomialRing(GF(101), ["x","y","z"], ordering=:degrevlex)
-(Multivariate Polynomial Ring in x, y, z over Galois field with characteristic 101, gfp_mpoly[x, y, z])
+julia> R, (x,y,z) = PolynomialRing(GF(101),["x","y","z"], ordering=:degrevlex)
+(Multivariate Polynomial Ring in x, y, z over Finite field F_101, AbstractAlgebra.Generic.MPoly{AbstractAlgebra.GFElem{Int64}}[x, y, z])
 
 julia> F = [x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y]
 3-element Vector{AbstractAlgebra.Generic.MPoly{AbstractAlgebra.GFElem{Int64}}}:
@@ -31,20 +32,20 @@ julia> F = [x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y]
  x^2 + 2*y^2 + 2*z^2 + 100*x
  2*x*y + 2*y*z + 100*y
 
-julia> groebner_basis(F, eliminate=0)
-4-element Vector{MPolyElem}:
+julia> groebner_basis(F)
+4-element Vector{AbstractAlgebra.MPolyElem}:
  x + 2*y + 2*z + 100
  y*z + 82*z^2 + 10*y + 40*z
  y^2 + 60*z^2 + 20*y + 81*z
  z^3 + 28*z^2 + 64*y + 13*z
 
 julia> groebner_basis(F, eliminate=2)
-1-element Vector{MPolyElem}:
+1-element Vector{AbstractAlgebra.MPolyElem}:
  z^4 + 38*z^3 + 95*z^2 + 95*z
 ```
 """
 function groebner_basis(
-        F::Vector{T};
+        F::Vector{T} where T <: MPolyElem;
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,
@@ -52,7 +53,7 @@ function groebner_basis(
         eliminate::Int=0,
         complete_reduction::Bool=true,
         info_level::Int=0
-        ) where T <: MPolyElem
+        )
 
     R = first(F).parent
     nr_vars     = R.num_vars
