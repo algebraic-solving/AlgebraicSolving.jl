@@ -1,6 +1,6 @@
-using Documenter
-using AlgebraicSolving
 using AbstractAlgebra
+using AlgebraicSolving
+using Documenter
 
 DocMeta.setdocmeta!(AlgebraicSolving, :DocTestSetup, :(using AlgebraicSolving); recursive=true)
 
@@ -13,11 +13,7 @@ makedocs(
     doctest = true,
     clean = true,
     sitename = "AlgebraicSolving.jl",
-    format = Documenter.HTML(
-        #= canonical = "https://juliadata.github.io/DataFrames.jl/stable/",
-         = assets = ["assets/favicon.ico"],
-         = edit_link = "main" =#
-    ),
+    format = Documenter.HTML(),
     pages = Any[
         "Introduction" => "index.md",
         "User Guide" => Any[
