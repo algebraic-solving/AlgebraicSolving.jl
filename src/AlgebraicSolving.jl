@@ -2,8 +2,6 @@ module AlgebraicSolving
 
 greet() = print("AlgebraicSolving -- a package for algebraic solving based on msolve")
 
-using msolve_jll
-
 include("imports.jl")
 
 export PolynomialRing, MPolyRing, QQ, ZZ, FiniteField, GF, characteristic
