@@ -1,5 +1,6 @@
 using Documenter
 using AlgebraicSolving
+using AbstractAlgebra
 
 DocMeta.setdocmeta!(AlgebraicSolving, :DocTestSetup, :(using AlgebraicSolving); recursive=true)
 
