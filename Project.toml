@@ -12,4 +12,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [compat]
 julia = "1.6"
 AbstractAlgebra = "0.26.0"
-msolve_jll = "0.2.5"
+msolve_jll = "0.3.0"
