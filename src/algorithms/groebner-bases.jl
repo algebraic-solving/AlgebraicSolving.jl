@@ -23,6 +23,8 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 
 # Examples
 ```jldoctest
+julia> using AlgebraicSolving
+
 julia> R, (x,y,z) = PolynomialRing(GF(101),["x","y","z"], ordering=:degrevlex)
 (Multivariate Polynomial Ring in x, y, z over Finite field F_101, AbstractAlgebra.Generic.MPoly{AbstractAlgebra.GFElem{Int64}}[x, y, z])
 
