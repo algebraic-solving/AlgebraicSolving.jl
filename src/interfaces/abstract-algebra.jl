@@ -53,7 +53,8 @@ function convert_finite_field_gb_to_abstract_algebra(
         blen::Vector{Int32},
         bcf::Vector{Int32},
         bexp::Vector{Int32},
-        R::MPolyRing
+        R::MPolyRing,
+        eliminate::Int=0
         )
 
     if characteristic(R) == 0
@@ -64,18 +65,28 @@ function convert_finite_field_gb_to_abstract_algebra(
     nr_vars = nvars(R)
     CR      = coefficient_ring(R)
 
-    basis = Vector{MPolyElem}(undef, nr_gens)
+    basis = MPolyElem[]
 
     len   = 0
 
+    if eliminate > 0
+        z = zeros(Int, eliminate)
+    end
     for i in 1:nr_gens
+        #= check if element is part of the eliminated basis =#
+        if eliminate > 0
+            cmp = convert(Vector{Int}, bexp[(len)*nr_vars+1:(len+1)*nr_vars])
+            if cmp[1:eliminate] > z
+                continue
+            end
+        end
         g  = MPolyBuildCtx(R)
         for j in 1:blen[i]
             push_term!(g, CR(bcf[len+j]),
                        convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
         end
         len +=  blen[i]
-        basis[i]  = g.poly
+        push!(basis, g.poly)
     end
 
     return basis
