@@ -58,7 +58,7 @@ jobs:
       - name: "Process code coverage"
         uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: src,experimental
+          directories: src
       - name: "Upload coverage data to Codecov"
         continue-on-error: true
         uses: codecov/codecov-action@v2
