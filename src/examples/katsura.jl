@@ -56,8 +56,6 @@ function katsura(R::MPolyRing)
     CR = base_ring(R)
     polys = elem_type(R)[]
     n = nvars(R) - 1
-    @show CR
-    @show elem_type(CR)
     coeffs_vec = 2 * fill(CR(1), n + 1)
     coeffs_vec[1] = CR(1)
     mono_exps = Matrix(1I, n+1, n+1)
