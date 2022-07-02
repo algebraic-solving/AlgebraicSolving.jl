@@ -77,7 +77,7 @@ function _core_msolve(
         error("At the moment we only support the rationals as ground field.")
     end
     # convert Singular ideal to flattened arrays of ints
-    lens, cfs, exps = convert_to_msolve(F)
+    lens, cfs, exps = _convert_to_msolve(F)
 
     res_ld    = Ref(Cint(0))
     res_dim   = Ref(Cint(0))
@@ -119,8 +119,7 @@ function _core_msolve(
     nterms  = 0
 
     [nterms += jl_len[i] for i=1:jl_ld]
-    # if 0 == field_char
-    jl_cf       = reinterpret(Ptr{BigInt}, res_cf[])
+    jl_cf = reinterpret(Ptr{BigInt}, res_cf[])
 
     rat_param = _get_rational_parametrization(jl_ld, jl_len, jl_cf)
 

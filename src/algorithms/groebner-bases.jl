@@ -71,7 +71,7 @@ function groebner_basis(
         error("At the moment we only supports finite fields.")
     end
 
-    lens, cfs, exps = convert_to_msolve(F)
+    lens, cfs, exps = _convert_to_msolve(F)
 
     gb_ld  = Ref(Cint(0))
     gb_len = Ref(Ptr{Cint}(0))
@@ -93,7 +93,7 @@ function groebner_basis(
     ptr     = reinterpret(Ptr{Int32}, gb_cf[])
     jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
 
-    basis = convert_finite_field_gb_to_abstract_algebra(
+    basis = _convert_finite_field_gb_to_abstract_algebra(
                 jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
 
 

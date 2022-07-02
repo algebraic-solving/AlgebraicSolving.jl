@@ -1,4 +1,13 @@
-function convert_to_msolve(
+
+@doc Markdown.doc"""
+    _convert_to_msolve(
+            F::Vector{T}) where T <: MPolyElem
+
+Convert a vector of polynomials to input data for msolve.
+
+**Note**: This is an internal function.
+"""
+function _convert_to_msolve(
         F::Vector{T}) where T <: MPolyElem
 
     R = first(F).parent
@@ -44,7 +53,22 @@ function convert_to_msolve(
     return lens, cfs, exps
 end
 
-function convert_finite_field_gb_to_abstract_algebra(
+@doc Markdown.doc"""
+    _convert_finite_field_gb_to_abstract_algebra(
+        bld::Int32,
+        blen::Vector{Int32},
+        bcf::Vector{Int32},
+        bexp::Vector{Int32},
+        R::MPolyRing,
+        eliminate::Int=0
+        )
+
+Converts a finite Gröbner basis computed internally via msolve
+to a vector of polynomials.
+
+**Note**: This is an internal function.
+"""
+function _convert_finite_field_gb_to_abstract_algebra(
         bld::Int32,
         blen::Vector{Int32},
         bcf::Vector{Int32},
