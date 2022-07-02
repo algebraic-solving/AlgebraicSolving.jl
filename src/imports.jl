@@ -2,6 +2,8 @@ using Markdown
 using Test
 using msolve_jll
 using AbstractAlgebra
+using Nemo
+using LinearAlgebra
 
 import AbstractAlgebra:
     @attr,
@@ -60,3 +62,39 @@ import AbstractAlgebra:
     symbols,
     total_degree
 
+import Nemo:
+    bell,
+    binomial,
+    denominator,
+    divexact,
+    divides,
+    divisor_sigma,
+    euler_phi,
+    factorial,
+    fibonacci,
+    fits,
+    FlintIntegerRing,
+    FlintRationalField,
+    fmpq,
+    fmpq_mat,
+    fmpz,
+    fmpz_mat,
+    fq_nmod,
+    FractionField,
+    height,
+    is_prime,
+    is_probable_prime,
+    is_square,
+    is_unit,
+    isqrtrem,
+    jacobi_symbol,
+    MatrixSpace,
+    moebius_mu,
+    number_of_partitions,
+    numerator,
+    primorial,
+    QQ,
+    rising_factorial,
+    root,
+    unit,
+    ZZ
