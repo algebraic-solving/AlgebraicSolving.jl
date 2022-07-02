@@ -3,11 +3,7 @@ function convert_to_msolve(
 
     R = first(F).parent
     
-    if R.ord != :degrevlex
-        error("Only applicablefor DRL monomial ordering.")
-    end
-
-    nr_vars    = R.num_vars
+    nr_vars    = nvars(R)
     nr_gens    = length(F)
     lens       = Int32[F[i].length for i in 1:nr_gens]
     nr_terms   = sum(lens)

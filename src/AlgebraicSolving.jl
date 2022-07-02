@@ -4,7 +4,7 @@ greet() = print("AlgebraicSolving -- a package for algebraic solving based on ms
 
 include("imports.jl")
 
-export PolynomialRing, MPolyRing, FiniteField, GF, characteristic, ZZ, QQ
+export PolynomialRing, MPolyRing, FiniteField, GF, characteristic, ZZ, QQ, nvars, ngens
 
 include("interfaces/abstract-algebra.jl")
 include("algorithms/groebner-bases.jl")

@@ -58,7 +58,7 @@ function groebner_basis(
         )
 
     R = first(F).parent
-    nr_vars     = R.num_vars
+    nr_vars     = nvars(R)
     nr_gens     = length(F)
     field_char  = Int(characteristic(R))
 
