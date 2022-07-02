@@ -1,4 +1,4 @@
-@testset "Algorithms -> Groebner bases" begin
+@testset "Algorithms -> Gröbner bases" begin
     R, (x,y,z) = PolynomialRing(QQ,["x","y","z"], ordering=:degrevlex)
     F = [x^2+1-3, x*y-z, x*z^2-3*y^2]
     #= not a finite field =#
