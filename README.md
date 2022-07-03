@@ -1,1 +1,1 @@
-A julia package for algebraic solving of multivariate polynomial systems.
+A julia package for algebraically solving multivariate polynomial systems.
