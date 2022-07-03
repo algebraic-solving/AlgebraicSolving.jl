@@ -1,9 +1,12 @@
+using msolve_jll
 using AbstractAlgebra
 using Nemo
+using LinearAlgebra
 using AlgebraicSolving
 using Documenter
 
-push!(LOAD_PATH, "../src/")
+include("../src/imports.jl")
+include("../src/exports.jl")
 
 DocMeta.setdocmeta!(AlgebraicSolving, :DocTestSetup, :(using AlgebraicSolving, AbstractAlgebra, Nemo); recursive=true)
 
