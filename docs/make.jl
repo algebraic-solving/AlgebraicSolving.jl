@@ -1,8 +1,11 @@
 using AbstractAlgebra
+using Nemo
 using AlgebraicSolving
 using Documenter
 
-DocMeta.setdocmeta!(AlgebraicSolving, :DocTestSetup, :(using AlgebraicSolving); recursive=true)
+push!(LOAD_PATH, "../src/")
+
+DocMeta.setdocmeta!(AlgebraicSolving, :DocTestSetup, :(using AlgebraicSolving, AbstractAlgebra, Nemo); recursive=true)
 
 # Build documentation.
 # ====================
@@ -17,7 +20,9 @@ makedocs(
     pages = Any[
         "Introduction" => "index.md",
         "User Guide" => Any[
-            "Algorithms" => "groebner-bases.md"
+            "Algorithms" => ["algorithms/groebner-bases.md",
+                    "algorithms/solvers.md"],
+            "Examples" => "examples/katsura.md"
         ],
     ],
     strict = true

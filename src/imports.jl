@@ -97,4 +97,5 @@ import Nemo:
     rising_factorial,
     root,
     unit,
+    vars,
     ZZ
