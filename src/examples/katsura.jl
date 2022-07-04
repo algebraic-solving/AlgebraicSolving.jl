@@ -53,7 +53,7 @@ Returns the Katsura ideal in the given polynomial ring `R`.
 julia> using AlgebraicSolving
 
 julia> R, _ = QQ["x", "y", "z"]
-(Multivariate Polynomial Ring in x, y, z over Rational Field, Nemo.fmpq_mpoly[x, y, z])
+(Multivariate Polynomial Ring in x, y, z over Rational Field, fmpq_mpoly[x, y, z])
 
 julia> katsura(R)
 3-element Vector{Nemo.fmpq_mpoly}:
