@@ -8,7 +8,7 @@ using Documenter
 include("../src/imports.jl")
 include("../src/exports.jl")
 
-DocMeta.setdocmeta!(AlgebraicSolving, :DocTestSetup, :(using AlgebraicSolving, AbstractAlgebra, Nemo); recursive=true)
+DocMeta.setdocmeta!(AlgebraicSolving, :DocTestSetup, :(using AlgebraicSolving); recursive=true)
 
 # Build documentation.
 # ====================
