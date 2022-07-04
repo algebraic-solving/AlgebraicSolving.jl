@@ -191,7 +191,7 @@ julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
 (Multivariate Polynomial Ring in x1, x2, x3 over Rational Field, fmpq_mpoly[x1, x2, x3])
 
 julia> F = [x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2]
-3-element Vector{fmpq_mpoly}:
+3-element Vector{Nemo.fmpq_mpoly}:
  x1 + 2*x2 + 2*x3 - 1
  x1^2 - x1 + 2*x2^2 + 2*x3^2
  2*x1*x2 + 2*x2*x3 - x2
@@ -250,7 +250,7 @@ julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
 (Multivariate Polynomial Ring in x1, x2, x3 over Rational Field, fmpq_mpoly[x1, x2, x3])
 
 julia> F = [x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2]
-3-element Vector{fmpq_mpoly}:
+3-element Vector{Nemo.fmpq_mpoly}:
  x1 + 2*x2 + 2*x3 - 1
  x1^2 - x1 + 2*x2^2 + 2*x3^2
  2*x1*x2 + 2*x2*x3 - x2
