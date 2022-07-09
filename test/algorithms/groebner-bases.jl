@@ -16,6 +16,10 @@
     G = groebner_basis(F, eliminate=2)
     H = MPolyElem[
          z^4 + 38*z^3 + 95*z^2 + 95*z
-                 ]
+        ]
     @test G == H
+
+    @test_throws ErrorException eliminate(F,0)
+    L = eliminate(F,2)
+    @test L == H
 end
