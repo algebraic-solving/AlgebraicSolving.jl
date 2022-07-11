@@ -1,5 +1,4 @@
 using msolve_jll
-using AbstractAlgebra
 using Nemo
 using LinearAlgebra
 using AlgebraicSolving

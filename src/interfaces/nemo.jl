@@ -85,7 +85,8 @@ function _convert_finite_field_gb_to_abstract_algebra(
     nr_vars = nvars(R)
     CR      = coefficient_ring(R)
 
-    basis = MPolyElem[]
+    basis = Nemo.gfp_mpoly[]
+    #= basis = Vector{MPolyElem}(undef, bld) =#
 
     len   = 0
 

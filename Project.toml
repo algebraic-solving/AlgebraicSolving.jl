@@ -5,7 +5,6 @@ authors = ["ederc <ederc@mathematik.uni-kl.de>",
 version = "0.1.0"
 
 [deps]
-AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 msolve_jll = "6d01cc9a-e8f6-580e-8c54-544227e08205"
@@ -14,6 +13,5 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 julia = "1.6"
-AbstractAlgebra = "0.26.0"
 msolve_jll = "0.3.0"
 Nemo = "0.31.0"

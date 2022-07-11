@@ -5,7 +5,7 @@ greet() = print("AlgebraicSolving -- a package for algebraic solving based on ms
 include("imports.jl")
 include("exports.jl")
 
-include("interfaces/abstract-algebra.jl")
+include("interfaces/nemo.jl")
 include("algorithms/groebner-bases.jl")
 include("algorithms/solvers.jl")
 include("examples/katsura.jl")
