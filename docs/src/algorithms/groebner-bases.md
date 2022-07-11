@@ -6,7 +6,7 @@ CurrentModule = AlgebraicSolving
 
 ## Introduction
 
-AbstractAlgebra allows to compute Gröbner bases for input generators over finite
+AlgebraicSolving allows to compute Gröbner bases for input generators over finite
 fields of characteristic smaller $2^{31}$ w.r.t. the degree reverse
 lexicographical monomial order.
 

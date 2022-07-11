@@ -6,7 +6,7 @@ CurrentModule = AlgebraicSolving
 
 ## Introduction
 
-AbstractAlgebra allows to solve systems for input generators over finite
+Algebraic Solving allows to solve systems for input generators over finite
 fields of characteristic smaller $2^{31}$ and over the rationals.
 
 The underlying engine is provided by msolve.
