@@ -38,15 +38,14 @@ function _get_rational_parametrization(
 end
 
 @doc Markdown.doc"""
-    _core_msolve(F::Vector{T} where T <: MPolyElem, <keyword arguments>)
+    _core_msolve(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
 
-Compute a rational parametrization and the real solutions of an ideal given by
-the generators `F` via msolve.
+Compute a rational parametrization and the real solutions of the ideal `I` via msolve.
 
 **Note**: This is an internal function.
 """
 function _core_msolve(
-        F::Vector{T} where T <: MPolyElem;    # input generators
+        I::Ideal{T} where T <: MPolyElem;     # input generators
         initial_hts::Int=17,                  # hash table size, default 2^17
         nr_thrds::Int=1,                      # number of threads
         max_nr_pairs::Int=0,                  # number of pairs maximally chosen
@@ -55,6 +54,8 @@ function _core_msolve(
         info_level::Int=0,                    # info level for print outs
         precision::Int=32                     # precision of the solution set
         )
+
+    F = I.gens
     R = first(F).parent
     nr_vars     = nvars(R)
     nr_gens     = length(F)
@@ -166,16 +167,16 @@ function _core_msolve(
 end
 
 @doc Markdown.doc"""
-    rational_parametrization(F::Vector{T} where T <: MPolyElem, <keyword arguments>)
+    rational_parametrization(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
 
-Given an ideal by generators `F` with a finite solution set over the complex numbers, return
+Given an ideal `I` with a finite solution set over the complex numbers, return
 the rational parametrization of the ideal with a given precision (default 32 bits).
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
 is greater then zero an empty array is returned.
 
 # Arguments
-- `F::Vector{T} where T <: MPolyElem`: input generators.
+- `I::Ideal{T} where T <: MPolyElem`: input generators.
 - `initial_hts::Int=17`: initial hash table size `log_2`.
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
@@ -205,7 +206,7 @@ julia> real_solutions(F)
 ```
 """
 function rational_parametrization(
-        F::Vector{T} where T <: MPolyElem;    # input generators
+        I::Ideal{T} where T <: MPolyElem;     # input generators
         initial_hts::Int=17,                  # hash table size, default 2^17
         nr_thrds::Int=1,                      # number of threads
         max_nr_pairs::Int=0,                  # number of pairs maximally chosen
@@ -214,7 +215,7 @@ function rational_parametrization(
         info_level::Int=0,                    # info level for print outs
         precision::Int=32                     # precision of the solution set
         )
-    parametrization,_ = _core_msolve(F, 
+    parametrization,_ = _core_msolve(I, 
                                      initial_hts = initial_hts,
                                      nr_thrds = nr_thrds,
                                      max_nr_pairs = max_nr_pairs,
@@ -225,16 +226,16 @@ function rational_parametrization(
 end
 
 @doc Markdown.doc"""
-    real_solutions(F::Vector{T} where T <: MPolyElem, <keyword arguments>)
+    real_solutions(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
 
-Given an ideal by generators `F` with a finite solution set over the complex numbers, return
+Given an ideal `I` with a finite solution set over the complex numbers, return
 the real roots of the ideal with a given precision (default 32 bits).
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
 is greater then zero an empty array is returned.
 
 # Arguments
-- `F::Vector{T} where T <: MPolyElem`: input generators.
+- `I::Ideal{T} where T <: MPolyElem`: input generators.
 - `initial_hts::Int=17`: initial hash table size `log_2`.
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
@@ -261,7 +262,7 @@ julia> rational_parametrization(F)
 ```
 """
 function real_solutions(
-        F::Vector{T} where T <: MPolyElem;    # input generators
+        I::Ideal{T} where T <: MPolyElem;     # input generators
         initial_hts::Int=17,                  # hash table size, default 2^17
         nr_thrds::Int=1,                      # number of threads
         max_nr_pairs::Int=0,                  # number of pairs maximally chosen
@@ -270,7 +271,7 @@ function real_solutions(
         info_level::Int=0,                    # info level for print outs
         precision::Int=32                     # precision of the solution set
         )
-    _, solutions = _core_msolve(F,
+    _, solutions = _core_msolve(I,
                                 initial_hts = initial_hts,
                                 nr_thrds = nr_thrds,
                                 max_nr_pairs = max_nr_pairs,
