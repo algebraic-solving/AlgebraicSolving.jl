@@ -16,7 +16,7 @@ At the moment different variants of Faugère's F4 Algorithm are implemented.
 
 ```@docs
     groebner_basis(
-        F::Vector{T} where T <: MPolyElem;
+        I::Ideal{T} where T <: MPolyElem;
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,
@@ -35,7 +35,7 @@ variables of the first block via the `eliminate` parameter in the
 
 ```@docs
 function eliminate(
-        F::Vector{T} where T <: MPolyElem,
+        I::Ideal{T} where T <: MPolyElem,
         eliminate::Int,
         initial_hts::Int=17,
         nr_thrds::Int=1,

@@ -92,6 +92,6 @@ function katsura(R::MPolyRing)
         push!(polys, poly)
     end
 
-    return polys
+    return Ideal(polys)
 end
 
