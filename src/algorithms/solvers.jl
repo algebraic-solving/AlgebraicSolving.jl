@@ -208,6 +208,37 @@ function rational_parametrization(
         info_level::Int=0,                    # info level for print outs
         precision::Int=32                     # precision of the solution set
         )
+
+    return get!(I.gb, eliminate) do
+        _core_rational_parametrization(I,
+                     initial_hts = initial_hts,
+                     nr_thrds = nr_thrds,
+                     max_nr_pairs = max_nr_pairs,
+                     la_option = la_option,
+                     info_level = info_level,
+                     precision = precision)
+    end
+
+end
+
+
+@doc Markdown.doc"""
+    _core_rational_parametrization(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
+
+Compute a rational parametrization of the ideal `I` via msolve.
+
+**Note**: This is an internal function.
+"""
+function _core_rational_parametrization(
+        I::Ideal{T} where T <: MPolyElem;     # input generators
+        initial_hts::Int=17,                  # hash table size, default 2^17
+        nr_thrds::Int=1,                      # number of threads
+        max_nr_pairs::Int=0,                  # number of pairs maximally chosen
+                                              # in symbolic preprocessing
+        la_option::Int=2,                     # linear algebra option
+        info_level::Int=0,                    # info level for print outs
+        precision::Int=32                     # precision of the solution set
+        )
     res = _core_msolve(I, 
                      initial_hts = initial_hts,
                      nr_thrds = nr_thrds,
@@ -267,6 +298,36 @@ function real_solutions(
         info_level::Int=0,                    # info level for print outs
         precision::Int=32                     # precision of the solution set
         )
+    return get!(I.real_sols) do
+        _core_real_solutions(I,
+                    initial_hts = initial_hts,
+                    nr_thrds = nr_thrds,
+                    max_nr_pairs = max_nr_pairs,
+                    la_option = la_option,
+                    info_level = info_level,
+                    precision = precision)
+    end
+end
+
+
+@doc Markdown.doc"""
+    _core_real_solutions(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
+
+Compute the real solutions of the ideal `I` via msolve.
+
+**Note**: This is an internal function.
+"""
+function _core_real_solutions(
+        I::Ideal{T} where T <: MPolyElem;     # input generators
+        initial_hts::Int=17,                  # hash table size, default 2^17
+        nr_thrds::Int=1,                      # number of threads
+        max_nr_pairs::Int=0,                  # number of pairs maximally chosen
+                                              # in symbolic preprocessing
+        la_option::Int=2,                     # linear algebra option
+        info_level::Int=0,                    # info level for print outs
+        precision::Int=32                     # precision of the solution set
+        )
+
     res = _core_msolve(I,
                     initial_hts = initial_hts,
                     nr_thrds = nr_thrds,
