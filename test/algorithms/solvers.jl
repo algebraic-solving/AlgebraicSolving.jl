@@ -21,18 +21,20 @@
     p1    = -3872448*x^7 + 2607552*x^6 - 408528*x^5 - 63088*x^4 + 20224*x^3 - 540*x^2 - 172*x + 7
     p2    = -303264*x^7 + 314928*x^6 - 113544*x^5 + 9840*x^4 + 3000*x^3 - 564*x^2 + 12*x
     p3    = -699840*x^7 + 449712*x^6 - 74808*x^5 - 1956*x^4 + 1308*x^3 - 174*x^2 + 18*x
-    c1    = -7
-    c2    = -7
-    c3    = -7
+    p1   *= -7
+    p2   *= -7
+    p3   *= -7
 
     param = rational_parametrization(I)
 
-    @test param[1] == elim
-    @test param[2] == denom
-    @test param[3][1] == p1
-    @test param[3][2] == p2
-    @test param[3][3] == p3
-    @test param[4][1] == c1
-    @test param[4][2] == c2
-    @test param[4][3] == c3
+    @test param.elim == elim
+    @test param.denom == denom
+    @test param.param[1] == p1
+    @test param.param[2] == p2
+    @test param.param[3] == p3
+    @test I.rat_param.elim == elim
+    @test I.rat_param.denom == denom
+    @test I.rat_param.param[1] == p1
+    @test I.rat_param.param[2] == p2
+    @test I.rat_param.param[3] == p3
 end
