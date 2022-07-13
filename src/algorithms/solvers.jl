@@ -208,14 +208,17 @@ function rational_parametrization(
         info_level::Int=0,                    # info level for print outs
         precision::Int=32                     # precision of the solution set
         )
-    parametrization,_ = _core_msolve(I, 
-                                     initial_hts = initial_hts,
-                                     nr_thrds = nr_thrds,
-                                     max_nr_pairs = max_nr_pairs,
-                                     la_option = la_option,
-                                     info_level = info_level,
-                                     precision = precision)
-    return parametrization
+    res = _core_msolve(I, 
+                     initial_hts = initial_hts,
+                     nr_thrds = nr_thrds,
+                     max_nr_pairs = max_nr_pairs,
+                     la_option = la_option,
+                     info_level = info_level,
+                     precision = precision)
+
+    #= I.rat_param = res[1] =#
+    I.real_sols = res[2]
+    return res[1]
 end
 
 @doc Markdown.doc"""
@@ -264,12 +267,16 @@ function real_solutions(
         info_level::Int=0,                    # info level for print outs
         precision::Int=32                     # precision of the solution set
         )
-    _, solutions = _core_msolve(I,
-                                initial_hts = initial_hts,
-                                nr_thrds = nr_thrds,
-                                max_nr_pairs = max_nr_pairs,
-                                la_option = la_option,
-                                info_level = info_level,
-                                precision = precision)
-    return solutions
+    res = _core_msolve(I,
+                    initial_hts = initial_hts,
+                    nr_thrds = nr_thrds,
+                    max_nr_pairs = max_nr_pairs,
+                    la_option = la_option,
+                    info_level = info_level,
+                    precision = precision)
+
+    #= I.rat_param = res[1] =#
+    I.real_sols = res[2]
+
+    return I.real_sols
 end
