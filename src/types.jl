@@ -2,14 +2,14 @@ export Ideal
 
 mutable struct RationalParametrization
     vars::Vector{Symbol}
-    lf_cfs::Vector{fmpq}
+    lf_cfs::Vector{fmpz}
     elim::fmpq_poly
     denom::fmpq_poly
     param::Vector{PolyElem}
 
     function RationalParametrization(
             vars::Vector{Symbol},
-            lf_cfs::Vector{fmpq},
+            lf_cfs::Vector{fmpz},
             elim::fmpq_poly,
             denom::fmpq_poly,
             param::Vector{PolyElem}
