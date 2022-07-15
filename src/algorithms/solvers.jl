@@ -12,8 +12,15 @@ Construct the rational parametrization of the solution set computed via msolve.
 function _get_rational_parametrization(
         nr::Int32,
         lens::Vector{Int32},
-        cfs::Ptr{BigInt}
+        cfs::Ptr{BigInt},
+        cfs_lf::Ptr{BigInt},
+        nr_vars::Int32
     )
+    if cfs_lf != Ptr{BigInt}(0)
+        lf = [fmpz(unsafe_load(cfs_lf, i)) for i in 1:nr_vars]
+    else
+        lf = fmpz[]
+    end
     C, x  = PolynomialRing(QQ,"x")
     ctr   = 0
 
@@ -35,7 +42,7 @@ function _get_rational_parametrization(
         k     +=  1
     end
 
-    return elim, denom, p
+    return lf, elim, denom, p
 end
 
 @doc Markdown.doc"""
@@ -81,34 +88,37 @@ function _core_msolve(
     # convert Singular ideal to flattened arrays of ints
     lens, cfs, exps = _convert_to_msolve(F)
 
-    res_ld    = Ref(Cint(0))
-    res_dim   = Ref(Cint(0))
-    res_dquot = Ref(Cint(0))
-    nb_sols   = Ref(Cint(0))
-    res_len   = Ref(Ptr{Cint}(0))
-    res_cf    = Ref(Ptr{Cvoid}(0))
-    sols_num  = Ref(Ptr{Cvoid}(0))
-    sols_den  = Ref(Ptr{Cint}(0))
+    res_ld      = Ref(Cint(0))
+    res_nr_vars = Ref(Cint(0))
+    res_dim     = Ref(Cint(0))
+    res_dquot   = Ref(Cint(0))
+    nb_sols     = Ref(Cint(0))
+    res_len     = Ref(Ptr{Cint}(0))
+    res_vnames  = Ref(Ptr{Ptr{Cchar}}(0))
+    res_cf_lf   = Ref(Ptr{Cvoid}(0))
+    res_cf      = Ref(Ptr{Cvoid}(0))
+    sols_num    = Ref(Ptr{Cvoid}(0))
+    sols_den    = Ref(Ptr{Cint}(0))
 
     ccall((:msolve_julia, libmsolve), Cvoid,
-        (Ptr{Nothing}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Ptr{Cint}},
-        Ptr{Cvoid}, Ptr{Cint}, Ptr{Cvoid}, Ptr{Ptr{Cint}}, Ptr{Cint},
+        (Ptr{Nothing}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Ptr{Cint}},
+         Ptr{Ptr{Ptr{Cchar}}}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cint}, Ptr{Cvoid}, Ptr{Ptr{Cint}}, Ptr{Cint},
         Ptr{Cint}, Ptr{Cvoid}, Ptr{Ptr{Cchar}}, Ptr{Cchar}, Cint, Cint,
         Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint,
         Cint, Cint, Cint),
-        cglobal(:jl_malloc), res_ld, res_dim, res_dquot, res_len, res_cf,
+        cglobal(:jl_malloc), res_ld, res_nr_vars, res_dim, res_dquot, res_len, res_vnames,
+        res_cf_lf, res_cf,
         nb_sols, sols_num, sols_den, lens, exps, cfs, variable_names,
         "/dev/null", field_char, mon_order, elim_block_size, nr_vars,
         nr_gens, initial_hts, nr_thrds, max_nr_pairs, reset_ht, la_option,
         use_signatures, print_gb, get_param, genericity_handling, precision,
         info_level)
     # convert to julia array, also give memory management to julia
-    jl_ld       = res_ld[]
-
-    jl_dim      = res_dim[]
-    jl_dquot    = res_dquot[]
-
-    jl_nb_sols	= nb_sols[]
+    jl_ld         = res_ld[]
+    jl_rp_nr_vars = res_nr_vars[]
+    jl_dim        = res_dim[]
+    jl_dquot      = res_dquot[]
+    jl_nb_sols    = nb_sols[]
 
     # set dimension
     #= I.dim = jl_dim =#
@@ -122,11 +132,19 @@ function _core_msolve(
 
     [nterms += jl_len[i] for i=1:jl_ld]
     jl_cf = reinterpret(Ptr{BigInt}, res_cf[])
+    jl_cf_lf = reinterpret(Ptr{BigInt}, res_cf_lf[])
 
-    rat_param = _get_rational_parametrization(jl_ld, jl_len, jl_cf)
+    jl_vnames = Base.unsafe_wrap(Array, res_vnames[], jl_rp_nr_vars)
 
-    I.rat_param = RationalParametrization(Symbol[],fmpq[],rat_param[1], rat_param[2], rat_param[3])
+    vsymbols = [Symbol(unsafe_string(jl_vnames[i])) for i in 1:jl_rp_nr_vars]
+
+    rat_param = _get_rational_parametrization(jl_ld, jl_len,
+                                              jl_cf, jl_cf_lf, jl_rp_nr_vars)
+
+    I.rat_param = RationalParametrization(vsymbols, rat_param[1],rat_param[2],
+                                          rat_param[3], rat_param[4])
     if jl_nb_sols == 0
+        I.real_sols = fmpq[]
         return rat_param, Vector{fmpq}[]
     end
 
