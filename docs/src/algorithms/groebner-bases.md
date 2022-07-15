@@ -33,15 +33,15 @@ reverse lexicographical order. One can either directly add the number of
 variables of the first block via the `eliminate` parameter in the
 `groebner_basis` call. We have also implemented an alias for this call:
 
-```@docs
-function eliminate(
-        I::Ideal{T} where T <: MPolyElem,
-        eliminate::Int,
-        initial_hts::Int=17,
-        nr_thrds::Int=1,
-        max_nr_pairs::Int=0,
-        la_option::Int=2,
-        complete_reduction::Bool=true,
-        info_level::Int=0
-        )
-```
+%% ```@docs
+%% function eliminate(
+%%         I::Ideal{T} where T <: MPolyElem,
+%%         eliminate::Int,
+%%         initial_hts::Int=17,
+%%         nr_thrds::Int=1,
+%%         max_nr_pairs::Int=0,
+%%         la_option::Int=2,
+%%         complete_reduction::Bool=true,
+%%         info_level::Int=0
+%%         )
+%% ```

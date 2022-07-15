@@ -4,6 +4,8 @@ using LinearAlgebra
 using AlgebraicSolving
 using Documenter
 
+push!(LOAD_PATH, "../src")
+
 include("../src/imports.jl")
 include("../src/exports.jl")
 
@@ -22,6 +24,7 @@ makedocs(
     pages = Any[
         "Introduction" => "index.md",
         "User Guide" => Any[
+            "Data Types" => "types.md",
             "Algorithms" => ["algorithms/groebner-bases.md",
                     "algorithms/solvers.md"],
             "Examples" => "examples/katsura.md"
