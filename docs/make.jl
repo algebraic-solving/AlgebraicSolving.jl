@@ -4,7 +4,7 @@ using LinearAlgebra
 using AlgebraicSolving
 using Documenter
 
-push!(LOAD_PATH, "../src")
+#= push!(LOAD_PATH, "../src") =#
 
 include("../src/imports.jl")
 include("../src/exports.jl")
@@ -19,18 +19,16 @@ makedocs(
     modules = [AlgebraicSolving],
     doctest = true,
     clean = true,
+    strict = true,
     sitename = "AlgebraicSolving.jl",
-    format = Documenter.HTML(),
-    pages = Any[
-        "Introduction" => "index.md",
-        "User Guide" => Any[
-            "Data Types" => "types.md",
-            "Algorithms" => ["algorithms/groebner-bases.md",
-                    "algorithms/solvers.md"],
-            "Examples" => "examples/katsura.md"
-        ],
-    ],
-    strict = true
+    format = Documenter.HTML(prettyurls = !local_build, collapselevel = 1),
+    pages = [
+        "About" => "index.md",
+        "Data Types" => "types.md",
+        "Algorithms" => ["algorithms/groebner-bases.md",
+                         "algorithms/solvers.md"],
+        "Examples" => "examples/katsura.md"
+        ]
 )
 
 # Deploy built documentation from Travis.

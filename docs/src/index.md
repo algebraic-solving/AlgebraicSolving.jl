@@ -5,8 +5,10 @@ language, maintained by Christian Eder and Mohab Safey El Din.
 
 - <https://github.com/algebraic-solving/AlgebraicSolving.jl> (Source code)
 
-The features of AlgebraicSolving so far includes algorthms for computing
+The features of AlgebraicSolving include algorithms for computing
 Gröbner bases over finite fields and for computing real solutions.
+The main workhorse of AlgebraicSolving is the [msolve
+library](https://msolve.lip6.fr/) .
 
 ## Installation
 
@@ -19,7 +21,3 @@ At the Julia prompt simply type
 ```
 julia> using Pkg; Pkg.add("AlgebraicSolving")
 ```
-
-## Quick start
-
-Here are some examples of using AlgebraicSolving....
