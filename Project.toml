@@ -13,5 +13,5 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 julia = "1.6"
-msolve_jll = "0.4.0"
-Nemo = "0.31.0"
+msolve_jll = "0.4.1"
+Nemo = "0.32.0"
