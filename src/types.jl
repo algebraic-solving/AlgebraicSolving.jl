@@ -45,3 +45,5 @@ end
 Base.parent(I::Ideal) = Nemo.parent(I.gens[1])
 
 Base.show(io::IO, I::Ideal) = print(io, I.gens)
+
+Base.getindex(I::Ideal, idx::Int) = I.gens[idx]
