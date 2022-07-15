@@ -21,13 +21,13 @@ makedocs(
     clean = true,
     strict = true,
     sitename = "AlgebraicSolving.jl",
-    format = Documenter.HTML(prettyurls = !local_build, collapselevel = 1),
+    format = Documenter.HTML(),
     pages = [
-        "About" => "index.md",
-        "Data Types" => "types.md",
-        "Algorithms" => ["algorithms/groebner-bases.md",
-                         "algorithms/solvers.md"],
-        "Examples" => "examples/katsura.md"
+        "index.md",
+        "types.md",
+        "Algorithms" => ["groebner-bases.md",
+                         "solvers.md"],
+        "Examples" => "katsura.md"
         ]
 )
 
@@ -38,7 +38,4 @@ deploydocs(
     # options
     repo = "github.com/algebraic-solving/AlgebraicSolving.jl.git",
     target = "build",
-    deps = nothing,
-    make = nothing,
-    devbranch = "main"
 )
