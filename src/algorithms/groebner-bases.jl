@@ -39,7 +39,7 @@ julia> eliminate(I, 2)
 """
 function eliminate(
         I::Ideal{T} where T <: MPolyElem,
-        eliminate::Int,
+        eliminate::Int;
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,
