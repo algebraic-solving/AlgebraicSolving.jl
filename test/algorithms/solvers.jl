@@ -27,6 +27,8 @@
 
     param = rational_parametrization(I)
 
+    @test param.vars == [:x1, :x2, :x3, :x4]
+    @test param.lf_cfs == fmpz[]
     @test param.elim == elim
     @test param.denom == denom
     @test param.param[1] == p1
