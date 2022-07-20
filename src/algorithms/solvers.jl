@@ -130,6 +130,11 @@ function _core_msolve(
     jl_len  = Base.unsafe_wrap(Array, res_len[], jl_ld)
     nterms  = 0
 
+    if jl_dquot == 0
+        I.rat_param = RationalParametrization(Symbol[], fmpz[], fmpq_poly(-1), fmpq_poly(-1), PolyElem[])
+        I.real_sols = fmpq[]
+        return I.rat_param, I.real_sols
+    end
     [nterms += jl_len[i] for i=1:jl_ld]
     jl_cf = reinterpret(Ptr{BigInt}, res_cf[])
     jl_cf_lf = reinterpret(Ptr{BigInt}, res_cf_lf[])
