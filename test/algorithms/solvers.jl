@@ -39,4 +39,8 @@
     @test I.rat_param.param[1] == p1
     @test I.rat_param.param[2] == p2
     @test I.rat_param.param[3] == p3
+
+    I = Ideal([x1^2-x2, x1*x3-x4, x2*x4-12, x4^3-x3^2])
+    real_solutions(I)
+    @test I.rat_param.vars == Symbol[]
 end
