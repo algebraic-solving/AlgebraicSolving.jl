@@ -131,7 +131,8 @@ function _core_msolve(
     nterms  = 0
 
     if jl_dquot == 0
-        I.rat_param = RationalParametrization(Symbol[], fmpz[], fmpq_poly(-1), fmpq_poly(-1), PolyElem[])
+        C,x = PolynomialRing(QQ,"x")
+        I.rat_param = RationalParametrization(Symbol[], fmpz[], C(-1), C(-1), PolyElem[])
         I.real_sols = fmpq[]
         return I.rat_param, I.real_sols
     end

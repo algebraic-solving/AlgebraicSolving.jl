@@ -45,6 +45,5 @@ end
 Base.parent(I::Ideal) = Nemo.parent(I.gens[1])
 
 Base.show(io::IO, I::Ideal) = print(io, I.gens)
-Base.show(io::IO, R::RationalParametrization) = R.vars == Symbol[] ? print(io, "Solution set is empty.") : print(io, R)
 
 Base.getindex(I::Ideal, idx::Int) = I.gens[idx]
