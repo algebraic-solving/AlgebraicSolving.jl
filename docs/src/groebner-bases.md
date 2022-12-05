@@ -1,5 +1,16 @@
 ```@meta
 CurrentModule = AlgebraicSolving
+DocTestSetup = quote
+  using AlgebraicSolving
+end
+```
+
+```@setup algebraicsolving
+using AlgebraicSolving
+```
+
+```@contents
+Pages = ["groebner-bases.md"]
 ```
 
 # Gröbner bases
