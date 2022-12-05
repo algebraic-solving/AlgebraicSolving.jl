@@ -24,6 +24,8 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 
 # Examples
 ```jldoctest
+julia> using AlgebraicSolving
+
 julia> R, (x,y,z) = PolynomialRing(GF(101),["x","y","z"], ordering=:degrevlex)
 (Multivariate Polynomial Ring in x, y, z over Galois field with characteristic 101, Nemo.gfp_mpoly[x, y, z])
 
@@ -76,6 +78,8 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 
 # Examples
 ```jldoctest
+julia> using AlgebraicSolving
+
 julia> R, (x,y,z) = PolynomialRing(GF(101),["x","y","z"], ordering=:degrevlex)
 (Multivariate Polynomial Ring in x, y, z over Galois field with characteristic 101, Nemo.gfp_mpoly[x, y, z])
 

@@ -213,6 +213,8 @@ is greater then zero an empty array is returned.
 
 # Examples
 ```jldoctest
+julia> using AlgebraicSolving
+
 julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
 (Multivariate Polynomial Ring in x1, x2, x3 over Rational Field, Nemo.fmpq_mpoly[x1, x2, x3])
 
@@ -266,6 +268,8 @@ is greater then zero an empty array is returned.
 
 # Examples
 ```jldoctest
+julia> using AlgebraicSolving
+
 julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
 (Multivariate Polynomial Ring in x1, x2, x3 over Rational Field, Nemo.fmpq_mpoly[x1, x2, x3])
 

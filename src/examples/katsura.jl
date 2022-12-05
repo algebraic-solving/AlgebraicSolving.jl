@@ -22,6 +22,8 @@ Also note that indices have been shifted to start from 1.
 
 # Example
 ```jldoctest
+julia> using AlgebraicSolving
+
 julia> katsura(2)
 Nemo.fmpq_mpoly[x1 + 2*x2 + 2*x3 - 1, x1^2 + 2*x2^2 + 2*x3^2 - x1, 2*x1*x2 + 2*x2*x3 - x2]
 ```
@@ -45,6 +47,8 @@ Returns the Katsura ideal in the given polynomial ring `R`.
 
 # Example
 ```jldoctest
+julia> using AlgebraicSolving
+
 julia> R, _ = QQ["x", "y", "z"]
 (Multivariate Polynomial Ring in x, y, z over Rational Field, Nemo.fmpq_mpoly[x, y, z])
 
