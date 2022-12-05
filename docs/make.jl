@@ -1,13 +1,7 @@
-using msolve_jll
-using Nemo
-using LinearAlgebra
 using AlgebraicSolving
 using Documenter
 
-#= push!(LOAD_PATH, "../src") =#
-
-include("../src/imports.jl")
-include("../src/exports.jl")
+push!(LOAD_PATH, "../src")
 
 DocMeta.setdocmeta!(AlgebraicSolving, :DocTestSetup, :(using AlgebraicSolving); recursive=true)
 
@@ -19,7 +13,7 @@ makedocs(
     modules = [AlgebraicSolving],
     doctest = true,
     clean = true,
-    strict = true,
+    checkdocs = :none,
     sitename = "AlgebraicSolving.jl",
     format = Documenter.HTML(),
     pages = [
