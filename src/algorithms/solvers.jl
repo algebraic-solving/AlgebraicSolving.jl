@@ -248,7 +248,9 @@ function rational_parametrization(
     return I.rat_param
 end
 
-
+@doc Markdown.doc"""
+    rational_solutions(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
+"""
 function rational_solutions(
         I::Ideal{T} where T <: MPolyElem;     # input generators
         initial_hts::Int=17,                  # hash table size, default 2^17
