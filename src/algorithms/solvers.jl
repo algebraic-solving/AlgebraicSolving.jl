@@ -280,10 +280,10 @@ julia> rat_sols = rational_solutions(I)
  [1//3, 0, 1//3]
 
 julia> map(r->map(p->evaluate(p, r), I.gens), rat_sols)
-4-element Vector{Vector{fmpq}}:
+2-element Vector{Vector{fmpq}}:
  [0, 0, 0]
  [0, 0, 0]
-
+```
 """
 function rational_solutions(
         I::Ideal{T} where T <: MPolyElem;     # input generators

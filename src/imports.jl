@@ -12,6 +12,7 @@ import Nemo:
     divides,
     divisor_sigma,
     euler_phi,
+    evaluate,
     factorial,
     fibonacci,
     fits,

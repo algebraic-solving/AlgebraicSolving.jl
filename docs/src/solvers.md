@@ -44,5 +44,14 @@ The underlying engine is provided by msolve.
         info_level::Int=0,
         precision::Int=32
         )
+    rational_solutions(
+        I::Ideal{T} where T <: MPolyElem;
+        initial_hts::Int=17,
+        nr_thrds::Int=1,
+        max_nr_pairs::Int=0,
+        la_option::Int=2,
+        info_level::Int=0,
+        precision::Int=32
+        )
 ```
 
