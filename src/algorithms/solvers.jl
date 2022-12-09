@@ -254,6 +254,35 @@ end
 Given an ideal `I` with a finite solution set over the complex numbers, return
 the rational roots of the ideal. 
 
+# Arguments
+- `I::Ideal{T} where T <: MPolyElem`: input generators.
+- `initial_hts::Int=17`: initial hash table size `log_2`.
+- `nr_thrds::Int=1`: number of threads for parallel linear algebra.
+- `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
+- `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
+- `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
+- `precision::Int=32`: bit precision for the computed solutions.
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
+(Multivariate Polynomial Ring in x1, x2, x3 over Rational Field, Nemo.fmpq_mpoly[x1, x2, x3])
+
+julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
+Nemo.fmpq_mpoly[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
+
+julia> rat_sols = rational_solutions(I)
+2-element Vector{Vector{fmpq}}:
+ [1, 0, 0]
+ [1//3, 0, 1//3]
+
+julia> map(r->map(p->evaluate(p, r), I.gens), rat_sols)
+4-element Vector{Vector{fmpq}}:
+ [0, 0, 0]
+ [0, 0, 0]
+
 """
 function rational_solutions(
         I::Ideal{T} where T <: MPolyElem;     # input generators
