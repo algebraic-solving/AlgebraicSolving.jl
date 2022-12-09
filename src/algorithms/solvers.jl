@@ -268,16 +268,18 @@ function rational_solutions(
                  info_level = info_level,
                  precision = precision)
     param_t = I.rat_param
+
+    nvars = length(param_t.vars)
+    lpol = filter(l->degree(l) == 1, keys(factor(param_t.elim).fac))
+    nb = length(lpol)
+
+    rat_elim = [-coeff(l, 0)// coeff(l, 1) for l in lpol]
+    rat_den = map(l->evaluate(param_t.denom, l), rat_elim)
+    rat_num = map(r->map(l->evaluate(l, r), param_t.param), rat_elim)
+
+    rat_sols = Vector{Vector{fmpq}}(undef, nb)
+
     if length(param_t.vars) == parent(I).nvars
-      nvars = length(param_t.vars)
-      lpol = filter(l->degree(l) == 1, keys(factor(param_t.elim).fac))
-      nb = length(lpol)
-
-      rat_elim = [-coeff(l, 0)// coeff(l, 1) for l in lpol]
-      rat_den = map(l->evaluate(param_t.denom, l), rat_elim)
-      rat_num = map(r->map(l->evaluate(l, r), param_t.param), rat_elim)
-
-      rat_sols = Vector{Vector{fmpq}}(undef, nb)
 
       for i in 1:nb
         rat_sols[i] = Vector{fmpq}(undef, nvars)
@@ -286,11 +288,20 @@ function rational_solutions(
         end
         rat_sols[i][nvars] = rat_elim[i]
       end
+
     else
-      println("Not implemented yet")
-      return []
+
+      for i in 1:nb
+        rat_sols[i] = Vector{fmpq}(undef, nvars - 1)
+        for j in 1:(nvars-1)
+           rat_sols[i][j] = rat_num[i][j] // rat_den[i]
+        end
+      end
+
     end
+
     return rat_sols
+
 end
 
 @doc Markdown.doc"""
