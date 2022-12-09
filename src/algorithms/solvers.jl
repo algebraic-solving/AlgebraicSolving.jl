@@ -249,13 +249,104 @@ function rational_parametrization(
 end
 
 @doc Markdown.doc"""
+    rational_solutions(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
+
+Given an ideal `I` with a finite solution set over the complex numbers, return
+the rational roots of the ideal. 
+
+# Arguments
+- `I::Ideal{T} where T <: MPolyElem`: input generators.
+- `initial_hts::Int=17`: initial hash table size `log_2`.
+- `nr_thrds::Int=1`: number of threads for parallel linear algebra.
+- `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
+- `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
+- `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
+- `precision::Int=32`: bit precision for the computed solutions.
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
+(Multivariate Polynomial Ring in x1, x2, x3 over Rational Field, Nemo.fmpq_mpoly[x1, x2, x3])
+
+julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
+Nemo.fmpq_mpoly[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
+
+julia> rat_sols = rational_solutions(I)
+2-element Vector{Vector{fmpq}}:
+ [1, 0, 0]
+ [1//3, 0, 1//3]
+
+julia> map(r->map(p->evaluate(p, r), I.gens), rat_sols)
+4-element Vector{Vector{fmpq}}:
+ [0, 0, 0]
+ [0, 0, 0]
+
+"""
+function rational_solutions(
+        I::Ideal{T} where T <: MPolyElem;     # input generators
+        initial_hts::Int=17,                  # hash table size, default 2^17
+        nr_thrds::Int=1,                      # number of threads
+        max_nr_pairs::Int=0,                  # number of pairs maximally chosen
+                                              # in symbolic preprocessing
+        la_option::Int=2,                     # linear algebra option
+        info_level::Int=0,                    # info level for print outs
+        precision::Int=32                     # precision of the solution set
+        )
+    isdefined(I, :rat_param) ||
+    _core_msolve(I,
+                 initial_hts = initial_hts,
+                 nr_thrds = nr_thrds,
+                 max_nr_pairs = max_nr_pairs,
+                 la_option = la_option,
+                 info_level = info_level,
+                 precision = precision)
+    param_t = I.rat_param
+
+    nvars = length(param_t.vars)
+    lpol = filter(l->degree(l) == 1, keys(factor(param_t.elim).fac))
+    nb = length(lpol)
+
+    rat_elim = [-coeff(l, 0)// coeff(l, 1) for l in lpol]
+    rat_den = map(l->evaluate(param_t.denom, l), rat_elim)
+    rat_num = map(r->map(l->evaluate(l, r), param_t.param), rat_elim)
+
+    rat_sols = Vector{Vector{fmpq}}(undef, nb)
+
+    if length(param_t.vars) == parent(I).nvars
+
+      for i in 1:nb
+        rat_sols[i] = Vector{fmpq}(undef, nvars)
+        for j in 1:(nvars-1)
+           rat_sols[i][j] = rat_num[i][j] // rat_den[i]
+        end
+        rat_sols[i][nvars] = rat_elim[i]
+      end
+
+    else
+
+      for i in 1:nb
+        rat_sols[i] = Vector{fmpq}(undef, nvars - 1)
+        for j in 1:(nvars-1)
+           rat_sols[i][j] = rat_num[i][j] // rat_den[i]
+        end
+      end
+
+    end
+
+    return rat_sols
+
+end
+
+@doc Markdown.doc"""
     real_solutions(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
 
 Given an ideal `I` with a finite solution set over the complex numbers, return
 the real roots of the ideal with a given precision (default 32 bits).
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
-is greater then zero an empty array is returned.
+is greater than zero an empty array is returned.
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyElem`: input generators.
