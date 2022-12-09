@@ -248,6 +248,51 @@ function rational_parametrization(
     return I.rat_param
 end
 
+
+function rational_solutions(
+        I::Ideal{T} where T <: MPolyElem;     # input generators
+        initial_hts::Int=17,                  # hash table size, default 2^17
+        nr_thrds::Int=1,                      # number of threads
+        max_nr_pairs::Int=0,                  # number of pairs maximally chosen
+                                              # in symbolic preprocessing
+        la_option::Int=2,                     # linear algebra option
+        info_level::Int=0,                    # info level for print outs
+        precision::Int=32                     # precision of the solution set
+        )
+    isdefined(I, :rat_param) ||
+    _core_msolve(I,
+                 initial_hts = initial_hts,
+                 nr_thrds = nr_thrds,
+                 max_nr_pairs = max_nr_pairs,
+                 la_option = la_option,
+                 info_level = info_level,
+                 precision = precision)
+    param_t = I.rat_param
+    if length(param_t.vars) == parent(I).nvars
+      nvars = length(param_t.vars)
+      lpol = filter(l->degree(l) == 1, keys(factor(param_t.elim).fac))
+      nb = length(lpol)
+
+      rat_elim = [-coeff(l, 0)// coeff(l, 1) for l in lpol]
+      rat_den = map(l->evaluate(param_t.denom, l), rat_elim)
+      rat_num = map(r->map(l->evaluate(l, r), param_t.param), rat_elim)
+
+      rat_sols = Vector{Vector{fmpq}}(undef, nb)
+
+      for i in 1:nb
+        rat_sols[i] = Vector{fmpq}(undef, nvars)
+        for j in 1:(nvars-1)
+           rat_sols[i][j] = rat_num[i][j] // rat_den[i]
+        end
+        rat_sols[i][nvars] = rat_elim[i]
+      end
+    else
+      println("Not implemented yet")
+      return []
+    end
+    return rat_sols
+end
+
 @doc Markdown.doc"""
     real_solutions(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
 
