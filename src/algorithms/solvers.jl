@@ -336,8 +336,9 @@ function rational_solutions(
 
     end
 
-    return rat_sols
+    I.rat_sols = rat_sols
 
+    return I.rat_sols
 end
 
 

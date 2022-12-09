@@ -30,6 +30,7 @@ mutable struct Ideal{T <: MPolyElem}
     dim::Int
     gb::Dict{Int, Vector{T}}
     real_sols::Vector{Vector{fmpq}}
+    rat_sols::Vector{Vector{fmpq}}
     rat_param::RationalParametrization
 
     function Ideal(F::Vector{T}) where {T <: MPolyElem}

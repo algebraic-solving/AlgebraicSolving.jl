@@ -46,4 +46,8 @@
     I = Ideal([x1^2-x2, x1*x3-x4, x2*x4-12, x4^3-x3^2])
     real_solutions(I)
     @test I.rat_param.vars == Symbol[]
+
+    I = Ideal([x1^2-x2, x1*x3, x2-12])
+	@test_throws ErrorException real_solutions(I)
+	@test_throws ErrorException rational_solutions(I)
 end
