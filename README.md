@@ -17,3 +17,6 @@ julia> using AlgebraicSolving
 You can find a detailed documentation including various examples at
 https://algebraic-solving.github.io/ .
 
+# Funding
+
+The development of `AlgebraicSolving` is supported by the [Forschungsinitiative Rheinland-Pfalz](https://rptu.de/forschung/forschungsinitiative-rlp).
