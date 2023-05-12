@@ -32,9 +32,9 @@
 # and the todal degree
 mutable struct Hashvalue
     idx::Int
-    hash::MonomHash
-    divmask::DivisionMask
-    deg::MonomHash
+    hash::MonHash
+    divmask::DivMask
+    deg::MonHash
 end
 
 function copy_hashvalue(x::Hashvalue)
@@ -55,7 +55,7 @@ mutable struct MonomialHashtable{M<:Monom, Ord<:AbstractMonomialOrdering}
 
     # values to hash exponents with, i.e
     # hash(e) := hash(e, hasher)
-    hasher::Vector{MonomHash}
+    hasher::Vector{MonHash}
 
     #= Ring information =#
     # number of variables
@@ -80,8 +80,8 @@ end
 #------------------------------------------------------------------------------
 
 # Returns the next look-up position in the table 
-function nexthashindex(h::MonomHash, j::MonomHash, mod::MonomHash)
-    (h + j) & mod + MonomHash(1)
+function nexthashindex(h::MonHash, j::MonHash, mod::MonHash)
+    (h + j) & mod + MonHash(1)
 end
 
 #------------------------------------------------------------------------------
@@ -123,7 +123,7 @@ function initialize_basis_hash_table(
     ndivbits == 0 && (ndivbits += 1)
     # count only first ndivvars variables for divisibility checks
     ndivvars = nvars < int32bits ? nvars : int32bits
-    divmap = Vector{DivisionMask}(undef, ndivvars * ndivbits)
+    divmap = Vector{DivMask}(undef, ndivvars * ndivbits)
 
     # first stored exponent used as buffer lately
     exponents[1] = make_zero_ev(MonomT, nvars)
@@ -230,13 +230,13 @@ function check_enlarge_hashtable!(ht::MonomialHashtable, added::Integer)
         resize!(ht.exponents, ht.size)
         ht.hashtable = zeros(Int, ht.size)
         
-        mod = MonomHash(ht.size - 1)
+        mod = MonHash(ht.size - 1)
 
         for i in ht.offset:ht.load
             # hash for this elem is already computed
             he = ht.hashdata[i].hash
             hidx = he
-            @inbounds for j in MonomHash(1):MonomHash(ht.size)
+            @inbounds for j in MonHash(1):MonHash(ht.size)
                 hidx = nexthashindex(he, j, mod)
                 !iszero(ht.hashtable[hidx]) && continue
                 ht.hashtable[hidx] = i
@@ -264,15 +264,15 @@ end
 
 function insert_in_hash_table!(ht::MonomialHashtable{M}, e::M) where {M}
     # generate hash
-    he::MonomHash = hash(e, ht.hasher)
+    he::MonHash = hash(e, ht.hasher)
 
     # find new elem position in the table
-    hidx = MonomHash(he)
+    hidx = MonHash(he)
     # power of twoooo
     @assert ispow2(ht.size)
-    mod = MonomHash(ht.size - 1)
-    i = MonomHash(1)
-    hsize = MonomHash(ht.size)
+    mod = MonHash(ht.size - 1)
+    i = MonHash(1)
+    hsize = MonHash(ht.size)
 
     @inbounds while i < hsize
         hidx = nexthashindex(he, i, mod)
@@ -284,7 +284,7 @@ function insert_in_hash_table!(ht::MonomialHashtable{M}, e::M) where {M}
 
         # if not free and not same hash
         if ishashcollision(ht, vidx, e, he)
-            i += MonomHash(1)
+            i += MonHash(1)
             continue
         end
 
@@ -296,7 +296,7 @@ function insert_in_hash_table!(ht::MonomialHashtable{M}, e::M) where {M}
     vidx = MonomIdx(ht.load + 1)
     @inbounds ht.hashtable[hidx] = vidx
     @inbounds ht.exponents[vidx] = copy(e)
-    divmask = monom_divmask(e, DivisionMask, ht.ndivvars, ht.divmap, ht.ndivbits)
+    divmask = monom_divmask(e, DivMask, ht.ndivvars, ht.divmap, ht.ndivbits)
     @inbounds ht.hashdata[vidx] = Hashvalue(0, he, divmask, totaldeg(e))
 
     ht.load += 1
@@ -306,7 +306,7 @@ end
 
 #------------------------------------------------------------------------------
 
-function is_divmask_divisible(d1::DivisionMask, d2::DivisionMask)
+function is_divmask_divisible(d1::DivMask, d2::DivMask)
     iszero(~d1 & d2)
 end
 
@@ -355,7 +355,7 @@ function fill_divmask!(ht::MonomialHashtable)
     @inbounds for vidx in ht.offset:ht.load
         unmasked = ht.hashdata[vidx]
         e = ht.exponents[vidx]
-        divmask = monom_divmask(e, DivisionMask, ht.ndivvars, ht.divmap, ht.ndivbits)
+        divmask = monom_divmask(e, DivMask, ht.ndivvars, ht.divmap, ht.ndivbits)
         ht.hashdata[vidx] = Hashvalue(0, unmasked.hash, divmask, totaldeg(e))
     end
 
@@ -438,7 +438,7 @@ end
 # and substitute hashes in row
 function insert_multiplied_poly_in_hash_table!(
         row::Vector{MonomIdx},
-        htmp::MonomHash,
+        htmp::MonHash,
         etmp::M,
         poly::Vector{MonomIdx},
         ht::MonomialHashtable{M},
@@ -447,7 +447,7 @@ function insert_multiplied_poly_in_hash_table!(
     # length of poly to add
     len = length(poly)
 
-    mod = MonomHash(symbol_ht.size - 1)
+    mod = MonHash(symbol_ht.size - 1)
 
     bexps = ht.exponents
     bdata = ht.hashdata
@@ -477,8 +477,8 @@ function insert_multiplied_poly_in_hash_table!(
         # insert into hashtable
         k = h
 
-        i = MonomHash(1)
-        ssize = MonomHash(symbol_ht.size)
+        i = MonHash(1)
+        ssize = MonHash(symbol_ht.size)
         @inbounds while i <= ssize
             k = nexthashindex(h, i, mod)
             vidx = symbol_ht.hashtable[k]
@@ -487,7 +487,7 @@ function insert_multiplied_poly_in_hash_table!(
             iszero(vidx) && break
 
             if ishashcollision(symbol_ht, vidx, enew, h)
-                i += MonomHash(1)
+                i += MonHash(1)
                 continue
             end
             
@@ -503,7 +503,7 @@ function insert_multiplied_poly_in_hash_table!(
         sexps[lastidx] = copy(enew)
         symbol_ht.hashtable[k] = lastidx
 
-        divmask = monom_divmask(enew, DivisionMask, 
+        divmask = monom_divmask(enew, DivMask, 
                     symbol_ht.ndivvars, symbol_ht.divmap, symbol_ht.ndivbits)
         sdata[lastidx] = Hashvalue(0, h, divmask, totaldeg(enew))
 
@@ -517,7 +517,7 @@ end
 
 function multiplied_poly_to_matrix_row!(
     symbolic_ht::MonomialHashtable, basis_ht::MonomialHashtable{M},
-    htmp::MonomHash, etmp::M, poly::Vector{MonomIdx}) where {M}
+    htmp::MonHash, etmp::M, poly::Vector{MonomIdx}) where {M}
 
     row = similar(poly)
     check_enlarge_hashtable!(symbolic_ht, length(poly))
@@ -538,7 +538,7 @@ function insert_in_basis_hash_table_pivots(
     sdata = symbol_ht.hashdata
     sexps = symbol_ht.exponents
 
-    mod = MonomHash(ht.size - 1)
+    mod = MonHash(ht.size - 1)
     bdata = ht.hashdata
     bexps = ht.exponents
     bhash = ht.hashtable
@@ -556,7 +556,7 @@ function insert_in_basis_hash_table_pivots(
         e = bexps[lastidx]
 
         k = h
-        i = MonomHash(1)
+        i = MonHash(1)
         @inbounds while i <= ht.size
             k = nexthashindex(h, i, mod)
             hm = bhash[k]
@@ -564,7 +564,7 @@ function insert_in_basis_hash_table_pivots(
             iszero(hm) && break
 
             if ishashcollision(ht, hm, e, h)
-                i += MonomHash(1)
+                i += MonHash(1)
                 continue
             end
 
