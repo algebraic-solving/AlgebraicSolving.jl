@@ -1,3 +1,6 @@
+# TAKEN FROM GROEBNER.JL
+# TODO: adjust to my monomial type, replace hash function everywhere
+
 # Hashtable
 
 # This hashtable stores monomials.
@@ -46,7 +49,7 @@ mutable struct MonomialHashtable{M<:Monom, Ord<:AbstractMonomialOrdering}
     exponents::Vector{M}
 
     # maps exponent hash to its position in exponents array
-    hashtable::Vector{MonomIdx}
+    hashtable::Vector{MonIdx}
 
     # stores hashes, division masks,
     # and other valuable info
@@ -96,7 +99,7 @@ function initialize_basis_hash_table(
     # not necessary to create `initial_size` exponents
     exponents = Vector{MonomT}(undef, initial_size)
     hashdata = Vector{Hashvalue}(undef, initial_size)
-    hashtable = zeros(MonomIdx, initial_size)
+    hashtable = zeros(MonIdx, initial_size)
 
     nvars = ring.nvars
     ord = ring.ord
@@ -137,7 +140,7 @@ end
 
 function copy_hashtable(ht::MonomialHashtable{M, O}) where {M, O}
     exps = Vector{M}(undef, ht.size)
-    table = Vector{MonomIdx}(undef, ht.size)
+    table = Vector{MonIdx}(undef, ht.size)
     data = Vector{Hashvalue}(undef, ht.size)
     exps[1] = make_zero_ev(M, ht.nvars)
 
@@ -163,7 +166,7 @@ function initialize_secondary_hash_table(basis_ht::MonomialHashtable{M}) where {
 
     exponents = Vector{M}(undef, initial_size)
     hashdata = Vector{Hashvalue}(undef, initial_size)
-    hashtable = zeros(MonomIdx, initial_size)
+    hashtable = zeros(MonIdx, initial_size)
 
     # preserve ring info
     nvars = basis_ht.nvars
@@ -293,7 +296,7 @@ function insert_in_hash_table!(ht::MonomialHashtable{M}, e::M) where {M}
     end
 
     # add its position to hashtable, and insert exponent to that position
-    vidx = MonomIdx(ht.load + 1)
+    vidx = MonIdx(ht.load + 1)
     @inbounds ht.hashtable[hidx] = vidx
     @inbounds ht.exponents[vidx] = copy(e)
     divmask = monom_divmask(e, DivMask, ht.ndivvars, ht.divmap, ht.ndivbits)
@@ -365,7 +368,7 @@ end
 #------------------------------------------------------------------------------
 
 # h1 divisible by h2
-function is_monom_divisible(h1::MonomIdx, h2::MonomIdx, ht::MonomialHashtable)
+function is_monom_divisible(h1::MonIdx, h2::MonIdx, ht::MonomialHashtable)
     @inbounds if !is_divmask_divisible(ht.hashdata[h1].divmask, ht.hashdata[h2].divmask)
         return false
     end
@@ -375,7 +378,7 @@ function is_monom_divisible(h1::MonomIdx, h2::MonomIdx, ht::MonomialHashtable)
 end
 
 # checks that gcd(g1, h2) is one
-function is_gcd_const(h1::MonomIdx, h2::MonomIdx, ht::MonomialHashtable)
+function is_gcd_const(h1::MonIdx, h2::MonIdx, ht::MonomialHashtable)
     @inbounds e1 = ht.exponents[h1]
     @inbounds e2 = ht.exponents[h2]
     is_gcd_const(e1, e2)
@@ -383,7 +386,7 @@ end
 
 # computes lcm of he1 and he2 as exponent vectors from ht1
 # and inserts it in ht2
-function get_lcm(he1::MonomIdx, he2::MonomIdx,
+function get_lcm(he1::MonIdx, he2::MonIdx,
     ht1::MonomialHashtable{M}, ht2::MonomialHashtable{M}) where {M}
 
     @inbounds e1 = ht1.exponents[he1]
@@ -399,8 +402,8 @@ end
 
 # compare pairwise divisibility of lcms from a[first:last] with lcm
 function check_monomial_division_in_update(
-    a::Vector{MonomIdx}, first::Int, last::Int,
-    lcm::MonomIdx, ht::MonomialHashtable{M}) where {M}
+    a::Vector{MonIdx}, first::Int, last::Int,
+    lcm::MonIdx, ht::MonomialHashtable{M}) where {M}
 
     # pairs are sorted, we only need to check entries above starting point
 
@@ -437,10 +440,10 @@ end
 # with hash `htmp` to hashtable `symbol_ht`,
 # and substitute hashes in row
 function insert_multiplied_poly_in_hash_table!(
-        row::Vector{MonomIdx},
+        row::Vector{MonIdx},
         htmp::MonHash,
         etmp::M,
-        poly::Vector{MonomIdx},
+        poly::Vector{MonIdx},
         ht::MonomialHashtable{M},
         symbol_ht::MonomialHashtable{M}) where {M}
 
@@ -517,7 +520,7 @@ end
 
 function multiplied_poly_to_matrix_row!(
     symbolic_ht::MonomialHashtable, basis_ht::MonomialHashtable{M},
-    htmp::MonHash, etmp::M, poly::Vector{MonomIdx}) where {M}
+    htmp::MonHash, etmp::M, poly::Vector{MonIdx}) where {M}
 
     row = similar(poly)
     check_enlarge_hashtable!(symbolic_ht, length(poly))
@@ -531,7 +534,7 @@ function insert_in_basis_hash_table_pivots(
     row::Vector{ColumnIdx},
     ht::MonomialHashtable{M},
     symbol_ht::MonomialHashtable{M},
-    col2hash::Vector{MonomIdx}) where {M}
+    col2hash::Vector{MonIdx}) where {M}
 
     check_enlarge_hashtable!(ht, length(row))
 

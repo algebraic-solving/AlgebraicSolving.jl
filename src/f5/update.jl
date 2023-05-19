@@ -10,25 +10,18 @@ end
 
 # construct all pairs with basis element at new_basis_idx
 # and perform corresponding rewrite checks
-function update_pairset!(pairset::Pairset{POTSPair{N}},
+function update_pairset!(pairset::Pairset{SPair{N}},
                          basis::POTBasis,
                          basis_ht::MonomialHashtable,
                          new_basis_idx::Int) where N
 
-
-    # resize pairset if needed
-    pair_size = length(pairset.pairs)
-    num_new_pairs = new_basis_idx - 1
-    if pairset.load + num_new_pairs >= pair_size
-        resize!(pairset.pairs, max(2 * pair_size, pair.load - num_new_pairs))
-    end
 
     new_sig_mon = monomial(basis.sigs[new_basis_idx])
 
     # check existing pairs for rewriteability against element
     # at new_basis_idx
     bmask = basis.sigmasks[new_basis_idx]
-    @inbounds for i in 1:(pairset.load)
+    @inbounds for i in 1:pairset.load
         p = pairset.pairs[i]
         iszero(p.top_index) && continue
         if div(new_sig_mon, p.top_sig, bmask, p.top_sig_mask)
@@ -42,7 +35,23 @@ function update_pairset!(pairset::Pairset{POTSPair{N}},
         end
     end
 
-    new_lm = basis_ht.exponents[basis.lms[new_basis_idx]]
+    # remove pairs that are rewriteable
+    j = 1
+    @inbounds for i in 1:pairset.load
+        iszero(pairset.pairs[i].top_index) && continue
+        pairset[j] = pairset[i]
+        j += 1
+    end
+    pairset.load -= (pairset.load - j)
+
+    # resize pairset if needed
+    pair_size = length(pairset.pairs)
+    num_new_pairs = new_basis_idx - 1
+    if pairset.load + num_new_pairs >= pair_size
+        resize!(pairset.pairs, max(2 * pair_size, pair.load - num_new_pairs))
+    end
+
+    new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
     # pair construction loop
     @inbounds for i in 1:(new_basis_idx - 1)
         basis_lm = basis_ht.exponents[basis.lms[i]]
@@ -104,16 +113,18 @@ function update_pairset!(pairset::Pairset{POTSPair{N}},
         is_rewr && continue
         
         new_pair = if index(basis.sigs[i]) == basis.curr_indx && lt_drl(new_sig_mon, basis_pair_sig_mon)
-            POTSPair(new_sig_mon, Sig(ind, basis_pair_sig_mon),
+            SPair(new_sig_mon, Sig(ind, basis_pair_sig_mon),
                      new_pair_sig_mask, basis_pair_sig_mask, new_basis_idx, i)
         else
-            POTSPair(basis_pair_sig_mon, new_sig_mon,
+            SPair(basis_pair_sig_mon, new_sig_mon,
                      basis_pair_mon_mask, new_pair_sig_mask, i, new_basis_idx)
         end
             
         pairset.pairs[pairset.load + 1] = new_pair
         pairset.load += 1
     end
+
+
 end
 
 @inline function rewr_syz(sig::Sig{N},
