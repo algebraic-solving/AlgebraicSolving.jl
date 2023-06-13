@@ -40,10 +40,12 @@ end
 # DRL comparison
 @generated function lt_drl(a::Monomial{N}, b::Monomial{N}) where N
     quote
-        a[1] < b[1] && return true
-        a[1] > b[1] && return false
+        a.deg < b.deg && return true
+        a.deg > b.deg && return false
         
-        $([:(a[$i] < b[$i] && return false ; a[$i] > b[$i] && return true) for i in N:-1:2]...)
+        ae = a.exps
+        be = b.exps
+        $([:(ae[$i] < be[$i] && return false ; ae[$i] > be[$i] && return true) for i in N:-1:1]...)
 
         return false
     end
@@ -89,4 +91,5 @@ Base.hash(a::Monomial{N}) = makehash(Val(N), a.exps)
 
 # for readibility
 index(a::Sig) = a[1]
+index(a::MaskSig) = a[1]
 monomial(a::Sig) = a[2]

@@ -7,45 +7,42 @@ const Exp = UInt16
 const MonIdx = Int32
 const MonHash = UInt32
 const DivMask = UInt32
+# stuff for matrix
+const ColIdx = UInt32
 
 struct Monomial{N}
     deg::Exp
     exps::SVector{N, Exp}
 end
 const Sig{N} = Tuple{SigIndex, Monomial{N}}
+const MaskSig = Tuple{SigIndex, DivMask}
 
 mutable struct LoadVector{P}
     elems::Vector{P}
     load::Int
 end
 
-abstract type Basis end
-
-mutable struct POTBasis{N, C}<:Basis
-    curr_indx::SigIndex
-    sigs::Vector{Sig{N}}
-    # elements in index k start in with index_cutoffs[k]
-    index_cutoffs::Vector{Int}
-
-    sigmasks::Vector{DivMask}
+mutable struct Basis{N, C}
+    sigs::Vector{Monomial{N}}
+    sigmasks::Vector{MaskSig}
 
     lm_masks::Vector{DivMask}
 
     monomials::Vector{Vector{MonIdx}}
     coefficients::Vector{Vector{C}}
 
+    is_red::Vector{Bool}
+
     syz_sigs::Vector{Monomial{N}}
-    syz_masks::Vector{DivMask}
-    # where do syzygies in current index start
-    syz_curr_indx_start::Int
-    syz_index_cutoffs::Vector{Int}
+    syz_masks::Vector{MaskSig}
 
     basis_load::Int
     syz_load::Int
 end
 
+# TODO: should these be stored in a more vectorized way?
 mutable struct SPair{N}
-    top_sig::Monomial{N}
+    top_sig::Sig{N}
     bot_sig::Sig{N}
     top_sig_mask::DivMask
     bot_sig_mask::DivMask
@@ -56,7 +53,6 @@ end
 
 const Pairset{N} = LoadVector{SPair{N}}
 
-const ColIdx = UInt32
 mutable struct MacaulayMatrix{C}
 
     # rows from upper, AB part of the matrix,

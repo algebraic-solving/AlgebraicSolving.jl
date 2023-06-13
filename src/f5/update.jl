@@ -10,25 +10,27 @@ end
 
 # construct all pairs with basis element at new_basis_idx
 # and perform corresponding rewrite checks
+# assumes DPOT
 function update_pairset!(pairset::Pairset{SPair{N}},
-                         basis::POTBasis,
+                         basis::Basis,
                          basis_ht::MonomialHashtable,
                          new_basis_idx::Int) where N
 
 
     new_sig_mon = monomial(basis.sigs[new_basis_idx])
+    new_sig_idx = index(basis.sigs[new_basis_idx])
 
     # check existing pairs for rewriteability against element
     # at new_basis_idx
     bmask = basis.sigmasks[new_basis_idx]
     @inbounds for i in 1:pairset.load
         p = pairset.pairs[i]
-        iszero(p.top_index) && continue
+        (iszero(p.top_index) || index(p.top_sig) != new_sig_idx) && continue
         if div(new_sig_mon, p.top_sig, bmask, p.top_sig_mask)
             pairset.pairs[i].top_index = 0
             continue
         end
-        basis.curr_indx != index(p.bot_sig) && continue
+        new_sig_idx != index(p.bot_sig) && continue
         if div(new_sig_mon, p.bot_sig, bmask, p.bot_sig_mask)
             pairset.pairs[i].top_index = 0
             continue
@@ -64,8 +66,9 @@ function update_pairset!(pairset::Pairset{SPair{N}},
         basis_pair_sig_mon = mul(mult_basis_elem, monomial(basis.sigs[i]))
 
         # check if S-pair is singular
-        basis.curr_indx == ind && new_pair_sig_mon == basis_pair_sig_mon && continue
+        new_sig_idx == ind && new_pair_sig_mon == basis_pair_sig_mon && continue
 
+        is_rewr = false
         new_pair_sig_mask = divmask(new_pair_sig_mon,
                                     basis_ht.divmap,
                                     basis_ht.ndivbits)
@@ -73,19 +76,31 @@ function update_pairset!(pairset::Pairset{SPair{N}},
                                       basis_ht.divmap,
                                       basis_ht.ndivbits)
 
+        # check both pair sigs against non-trivial syzygies
+        @inbounds for j in 1:basis.syz_load
+            if index(basis.syz_masks[j]) == new_sig_idx
+                is_rewr = div(basis.syz_sigs[j], new_pair_sig_mon,
+                              basis.syz_masks[j][2], new_pair_sig_mask) 
+                is_rewr && break
+            end
+            if index(basis.syz_masks[j]) == ind
+                is_rewr = div(basis.syz_sigs[j], basis_pair_sig_mon,
+                              basis.syz_masks[j][2], basis_pair_sig_mask) 
+                is_rewr && break
+            end
+        end
+        is_rewr && continue
+
         # check both pair signatures against koszul syzygies
-        exc_ind = false
-        is_rewr = false
-        for j in 1:(basis.curr_indx_start-1)
-            is_rewr = div(leading_monomial(basis, basis_ht, j),
-                          new_pair_sig_mon,
-                          basis.lm_masks[j], new_pair_sig_mask)
-            is_rewr && break
-            if !exc_ind
-                if j >= basis.index_cutoffs[ind+1]
-                    exc_ind = true
-                    continue
-                end
+        # TODO: should we store the indices with the lm masks
+        @inbounds for j in 1:(new_basis_idx-1)
+            if index(basis.sigs[j]) < new_basis_idx
+                is_rewr = div(leading_monomial(basis, basis_ht, j),
+                              new_pair_sig_mon,
+                              basis.lm_masks[j], new_pair_sig_mask)
+                is_rewr && break
+            end
+            if index(basis.sigs[j]) < ind
                 is_rewr = div(leading_monomial(basis, basis_ht, j),
                               basis_pair_sig_mon,
                               basis.lm_masks[j], basis_pair_sig_mask)
@@ -93,53 +108,34 @@ function update_pairset!(pairset::Pairset{SPair{N}},
             end
         end
         is_rewr && continue
-
-        # check both pair sigs against non-trivial syzygies
-        rewr_syz((basis.curr_indx, new_pair_sig_mon),
-                 new_pair_sig_mask, basis) && continue
-        rewr_syz((ind, basis_pair_sig_mon),
-                 basis_pair_sig_mask, basis) && continue
         
         # check multiplied signature of basis element against basis sigs
-        is_rewr = false
-        ind_cuts = basis.index_cutoffs
-        start_ind = ind_cuts[ind]
-        end_ind = length(ind_cuts) == ind ? ind_cuts[ind+1]-1 : basis.basis_load
-        @inbounds for j in start_ind:end_ind
+        @inbounds for j in 1:new_basis_idx
+            index(basis.sigmasks[j]) != new_sig_idx && continue
             is_rewr = div(monomial(basis.sigs[j]), basis_pair_sig_mon,
-                          basis.sigmasks[j], basis_pair_sig_mask)
+                          basis.sigmasks[j][2], basis_pair_sig_mask)
             is_rewr && break
         end
         is_rewr && continue
         
-        new_pair = if index(basis.sigs[i]) == basis.curr_indx && lt_drl(new_sig_mon, basis_pair_sig_mon)
-            SPair(new_sig_mon, Sig(ind, basis_pair_sig_mon),
-                     new_pair_sig_mask, basis_pair_sig_mask, new_basis_idx, i)
-        else
+        # TODO: feels like this could be simplified
+        new_pair = if index(basis.sigs[i]) == new_sig_idx
+            if lt_drl(new_sig_mon, basis_pair_sig_mon)
+                SPair(new_sig_mon, Sig(ind, basis_pair_sig_mon),
+                      new_pair_sig_mask, basis_pair_sig_mask, new_basis_idx, i)
+            else
+                SPair(basis_pair_sig_mon, new_sig_mon,
+                      basis_pair_mon_mask, new_pair_sig_mask, i, new_basis_idx)
+            end
+        elseif index(basis.sigs[i]) > new_sig_idx
             SPair(basis_pair_sig_mon, new_sig_mon,
                      basis_pair_mon_mask, new_pair_sig_mask, i, new_basis_idx)
+        else
+            SPair(new_sig_mon, Sig(ind, basis_pair_sig_mon),
+                  new_pair_sig_mask, basis_pair_sig_mask, new_basis_idx, i)
         end
             
         pairset.pairs[pairset.load + 1] = new_pair
         pairset.load += 1
     end
-
-
-end
-
-@inline function rewr_syz(sig::Sig{N},
-                          sigmask::DivMask,
-                          basis::POTBasis{N}) where N
-
-    sigmon = monomial(sig)
-    ind = index(sig)
-    syz_ind_cuts = basis.syz_index_cutoffs
-    start_ind = syz_ind_cuts[ind]
-    end_ind = length(syz_ind_cuts) == ind ? syz_ind_cuts[ind+1]-1 : basis.syz_load
-    @inbounds for j in start_ind:end_ind
-        div(basis.syz_sigs[j], sigmon,
-            basis.syz_masks[j], sigmask) && return true
-    end
-
-    return false 
 end
