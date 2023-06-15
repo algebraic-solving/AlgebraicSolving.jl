@@ -34,9 +34,11 @@
 # corresponding divmask to speed up divisibility checks,
 # and the todal degree
 mutable struct Hashvalue
+    # TODO: probably dont need this either
     idx::Int
     hash::MonHash
     divmask::DivMask
+    # TODO: now need to store this
     deg::MonHash
 end
 
@@ -56,11 +58,13 @@ mutable struct MonomialHashtable{M<:Monom, Ord<:AbstractMonomialOrdering}
     # for each hashtable enrty
     hashdata::Vector{Hashvalue}
 
+    # TODO: we dont need this
     # values to hash exponents with, i.e
     # hash(e) := hash(e, hasher)
     hasher::Vector{MonHash}
 
     #= Ring information =#
+    # TODO: this can also go
     # number of variables
     nvars::Int
     # ring monomial ordering
