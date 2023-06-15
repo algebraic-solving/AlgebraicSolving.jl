@@ -51,6 +51,14 @@ end
     end
 end
 
+function lt_pot(a::Sig, b::Sig)
+    if index(a) == index(b)
+        return lt_drl(a[2], b[2])
+    else
+        return index(a) < index(b)
+    end
+end
+
 #---------------------#
 
 #-- Masking and hashing --#

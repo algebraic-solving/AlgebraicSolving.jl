@@ -1,19 +1,20 @@
+# TODO: enforce some type restrictions
+# TODO: make sure pivots array has enough space
 function select_normal!(pairset::Pairset,
-                        basis::POTBasis,
+                        basis::Basis,
                         matrix::MacaulayMatrix,
                         ht::MonomialHashtable,
                         symbol_ht::MonomialHashtable) 
 
     # number of selected pairs
     npairs = 0
-    sig_deg = zero(Exp) 
+    deg = zero(Exp) 
     for i in 1:pairset.load
-        if iszero(sig_deg)
-            sig_deg = pairset.pairs[i].top_sig.deg
+        if iszero(deg)
+            deg = pairset.pairs[i].deg
             npairs += 1
-            iszero(sig_deg) && break
         end
-        if pairset.pairs[i].top_sig.deg == deg
+        if pairset.pairs[i].deg == deg
             npairs += 1
         else
             break
@@ -21,107 +22,55 @@ function select_normal!(pairset::Pairset,
     end
 
     reinitialize_matrix!(matrix, npairs)
+    skip = falses(npairs)
 
-    # TODO: EVERYTHING BELOW HERE STILL FROM GROEBNER.JL
-    # polynomials from pairs in order (p11, p12)(p21, p21)
-    # (future rows of the matrix)
-    gens = Vector{Int}(undef, 2 * npairs)
+    @inbounds for i in 1:npairs
+        skip[i] && continue
+        pair = pairset.pairs[i]
+        curr_top_sig = pair.top_sig
+        reducer_sig = pair.bot_sig
+        reducer_ind = pair.bot_index
 
-    # monomial buffer
-    etmp = ht.exponents[1]
-    i = 1
-    @inbounds while i <= npairs
-        matrix.ncols += 1
-        load = 1
-        lcm = ps[i].lcm
-        j = i
-
-        # we collect all generators with same lcm into gens
-        while j <= npairs && ps[j].lcm == lcm
-            gens[load] = ps[j].poly1
-            load += 1
-            gens[load] = ps[j].poly2
-            load += 1
-            j += 1
-        end
-        load -= 1
-
-        # sort by the index in the basis (by=identity)
-        sort_generators_by_position!(gens, load)
-
-        # now we collect reducers and to-be-reduced polynomials
-
-        # first generator index in groebner basis
-        prev = gens[1]
-        # first generator in hash table
-        poly = basis.monoms[prev]
-        # first generator lead monomial index in hash data
-        vidx = poly[1]
-
-        # first generator exponent
-        eidx = ht.exponents[vidx]
-        # exponent of lcm corresponding to first generator
-        elcm = ht.exponents[lcm]
-        etmp = monom_division!(etmp, elcm, eidx)
-        # now etmp contents complement to eidx in elcm
-
-        # hash of complement
-        htmp = ht.hashdata[lcm].hash - ht.hashdata[vidx].hash
-
-        # add row as a reducer
-        matrix.nup += 1
-        uprows[matrix.nup] = multiplied_poly_to_matrix_row!(symbol_ht, ht, htmp, etmp, poly)
-        # map upper row to index in basis
-        matrix.up2coef[matrix.nup] = prev
-
-        # mark lcm column as reducer in symbolic hashtable
-        symbol_ht.hashdata[uprows[matrix.nup][1]].idx = 2
-        # increase number of rows set
-        matrix.nrows += 1
-
-        # over all polys with same lcm,
-        # add them to the lower part of matrix
-        @inbounds for k in 1:load
-            # duplicate generator,
-            # we can do so as long as generators are sorted
-            if gens[k] == prev
-                continue
+        @inbounds for j in (i+1):npairs
+            pair2 = pairset.pairs[j]
+            if pair2.top_sig = curr_top_sig
+                skip[j] = true
+                if lt_pot(pair2.bot_sig, reducer_sig)
+                    reducer_sig = pair2.bot_sig
+                    reducer_ind = pair2.bot_index
+                end
             end
-
-            # if the table was reallocated
-            elcm = ht.exponents[lcm]
-
-            # index in gb
-            prev = gens[k]
-            # poly of indices of monoms in hash table
-            poly = basis.monoms[prev]
-            vidx = poly[1]
-            # leading monom idx
-            eidx = ht.exponents[vidx]
-
-            etmp = monom_division!(etmp, elcm, eidx)
-
-            htmp = ht.hashdata[lcm].hash - ht.hashdata[vidx].hash
-
-            # add row to be reduced
-            matrix.nlow += 1
-            lowrows[matrix.nlow] = multiplied_poly_to_matrix_row!(symbol_ht, ht, htmp, etmp, poly)
-            # map lower row to index in basis
-            matrix.low2coef[matrix.nlow] = prev
-
-            symbol_ht.hashdata[lowrows[matrix.nlow][1]].idx = 2
-
-            matrix.nrows += 1
         end
-
-        i = j
+        write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
+                             ht, curr_top_sig[2]) 
+        lead_col_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
+                                            symbol_ht,
+                                            ht, reducer_sig[2])
+        pivots[lead_col_idx] = matrix.nrows 
     end
-
-    resize!(matrix.lowrows, matrix.nrows - matrix.ncols)
 
     # remove selected parirs from pairset
     @inbounds for i in 1:pairset.load-npairs
-        ps[i] = ps[i+npairs]
+        pairset.pairs[i] = pairset.[i+npairs]
     end
     pairset.load -= npairs
+end
+
+# TODO: make sure to have space before calling this
+function write_to_matrix_row!(matrix::MacaulayMatrix,
+                              basis::Basis,
+                              basis_idx::Int,
+                              symbol_ht::MonomialHashtable,
+                              ht::MonomialHashtable,
+                              top_sig_mon::Monomial)
+
+    mult = divide(top_sig_mon, basis.sigs[basis_idx][2])
+    hsh = Base.hash(mult)
+    row_ind = matrix.nrows + 1
+    @inbounds matrix.rows[row_ind] =
+        multiplied_poly_to_matrix_row!(symbol_ht, ht,
+                                       hsh, mult, basis.monomials[basis_idx])
+    matrix.coeffs[row_ind] = basis.coefficients[basis_idx]
+    matrix.nrows += 1
+    return first(matrix.rows[row_ind])
 end

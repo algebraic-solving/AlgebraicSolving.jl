@@ -36,6 +36,9 @@ mutable struct Basis{N, C}
     syz_sigs::Vector{Monomial{N}}
     syz_masks::Vector{MaskSig}
 
+    # degrees of input elements
+    degs::Vector{Exp}
+
     basis_load::Int
     syz_load::Int
 end
@@ -49,15 +52,21 @@ mutable struct SPair{N}
     # top index = 0 -> pair is redundant
     top_index::Int
     bot_index::Int
+    deg::Exp
 end
 
 const Pairset{N} = LoadVector{SPair{N}}
 
 mutable struct MacaulayMatrix{C}
 
-    # rows from upper, AB part of the matrix,
     # stored as vectors of corresponding exponents (already hashed and sorted)
     rows::Vector{Vector{ColIdx}}
+
+    # pivot row index for colidx is pivots[colidx] 
+    pivots::Vector{Int}
+
+    # sig(row[i]) < sig(row[j]) <=> sig_order[i] < sig_order[j]
+    sig_order::Vector{Int}
 
     # maps column idx {1 ... ncols} to monomial hash idx {2 ... ht.load}
     # in some hashtable
@@ -69,9 +78,6 @@ mutable struct MacaulayMatrix{C}
     #= sizes info =#
     # total number of allocated rows
     size::Int
-    # number of pivots,
-    # ie new basis elements discovered after matrix reduction
-    npivots::Int
     # number of filled rows, nrows <= size
     nrows::Int
     # number of columns
