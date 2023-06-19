@@ -35,7 +35,7 @@
 # and the todal degree
 mutable struct Hashvalue
     # TODO: probably dont need this either
-    idx::Int
+    done::Bool
     hash::MonHash
     divmask::DivMask
     # TODO: now need to store this

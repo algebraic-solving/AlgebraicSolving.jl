@@ -15,6 +15,8 @@ end
 # Refresh and initialize matrix for `npairs` elements
 function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
     resize!(matrix.rows, npairs * 2)
+    resize!(matrix.sig_order, npairs * 2)
+    resize!(matrix.coeffs, npairs * 2)
     matrix.size = 2 * npairs
     matrix.ncols = 0
     matrix

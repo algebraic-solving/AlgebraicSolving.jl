@@ -74,3 +74,95 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
     matrix.nrows += 1
     return first(matrix.rows[row_ind])
 end
+
+function symbolic_pp!(basis::Basis{N},
+                      matrix::MacaulayMatrix,
+                      ht::MonomialHashtable,
+                      symbol_ht::MonomialHashtable) where N
+
+    pivots = matrix.pivots
+    i = MonIdx(symbol_ht.offset)
+
+    @inbounds while i <= symbol_ht.load
+        if !iszero(matrix.pivots[i])
+            i += one(MonIdx)
+            continue
+        end
+        if matrix.size == matrix.nrows
+            matrix.size *= 2
+            resize!(matrix.rows, matrix.size)
+            resize!(matrix.sig_order, matrix.size)
+            resize!(matrix.coeffs, matrix.size)
+        end
+
+        exp = symbol_ht.exponents[i]
+        divm = symbol_ht.hashdata[i].divmask
+        mult = SVector{N, Exp}()
+        
+        j = 1
+        @label target
+        @inbounds while j <= basis.basis_load && !div(basis.lm_masks[j], divm)
+            j += 1 
+        end
+
+        if j <= basis.basis_load
+            @inbounds red_poly = basis.monomials[j]
+            @inbounds red_sig = basis.sigs[j]
+            @inbounds red_exp = ht.exponents[red_poly[1]]
+
+            # actual divisibility check
+            div_flag = true
+            @inbounds for k in 1:N
+                mult[k] = exp.exps[k] - red_exp.exps[k]
+                if mult[k] < 0
+                    div_flag = false
+                    break
+                end
+            end
+            j += 1
+            if !div_flag
+                @goto target
+            end
+            mul_red_sig = (index(red_sig), mul(mult, monomial(red_sig)))
+            mul_sig_mask = divmask(monomial(mul_red_sig), ht.divmap,
+                                   ht.ndivbits)
+
+            # now we found a reducer
+            j += 1
+            @label target2
+            @inbounds while j <= basis.basis_load && !div(basis.lm_masks[j], divm)
+                j += 1 
+            end
+
+            mult2 = SVector{N, Exp}()
+            @inbounds if j <= basis.basis_load
+                # TODO first check if potential new reducer has smaller signature and divides lm
+                # then do rewrite check
+                cand_index = index(basis.sigmasks[j])
+                cand_sig_mask = basis.sigmasks[j][2]
+                if (cand_index == index(mul_red_sig)
+                    && div(cand_sig_mask, mul_sig_mask))
+                    cand_sig = basis.sigs[j]
+
+                    m = monomial(mul_red_sig)
+                    @inbounds for k in 1:N
+                        mult2[k] = m.exps[k] - monomial(cand_sig).exps[k]
+                        if mult2[k] < 0
+                            j += 1
+                            @goto target2
+                        end
+                    end
+                    @inbounds red_poly = basis.monomials[j]
+                    @inbounds red_exp = ht.exponents[red_poly[1]]
+                    red_sig = cand_sig
+                    mul_red_sig = (index(red_sig), mul(mult2, monomial(red_sig)))
+                    mul_sig_mask = divmask(monomial(mul_red_sig), ht.divmap,
+                                           ht.ndivbits)
+                    j += 1
+                    @goto target2
+                end
+            end
+            # TODO: register red_poly, mul_red_sig etc
+        end
+    end
+end

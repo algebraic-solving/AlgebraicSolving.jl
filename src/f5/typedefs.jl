@@ -2,7 +2,7 @@
 const SigIndex = UInt16
 # type for exponents in monomials
 # ints because sigratios may require negative exponents
-const Exp = UInt16
+const Exp = Int16
 # types for hashvalue, ht index and divisor mask of a monomial
 const MonIdx = Int32
 const MonHash = UInt32
@@ -37,6 +37,7 @@ mutable struct Basis{N, C}
     syz_masks::Vector{MaskSig}
 
     # degrees of input elements
+    # TODO: do we ever need this
     degs::Vector{Exp}
 
     basis_load::Int
