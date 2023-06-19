@@ -129,12 +129,12 @@ function symbolic_pp!(basis::Basis{N},
 
             # now we found a reducer
             j += 1
+            mult2 = SVector{N, Exp}()
             @label target2
             @inbounds while j <= basis.basis_load && !div(basis.lm_masks[j], divm)
                 j += 1 
             end
 
-            mult2 = SVector{N, Exp}()
             @inbounds if j <= basis.basis_load
                 # TODO first check if potential new reducer has smaller signature and divides lm
                 # then do rewrite check
@@ -154,8 +154,8 @@ function symbolic_pp!(basis::Basis{N},
                     end
                     @inbounds red_poly = basis.monomials[j]
                     @inbounds red_exp = ht.exponents[red_poly[1]]
-                    red_sig = cand_sig
                     mul_red_sig = (index(red_sig), mul(mult2, monomial(red_sig)))
+                    red_sig = cand_sig
                     mul_sig_mask = divmask(monomial(mul_red_sig), ht.divmap,
                                            ht.ndivbits)
                     j += 1
