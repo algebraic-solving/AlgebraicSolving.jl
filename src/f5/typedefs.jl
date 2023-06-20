@@ -14,6 +14,9 @@ struct Monomial{N}
     deg::Exp
     exps::SVector{N, Exp}
 end
+function monomial(exps::SVector{N, Exp}) where N
+    return Monomial{N, Exp}(sum(exps), exps)
+end
 const Sig{N} = Tuple{SigIndex, Monomial{N}}
 const MaskSig = Tuple{SigIndex, DivMask}
 
@@ -25,6 +28,8 @@ end
 mutable struct Basis{N, C}
     sigs::Vector{Monomial{N}}
     sigmasks::Vector{MaskSig}
+
+    sigratios::Vector{Monomial{N}}
 
     lm_masks::Vector{DivMask}
 
@@ -65,6 +70,7 @@ mutable struct MacaulayMatrix{C}
 
     # pivot row index for colidx is pivots[colidx] 
     pivots::Vector{Int}
+    pivot_size::Int
 
     # sig(row[i]) < sig(row[j]) <=> sig_order[i] < sig_order[j]
     sig_order::Vector{Int}
@@ -81,6 +87,4 @@ mutable struct MacaulayMatrix{C}
     size::Int
     # number of filled rows, nrows <= size
     nrows::Int
-    # number of columns
-    ncols::Int
 end

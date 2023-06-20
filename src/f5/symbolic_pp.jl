@@ -1,10 +1,9 @@
 # TODO: enforce some type restrictions
-# TODO: make sure pivots array has enough space
-function select_normal!(pairset::Pairset,
-                        basis::Basis,
-                        matrix::MacaulayMatrix,
+function select_normal!(pairset::Pairset{SPair{N}},
+                        basis::Basis{N, C},
+                        matrix::MacaulayMatrix{C},
                         ht::MonomialHashtable,
-                        symbol_ht::MonomialHashtable) 
+                        symbol_ht::MonomialHashtable) where {N, C}
 
     # number of selected pairs
     npairs = 0
@@ -21,16 +20,18 @@ function select_normal!(pairset::Pairset,
         end
     end
 
+    # allocate matrix
     reinitialize_matrix!(matrix, npairs)
     skip = falses(npairs)
 
     @inbounds for i in 1:npairs
         skip[i] && continue
         pair = pairset.pairs[i]
+        # for each unique pair signature
         curr_top_sig = pair.top_sig
         reducer_sig = pair.bot_sig
-        reducer_ind = pair.bot_index
 
+        # find the minimal top reducing bottom signature
         @inbounds for j in (i+1):npairs
             pair2 = pairset.pairs[j]
             if pair2.top_sig = curr_top_sig
@@ -41,38 +42,30 @@ function select_normal!(pairset::Pairset,
                 end
             end
         end
+
+        # add both as rows to matrix
+        mult = divide(monomial(pair.top_sig),
+                      monomial(basis.sigs[pair.top_index]))
         write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
-                             ht, curr_top_sig[2]) 
+                             ht, mult) 
+        mult = divide(monomial(reducer_sig),
+                      monomial(basis.sigs[reducer_ind]))
         lead_col_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
-                                            symbol_ht,
-                                            ht, reducer_sig[2])
-        pivots[lead_col_idx] = matrix.nrows 
+                                            symbol_ht, ht, mult)
+
+        # resize pivots array if needed
+        if matrix.pivot_size < symbol_ht.load - 1
+            resize!(matrix.pivots, 2 * (matrix.symbol_ht.load - 1))
+            matrix.pivot_size = 2 * (matrix.symbol_ht.load - 1)
+        end
+        matrix.pivots[lead_col_idx] = matrix.nrows 
     end
 
-    # remove selected parirs from pairset
+    # remove selected pairs from pairset
     @inbounds for i in 1:pairset.load-npairs
         pairset.pairs[i] = pairset.[i+npairs]
     end
     pairset.load -= npairs
-end
-
-# TODO: make sure to have space before calling this
-function write_to_matrix_row!(matrix::MacaulayMatrix,
-                              basis::Basis,
-                              basis_idx::Int,
-                              symbol_ht::MonomialHashtable,
-                              ht::MonomialHashtable,
-                              top_sig_mon::Monomial)
-
-    mult = divide(top_sig_mon, basis.sigs[basis_idx][2])
-    hsh = Base.hash(mult)
-    row_ind = matrix.nrows + 1
-    @inbounds matrix.rows[row_ind] =
-        multiplied_poly_to_matrix_row!(symbol_ht, ht,
-                                       hsh, mult, basis.monomials[basis_idx])
-    matrix.coeffs[row_ind] = basis.coefficients[basis_idx]
-    matrix.nrows += 1
-    return first(matrix.rows[row_ind])
 end
 
 function symbolic_pp!(basis::Basis{N},
@@ -83,11 +76,15 @@ function symbolic_pp!(basis::Basis{N},
     pivots = matrix.pivots
     i = MonIdx(symbol_ht.offset)
 
+    # iterate over monomials in symbolic ht
     @inbounds while i <= symbol_ht.load
+        # skip if reducer already exists
         if !iszero(matrix.pivots[i])
             i += one(MonIdx)
             continue
         end
+
+        # realloc matrix if necessary
         if matrix.size == matrix.nrows
             matrix.size *= 2
             resize!(matrix.rows, matrix.size)
@@ -101,14 +98,14 @@ function symbolic_pp!(basis::Basis{N},
         
         j = 1
         @label target
+        # find element in basis which divmask divides divmask of monomial
         @inbounds while j <= basis.basis_load && !div(basis.lm_masks[j], divm)
             j += 1 
         end
 
         if j <= basis.basis_load
-            @inbounds red_poly = basis.monomials[j]
-            @inbounds red_sig = basis.sigs[j]
-            @inbounds red_exp = ht.exponents[red_poly[1]]
+            @inbounds red_exp = leading_monomial(basis, ht, j)
+            red_ind = j
 
             # actual divisibility check
             div_flag = true
@@ -119,50 +116,91 @@ function symbolic_pp!(basis::Basis{N},
                     break
                 end
             end
-            j += 1
             if !div_flag
+                j += 1
                 @goto target
             end
-            mul_red_sig = (index(red_sig), mul(mult, monomial(red_sig)))
-            mul_sig_mask = divmask(monomial(mul_red_sig), ht.divmap,
-                                   ht.ndivbits)
 
-            # now we found a reducer
-            j += 1
-            mult2 = SVector{N, Exp}()
+            # set reducer
+            @inbounds red_sig = basis.sigs[j]
+
+            # now that we found a reducer, we start looking for a better one
             @label target2
+            j += 1
             @inbounds while j <= basis.basis_load && !div(basis.lm_masks[j], divm)
                 j += 1 
             end
 
             @inbounds if j <= basis.basis_load
-                # TODO first check if potential new reducer has smaller signature and divides lm
-                # then do rewrite check
-                cand_index = index(basis.sigmasks[j])
-                cand_sig_mask = basis.sigmasks[j][2]
-                if (cand_index == index(mul_red_sig)
-                    && div(cand_sig_mask, mul_sig_mask))
-                    cand_sig = basis.sigs[j]
+                cand_sig = basis.sigs[j]
+                cand_index = index(cand_sig)
 
-                    m = monomial(mul_red_sig)
-                    @inbounds for k in 1:N
-                        mult2[k] = m.exps[k] - monomial(cand_sig).exps[k]
-                        if mult2[k] < 0
-                            j += 1
-                            @goto target2
-                        end
+                # skip if index is larger than current reducer
+                if cand_index > index(red_sig)
+                    @goto target2
+                end
+
+                # actual divisibility check
+                div_flag = true
+                mult2 = SVector{N, Exp}()
+                @inbounds cand_exp = leading_monomial(basis, ht, j)
+                @inbounds for k in 1:N
+                    mult2[k] = exp.exps[k] - cand_exp.exps[k]
+                    if mult2[k] < 0
+                        div_flag = false
+                        break
                     end
-                    @inbounds red_poly = basis.monomials[j]
-                    @inbounds red_exp = ht.exponents[red_poly[1]]
-                    mul_red_sig = (index(red_sig), mul(mult2, monomial(red_sig)))
+                end
+                if !div_flag
+                    @goto target2
+                end
+
+                # check if new candidate reducer has smaller signature
+                if (cand_index < index(red_sig) ||
+                    lt_drl(mul(monomial(mult2), monomial(cand_sig)),
+                           mul(monomial(mult), monomial(red_sig))))
+
+                    mult = mult2
+                    red_ind = j
                     red_sig = cand_sig
-                    mul_sig_mask = divmask(monomial(mul_red_sig), ht.divmap,
-                                           ht.ndivbits)
-                    j += 1
+                    @goto target2
+                end
+
+                # check if new candidate rewrites reducer
+                # TODO: in theory the following is correct?
+                if (div(monomial(cand_sig),
+                        mul(monomial(mult), monomial(red_sig)))
+                    comp_sigratio(basis, j, red_ind))
+                    mult = mult2
+                    red_ind = j
+                    red_sig = cand_sig
                     @goto target2
                 end
             end
-            # TODO: register red_poly, mul_red_sig etc
+            @inbounds lead_col_idx = write_to_matrix_row!(matrix, basis,
+                                                          red_ind, symbol_ht,
+                                                          ht, mult)
+            pivots[lead_col_idx] = matrix.nrows
         end
     end
+end
+
+function write_to_matrix_row!(matrix::MacaulayMatrix,
+                              basis::Basis,
+                              basis_idx::Int,
+                              symbol_ht::MonomialHashtable,
+                              ht::MonomialHashtable,
+                              mult::Monomial)
+
+    hsh = Base.hash(mult)
+    row_ind = matrix.nrows + 1
+    poly = basis.monomials[basis_idx]
+    row = similar(row)
+    check_enlarge_hashtable!(symbol_ht, length(basis.monomials[basis_idx]))
+    @inbounds matrix.rows[row_ind] =
+        insert_multiplied_poly_in_hash_table!(row, hsh, mult, poly,
+                                              ht, symbol_ht)
+    matrix.coeffs[row_ind] = basis.coefficients[basis_idx]
+    matrix.nrows += 1
+    return first(matrix.rows[row_ind])
 end

@@ -147,9 +147,8 @@ function update_pairset!(pairset::Pairset{SPair{N}},
         end
         is_rewr && continue
         
-        # TODO: feels like this could be simplified, do we even need
-        # to distinguish between top and bottom sig?
-
+        # TODO: do we need to distinguish between top and bottom sig
+        # TODO: this is wrong
         pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
         new_pair = if basis_sig_idx < new_sig_idx || (basis_sig_idx == new_sig_idx && comp_sigratio(basis, new_basis_idx, i))
                 SPair(Sig(new_sigidx, new_pair_sig_mon),

@@ -1,3 +1,4 @@
+# TODO: update this function
 function initialize_matrix(::Type{C}) where {C}
     rows = Vector{Vector{ColIdx}}(undef, 0)
     col2hash = Vector{MonIdx}(undef, 0)
@@ -14,10 +15,11 @@ end
 
 # Refresh and initialize matrix for `npairs` elements
 function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
-    resize!(matrix.rows, npairs * 2)
-    resize!(matrix.sig_order, npairs * 2)
-    resize!(matrix.coeffs, npairs * 2)
     matrix.size = 2 * npairs
-    matrix.ncols = 0
-    matrix
+    resize!(matrix.rows, matrix.size)
+    resize!(matrix.sig_order, matrix.size)
+    resize!(matrix.coeffs, matrix.size)
+    resize!(matrix.pivots, 2 * npairs)
+    matrix.pivot_size = 2 * npairs
+    return matrix
 end
