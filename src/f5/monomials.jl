@@ -1,5 +1,3 @@
-using StaticArrays
-
 #-- Monomial arithmetic --#
 
 function mul(a::Monomial, b::Monomial)
@@ -99,7 +97,7 @@ end
     return hash
 end
 
-Base.hash(a::Monomial{N}) = makehash(Val(N), a.exps)
+Base.hash(a::Monomial{N}) where N = makehash(Val(N), a.exps)
 
 #-------------------------#
 

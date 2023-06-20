@@ -34,7 +34,7 @@ function select_normal!(pairset::Pairset{SPair{N}},
         # find the minimal top reducing bottom signature
         @inbounds for j in (i+1):npairs
             pair2 = pairset.pairs[j]
-            if pair2.top_sig = curr_top_sig
+            if pair2.top_sig == curr_top_sig
                 skip[j] = true
                 if lt_pot(pair2.bot_sig, reducer_sig)
                     reducer_sig = pair2.bot_sig
@@ -63,7 +63,7 @@ function select_normal!(pairset::Pairset{SPair{N}},
 
     # remove selected pairs from pairset
     @inbounds for i in 1:pairset.load-npairs
-        pairset.pairs[i] = pairset.[i+npairs]
+        pairset.pairs[i] = pairset.pairs[i+npairs]
     end
     pairset.load -= npairs
 end
@@ -169,7 +169,7 @@ function symbolic_pp!(basis::Basis{N},
                 # check if new candidate rewrites reducer
                 # TODO: in theory the following is correct?
                 if (divch(monomial(cand_sig),
-                        mul(monomial(mult), monomial(red_sig)))
+                        mul(monomial(mult), monomial(red_sig))) &&
                     comp_sigratio(basis, j, red_ind))
                     mult = mult2
                     red_ind = j

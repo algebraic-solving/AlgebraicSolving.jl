@@ -80,7 +80,7 @@ mutable struct MacaulayMatrix{C}
     col2hash::Vector{MonIdx}
 
     # row coefficients
-    coeffs::Vector{Vector{T}}
+    coeffs::Vector{Vector{C}}
 
     #= sizes info =#
     # total number of allocated rows

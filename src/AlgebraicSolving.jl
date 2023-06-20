@@ -12,12 +12,7 @@ include("interfaces/nemo.jl")
 include("algorithms/groebner-bases.jl")
 include("algorithms/solvers.jl")
 #= f5 =#
-include("f5/typedefs.jl")
-include("f5/monomials.jl")
-include("f5/hashtable.jl")
-include("f5/update.jl")
-include("f5/symbolic_pp.jl")
-include("f5/matrix.jl")
+include("f5/f5.jl")
 #= examples =#
 include("examples/katsura.jl")
 

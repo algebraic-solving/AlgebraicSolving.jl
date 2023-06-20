@@ -1,14 +1,14 @@
 # updating the pairset and basis
 
 # for readability
-function leading_monomial(basis::POTBasis,
+function leading_monomial(basis::Basis,
                           basis_ht::MonomialHashtable,
                           i)
 
     return basis_ht.exponents[first(basis.monomials[i])]
 end
 
-@inline function comp_sigratio(basis::Basis, ind1::Int, ind2::Int2)
+@inline function comp_sigratio(basis::Basis, ind1::Int, ind2::Int)
 
     rat1 = basis.sigratios[ind1]
     rat2 = basis.sigratios[ind2]

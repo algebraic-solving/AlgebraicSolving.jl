@@ -43,7 +43,7 @@ end
 #------------------------------------------------------------------------------
 
 # initialize and set fields for basis hashtable
-function initialize_basis_hash_table(initial_size::Int=2^16, ::Val{N}) where N
+function initialize_basis_hash_table(::Val{N}, initial_size::Int=2^16) where N
 
     # for now at most 32 variables
     if N > 32
@@ -225,7 +225,7 @@ end
     Having `ht` filled with monomials from input polys,
     computes ht.divmap and divmask for each of already stored monomials
 =#
-function fill_divmask!(ht::MonomialHashtable{N})
+function fill_divmask!(ht::MonomialHashtable{N}) where N
 
     min_exp = Vector{UInt64}(undef, N)
     max_exp = Vector{UInt64}(undef, N)
@@ -365,7 +365,7 @@ end
 #------------------------------------------------------------------------------
 
 function insert_in_basis_hash_table_pivots(
-    row::Vector{ColumnIdx},
+    row::Vector{ColIdx},
     ht::MonomialHashtable{N},
     symbol_ht::MonomialHashtable{N},
     col2hash::Vector{MonIdx}) where {N}
