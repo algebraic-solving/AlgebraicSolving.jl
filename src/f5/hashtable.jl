@@ -1,54 +1,16 @@
-# TAKEN FROM GROEBNER.JL
-# TODO: adjust to my monomial type, replace hash function everywhere
-
-# Hashtable
-
-# This hashtable stores monomials.
-# This hashtable implementation assumes 
-# that the hash function that acts on monomials is linear. 
-# (each monomial type should implement linear hash function)
-
-# Some monomial implementations are mutable, and some are not.
-# In order to maintain generic enough code that will work for both
-# we usually write something like:
-#   enew = monom_product!(enew, e1, e2)
-# Then, if a mutable implementation is used, 
-# enew would be overwritten inside of monom_product!.
-# Otherwise, monom_product! would return a new immutable object
-# that is then assigned to enew.
-# That allows us to write more or less independently
-# of the monomial implementation.
-
-# The hashtable size is always the power of two.
-# The hashtable size is doubled each time the load factor exceeds
-#   ht_resize_threshold()
-# (this ht_resize_threshold() should be around 0.5
-#  to balance the rehashing cost with the insertion cost)
-# (this ht_resize_threshold() should be a bit smaller than 0.5,
-#  since the number of hit insertions greatly exceeds the number
-#  of miss insertions in the hashtable)
-
-# Hashvalue.
-# stores index for position in the matrix (defaults to zero),
-# hash of a monomial,
-# corresponding divmask to speed up divisibility checks,
-# and the todal degree
+# TAKEN AND ADJUSTED FROM GROEBNER.JL
 mutable struct Hashvalue
-    # TODO: probably dont need this either
-    done::Bool
     hash::MonHash
     divmask::DivMask
-    # TODO: now need to store this
-    deg::MonHash
 end
 
 function copy_hashvalue(x::Hashvalue)
-    Hashvalue(x.idx, x.hash, x.divmask, x.deg)
+    Hashvalue(x.hash, x.divmask)
 end
 
 # Hashtable designed to store monomials
-mutable struct MonomialHashtable{M<:Monom, Ord<:AbstractMonomialOrdering}
-    exponents::Vector{M}
+mutable struct MonomialHashtable{N}
+    exponents::Vector{Monomial{N}}
 
     # maps exponent hash to its position in exponents array
     hashtable::Vector{MonIdx}
@@ -58,22 +20,9 @@ mutable struct MonomialHashtable{M<:Monom, Ord<:AbstractMonomialOrdering}
     # for each hashtable enrty
     hashdata::Vector{Hashvalue}
 
-    # TODO: we dont need this
-    # values to hash exponents with, i.e
-    # hash(e) := hash(e, hasher)
-    hasher::Vector{MonHash}
-
-    #= Ring information =#
-    # TODO: this can also go
-    # number of variables
-    nvars::Int
-    # ring monomial ordering
-    ord::Ord
-
     #= Monom divisibility =#
     # divisor map to check divisibility faster
     divmap::Vector{UInt32}
-    ndivvars::Int
     # bits per div variable
     ndivbits::Int
 
@@ -94,22 +43,17 @@ end
 #------------------------------------------------------------------------------
 
 # initialize and set fields for basis hashtable
-function initialize_basis_hash_table(
-    ring::PolyRing{Char, Ord},
-    rng::Random.AbstractRNG,
-    MonomT;
-    initial_size::Int=2^16) where {Char, Ord<:AbstractMonomialOrdering}
+function initialize_basis_hash_table(initial_size::Int=2^16, ::Val{N}) where N
 
+    # for now at most 32 variables
+    if N > 32
+        error("At most 32 variables currently supported.")
+    end
+    
     # not necessary to create `initial_size` exponents
-    exponents = Vector{MonomT}(undef, initial_size)
+    exponents = Vector{Monomial{N}}(undef, initial_size)
     hashdata = Vector{Hashvalue}(undef, initial_size)
     hashtable = zeros(MonIdx, initial_size)
-
-    nvars = ring.nvars
-    ord = ring.ord
-
-    # initialize hashing vector
-    hasher = make_hasher(MonomT, nvars)
 
     # exponents[1:load] cover all stored exponents
     # , also exponents[1] is zeroed by default
@@ -121,86 +65,50 @@ function initialize_basis_hash_table(
     offset = 2
 
     # initialize fast divisibility params
-    charbit = 8
-    int32bits = charbit * sizeof(Int32)
-    int32bits != 32 && error("Strange story with Ints")
-    ndivbits = div(int32bits, nvars)
+    int32bits = 32
+    ndivbits = div(int32bits, N)
     # division mask stores at least 1 bit
     # per each of first ndivvars variables
     ndivbits == 0 && (ndivbits += 1)
-    # count only first ndivvars variables for divisibility checks
-    ndivvars = nvars < int32bits ? nvars : int32bits
-    divmap = Vector{DivMask}(undef, ndivvars * ndivbits)
+    divmap = Vector{DivMask}(undef, N * ndivbits)
 
     # first stored exponent used as buffer lately
-    exponents[1] = make_zero_ev(MonomT, nvars)
+    exponents[1] = monomial(SVector{N}(zeros(Exp, N)))
 
-    MonomialHashtable(
-        exponents, hashtable, hashdata, hasher,
-        nvars, ord,
-        divmap, ndivvars, ndivbits,
-        size, load, offset)
+    MonomialHashtable{N}(exponents, hashtable, hashdata,
+                         divmap, ndivbits,
+                         size, load, offset)
 end
 
-function copy_hashtable(ht::MonomialHashtable{M, O}) where {M, O}
-    exps = Vector{M}(undef, ht.size)
-    table = Vector{MonIdx}(undef, ht.size)
-    data = Vector{Hashvalue}(undef, ht.size)
-    exps[1] = make_zero_ev(M, ht.nvars)
-
-    @inbounds for i in 2:ht.load
-        exps[i] = copy(ht.exponents[i])
-        table[i] = ht.hashtable[i]
-        data[i] = copy_hashvalue(ht.hashdata[i])
-    end
-
-    MonomialHashtable(
-        ht.exponents, ht.hashtable, ht.hashdata, ht.hasher,
-        ht.nvars, ht.ord,
-        ht.divmap, ht.ndivvars, ht.ndivbits,
-        ht.size, ht.load, ht.offset)
-end
-
-# initialize hashtable either for `symbolic_preprocessing` or for `update` functions
+# initialize hashtable for `symbolic_preprocessing` 
 # These are of the same purpose and structure as basis hashtable,
 # but are more local oriented
-function initialize_secondary_hash_table(basis_ht::MonomialHashtable{M}) where {M}
+function initialize_secondary_hash_table(basis_ht::MonomialHashtable{N}) where {N}
     # 2^6 seems to be the best out of 2^5, 2^6, 2^7
     initial_size = 2^6
 
-    exponents = Vector{M}(undef, initial_size)
+    exponents = Vector{Monomial{N}}(undef, initial_size)
     hashdata = Vector{Hashvalue}(undef, initial_size)
     hashtable = zeros(MonIdx, initial_size)
-
-    # preserve ring info
-    nvars = basis_ht.nvars
-    ord = basis_ht.ord
 
     # preserve division info
     divmap = basis_ht.divmap
     ndivbits = basis_ht.ndivbits
-    ndivvars = basis_ht.ndivvars
-
-    # preserve hasher
-    hasher = basis_ht.hasher
 
     load = 1
     size = initial_size
     offset = 2
 
-    exponents[1] = make_zero_ev(M, nvars)
+    # first stored exponent used as buffer lately
+    exponents[1] = monomial(SVector{N}(zeros(Exp, N)))
 
-    MonomialHashtable(
-        exponents, hashtable, hashdata, hasher,
-        nvars, ord,
-        divmap, ndivvars, ndivbits,
-        size, load, offset)
+    MonomialHashtable(exponents, hashtable, hashdata,
+                      divmap, ndivbits,
+                      size, load, offset)
 end
 
-function select_tablesize(ring::PolyRing, polys::AbstractVector)
+function select_tablesize(nvars, syssize)
     nvars = ring.nvars
-    sz = length(polys)
-
     tablesize = 2^10
     if nvars > 4
         tablesize = 2^14
@@ -209,14 +117,14 @@ function select_tablesize(ring::PolyRing, polys::AbstractVector)
         tablesize = 2^16
     end
 
-    if sz < 3
-        tablesize = div(tablesize, 2)
+    if syssize < 3
+        tablesize = divch(tablesize, 2)
     end
-    if sz < 2
-        tablesize = div(tablesize, 2)
+    if syssize < 2
+        tablesize = divch(tablesize, 2)
     end
 
-    tablesize
+    return tablesize
 end
 
 #------------------------------------------------------------------------------
@@ -263,18 +171,18 @@ function ishashcollision(ht::MonomialHashtable, vidx, e, he)
         return true
     end
     # if not free and not same monomial
-    @inbounds if !is_monom_elementwise_eq(ht.exponents[vidx], e)
+    @inbounds if ht.exponents[vidx].exps != e
         return true
     end
     false
 end
 
-function insert_in_hash_table!(ht::MonomialHashtable{M}, e::M) where {M}
+function insert_in_hash_table!(ht::MonomialHashtable{N}, e::Monomial{N}) where {N}
     # generate hash
-    he::MonHash = hash(e, ht.hasher)
+    he = Base.hash(e)
 
     # find new elem position in the table
-    hidx = MonHash(he)
+    hidx = he
     # power of twoooo
     @assert ispow2(ht.size)
     mod = MonHash(ht.size - 1)
@@ -303,8 +211,8 @@ function insert_in_hash_table!(ht::MonomialHashtable{M}, e::M) where {M}
     vidx = MonIdx(ht.load + 1)
     @inbounds ht.hashtable[hidx] = vidx
     @inbounds ht.exponents[vidx] = copy(e)
-    divmask = monom_divmask(e, DivMask, ht.ndivvars, ht.divmap, ht.ndivbits)
-    @inbounds ht.hashdata[vidx] = Hashvalue(0, he, divmask, totaldeg(e))
+    divm = divmask(e, ht.divmap, ht.ndivbits)
+    @inbounds ht.hashdata[vidx] = Hashvalue(he, divm)  
 
     ht.load += 1
 
@@ -313,44 +221,39 @@ end
 
 #------------------------------------------------------------------------------
 
-function is_divmask_divisible(d1::DivMask, d2::DivMask)
-    iszero(~d1 & d2)
-end
-
 #=
     Having `ht` filled with monomials from input polys,
     computes ht.divmap and divmask for each of already stored monomials
 =#
-function fill_divmask!(ht::MonomialHashtable)
-    ndivvars = ht.ndivvars
+function fill_divmask!(ht::MonomialHashtable{N})
 
-    min_exp = Vector{UInt64}(undef, ndivvars)
-    max_exp = Vector{UInt64}(undef, ndivvars)
+    min_exp = Vector{UInt64}(undef, N)
+    max_exp = Vector{UInt64}(undef, N)
 
-    e = Vector{UInt64}(undef, ht.nvars)
-    make_dense!(e, ht.exponents[ht.offset])
+    e = ht.exponents[ht.offset].exps
 
-    @inbounds for i in 1:ndivvars
+    @inbounds for i in 1:N
         min_exp[i] = e[i]
         max_exp[i] = e[i]
     end
 
-    @inbounds for i in ht.offset:ht.load # TODO: offset
-        make_dense!(e, ht.exponents[i])
-        for j in 1:ndivvars
-            if e[j] > max_exp[j]
-                max_exp[j] = e[j]
-                continue
-            end
-            if e[j] < min_exp[j]
-                min_exp[j] = e[j]
-            end
-        end
-    end
+   @inbounds for i in ht.offset:ht.load # TODO: offset
+       make_dense!(e, ht.exponents[i])
+       e = ht.exponents[i].exps
+       for j in 1:N
+           if e[j] > max_exp[j]
+               max_exp[j] = e[j]
+               continue
+           end
+           if e[j] < min_exp[j]
+               min_exp[j] = e[j]
+           end
+       end
+   end
 
     ctr = 1
     steps = UInt32(0)
-    @inbounds for i in 1:ndivvars
+    @inbounds for i in 1:N
         steps = div(max_exp[i] - min_exp[i], UInt32(ht.ndivbits))
         (iszero(steps)) && (steps += UInt32(1))
         for j in 1:ht.ndivbits
@@ -360,79 +263,10 @@ function fill_divmask!(ht::MonomialHashtable)
         end
     end
     @inbounds for vidx in ht.offset:ht.load
-        unmasked = ht.hashdata[vidx]
-        e = ht.exponents[vidx]
-        divmask = monom_divmask(e, DivMask, ht.ndivvars, ht.divmap, ht.ndivbits)
-        ht.hashdata[vidx] = Hashvalue(0, unmasked.hash, divmask, totaldeg(e))
-    end
-
-    nothing
-end
-
-#------------------------------------------------------------------------------
-
-# h1 divisible by h2
-function is_monom_divisible(h1::MonIdx, h2::MonIdx, ht::MonomialHashtable)
-    @inbounds if !is_divmask_divisible(ht.hashdata[h1].divmask, ht.hashdata[h2].divmask)
-        return false
-    end
-    @inbounds e1 = ht.exponents[h1]
-    @inbounds e2 = ht.exponents[h2]
-    is_monom_divisible(e1, e2)
-end
-
-# checks that gcd(g1, h2) is one
-function is_gcd_const(h1::MonIdx, h2::MonIdx, ht::MonomialHashtable)
-    @inbounds e1 = ht.exponents[h1]
-    @inbounds e2 = ht.exponents[h2]
-    is_gcd_const(e1, e2)
-end
-
-# computes lcm of he1 and he2 as exponent vectors from ht1
-# and inserts it in ht2
-function get_lcm(he1::MonIdx, he2::MonIdx,
-    ht1::MonomialHashtable{M}, ht2::MonomialHashtable{M}) where {M}
-
-    @inbounds e1 = ht1.exponents[he1]
-    @inbounds e2 = ht1.exponents[he2]
-    @inbounds etmp = ht1.exponents[1]
-
-    etmp = monom_lcm!(etmp, e1, e2)
-
-    insert_in_hash_table!(ht2, etmp)
-end
-
-#------------------------------------------------------------------------------
-
-# compare pairwise divisibility of lcms from a[first:last] with lcm
-function check_monomial_division_in_update(
-    a::Vector{MonIdx}, first::Int, last::Int,
-    lcm::MonIdx, ht::MonomialHashtable{M}) where {M}
-
-    # pairs are sorted, we only need to check entries above starting point
-
-    @inbounds divmask = ht.hashdata[lcm].divmask
-    @inbounds lcmexp = ht.exponents[lcm]
-
-    j = first
-    @inbounds while j <= last
-        # bad lcm
-        if iszero(a[j])
-            j += 1
-            continue
-        end
-        # fast division check
-        if !is_divmask_divisible(ht.hashdata[a[j]].divmask, divmask)
-            j += 1
-            continue
-        end
-        ea = ht.exponents[a[j]]
-        if !is_monom_divisible(ea, lcmexp)
-            j += 1
-            continue
-        end
-        # mark as redundant
-        a[j] = 0
+        m = ht.exponents[vidx]
+        divm = divmask(m, ht.divmap, ht.ndivbits)
+        hsh = Base.hash(m)
+        ht.hashdata[vidx] = Hashvalue(hsh, divm)
     end
 
     nothing
@@ -443,13 +277,12 @@ end
 # add monomials from `poly` multiplied by exponent vector `etmp`
 # with hash `htmp` to hashtable `symbol_ht`,
 # and substitute hashes in row
-function insert_multiplied_poly_in_hash_table!(
-        row::Vector{MonIdx},
-        htmp::MonHash,
-        etmp::M,
-        poly::Vector{MonIdx},
-        ht::MonomialHashtable{M},
-        symbol_ht::MonomialHashtable{M}) where {M}
+function insert_multiplied_poly_in_hash_table!(row::Vector{MonIdx},
+                                               htmp::MonHash,
+                                               etmp::Monomial{N},
+                                               poly::Vector{MonIdx},
+                                               ht::MonomialHashtable{N},
+                                               symbol_ht::MonomialHashtable{N}) where N
 
     # length of poly to add
     len = length(poly)
@@ -471,15 +304,13 @@ function insert_multiplied_poly_in_hash_table!(
 
         # hash is linear, so that
         # hash(e1 + e2) = hash(e1) + hash(e2)
-        # We also assume that the hashing vector is shared same
-        # between all created hashtables
         h = htmp + bdata[poly[l]].hash
 
         e = bexps[poly[l]]
 
         lastidx = symbol_ht.load + 1
         enew = sexps[1]
-        enew = monom_product!(enew, etmp, e)
+        enew = mul!(enew, etmp, e)
 
         # insert into hashtable
         k = h
@@ -507,12 +338,11 @@ function insert_multiplied_poly_in_hash_table!(
         # miss
 
         # add multiplied exponent to hash table        
-        sexps[lastidx] = copy(enew)
+        sexps[lastidx] = Monomial(enew.deg, copy(enew.exps))
         symbol_ht.hashtable[k] = lastidx
 
-        divmask = monom_divmask(enew, DivMask, 
-                    symbol_ht.ndivvars, symbol_ht.divmap, symbol_ht.ndivbits)
-        sdata[lastidx] = Hashvalue(0, h, divmask, totaldeg(enew))
+        divm = divmask(enew, symbol_ht.divmap, symbol_ht.ndivbits)
+        sdata[lastidx] = Hashvalue(h, divm)
 
         row[l] = lastidx
         l += 1
@@ -523,8 +353,8 @@ function insert_multiplied_poly_in_hash_table!(
 end
 
 function multiplied_poly_to_matrix_row!(
-    symbolic_ht::MonomialHashtable, basis_ht::MonomialHashtable{M},
-    htmp::MonHash, etmp::M, poly::Vector{MonIdx}) where {M}
+    symbolic_ht::MonomialHashtable{N}, basis_ht::MonomialHashtable{N},
+    htmp::MonHash, etmp::Monomial{N}, poly::Vector{MonIdx}) where {N}
 
     row = similar(poly)
     check_enlarge_hashtable!(symbolic_ht, length(poly))
@@ -536,9 +366,9 @@ end
 
 function insert_in_basis_hash_table_pivots(
     row::Vector{ColumnIdx},
-    ht::MonomialHashtable{M},
-    symbol_ht::MonomialHashtable{M},
-    col2hash::Vector{MonIdx}) where {M}
+    ht::MonomialHashtable{N},
+    symbol_ht::MonomialHashtable{N},
+    col2hash::Vector{MonIdx}) where {N}
 
     check_enlarge_hashtable!(ht, length(row))
 
@@ -584,7 +414,7 @@ function insert_in_basis_hash_table_pivots(
         row[l] = pos
         l += 1
 
-        bdata[pos] = Hashvalue(sdata[hidx].idx, h, sdata[hidx].divmask, sdata[hidx].deg)
+        bdata[pos] = Hashvalue(h, sdata[hidx].divmask)
 
         ht.load += 1
     end
