@@ -6,6 +6,12 @@ function mul(a::Monomial, b::Monomial)
     return Monomial(a.deg + b.deg, a.exps + b.exps)
 end
 
+function mul!(buf::Monomial, a::Monomial, b::Monomial)
+    buf.deg = a.deg + b.deg
+    buf.exps = a.exps + b.exps
+    return buf
+end
+
 function divide(a::Monomial, b::Monomial)
     return Monomial(a.deg - b.deg, a.exps - b.exps)
 end
@@ -20,19 +26,19 @@ end
 
 # false if the monomial corresponding to a does not divide
 # the monomial corresponding to b
-@inline function div(a::DivMask, b::DivMask)
+@inline function divch(a::DivMask, b::DivMask)
     return iszero(a & (~b))
 end
 
-@inline function div(a::Monomial, b::Monomial)
+@inline function divch(a::Monomial, b::Monomial)
     return a.deg <= b.deg && (a.exps .<= b.exps)
 end
 
 # TODO: inlining should make memory access nice
-@inline function div(a::Monomial, b::Monomial,
+@inline function divch(a::Monomial, b::Monomial,
                      am::DivMask, bm::DivMask)
 
-    return div(am, bm) && div(a, b)
+    return divch(am, bm) && divch(a, b)
 end
 
 #-- Monomial Orders --#

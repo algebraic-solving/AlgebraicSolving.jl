@@ -36,14 +36,14 @@ function update_pairset!(pairset::Pairset{SPair{N}},
     @inbounds for i in 1:pairset.load
         p = pairset.pairs[i]
         (iszero(p.top_index) || index(p.top_sig) != new_sig_idx) && continue
-        if div(new_sig_mon, p.top_sig, bmask, p.top_sig_mask)
+        if divch(new_sig_mon, p.top_sig, bmask, p.top_sig_mask)
             if comp_sigratio(basis, new_sig_idx, p.top_index)
                 pairset.pairs[i].top_index = 0
                 continue
             end
         end
         new_sig_idx != index(p.bot_sig) && continue
-        if div(new_sig_mon, p.bot_sig, bmask, p.bot_sig_mask)
+        if divch(new_sig_mon, p.bot_sig, bmask, p.bot_sig_mask)
             if comp_sigratio(basis, new_sig_idx, p.bot_index)
                 pairset.pairs[i].top_index = 0
                 continue
@@ -94,12 +94,12 @@ function update_pairset!(pairset::Pairset{SPair{N}},
         # check both pair sigs against non-trivial syzygies
         @inbounds for j in 1:basis.syz_load
             if index(basis.syz_masks[j]) == new_sig_idx
-                is_rewr = div(basis.syz_sigs[j], new_pair_sig_mon,
+                is_rewr = divch(basis.syz_sigs[j], new_pair_sig_mon,
                               basis.syz_masks[j][2], new_pair_sig_mask) 
                 is_rewr && break
             end
             if index(basis.syz_masks[j]) == basis_sig_idx
-                is_rewr = div(basis.syz_sigs[j], basis_pair_sig_mon,
+                is_rewr = divch(basis.syz_sigs[j], basis_pair_sig_mon,
                               basis.syz_masks[j][2], basis_pair_sig_mask) 
                 is_rewr && break
             end
@@ -113,14 +113,14 @@ function update_pairset!(pairset::Pairset{SPair{N}},
             (j_sig_idx != new_sig_idx && j_sig_idx != basis_sig_idx) && continue
             j_sig_mask = basis.sigmasks[j][2]
             if (j_sig_idx == new_sig_idx &&
-                div(monomial(basis.sigs[j]), new_pair_sig_mon,
+                divch(monomial(basis.sigs[j]), new_pair_sig_mon,
                     j_sig_mask, new_pair_sig_mask))
 
                 is_rewr = comp_sigratio(basis, j, new_basis_idx)
                 is_rewr && break
             end
             if (j_sig_idx == basis_sig_idx &&
-                div(monomial(basis.sigs[j]), basis_pair_sig_mon,
+                divch(monomial(basis.sigs[j]), basis_pair_sig_mon,
                     j_sig_mask, basis_pair_sig_mask))
                 
                 is_rewr = comp_sigratio(basis, j, i)
@@ -133,13 +133,13 @@ function update_pairset!(pairset::Pairset{SPair{N}},
         # TODO: should we store the indices with the lm masks
         @inbounds for j in 1:(new_basis_idx-1)
             if index(basis.sigs[j]) < new_basis_idx
-                is_rewr = div(leading_monomial(basis, basis_ht, j),
+                is_rewr = divch(leading_monomial(basis, basis_ht, j),
                               new_pair_sig_mon,
                               basis.lm_masks[j], new_pair_sig_mask)
                 is_rewr && break
             end
             if index(basis.sigs[j]) < basis_sig_idx
-                is_rewr = div(leading_monomial(basis, basis_ht, j),
+                is_rewr = divch(leading_monomial(basis, basis_ht, j),
                               basis_pair_sig_mon,
                               basis.lm_masks[j], basis_pair_sig_mask)
                 is_rewr && break

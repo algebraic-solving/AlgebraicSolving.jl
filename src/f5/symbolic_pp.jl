@@ -99,7 +99,7 @@ function symbolic_pp!(basis::Basis{N},
         j = 1
         @label target
         # find element in basis which divmask divides divmask of monomial
-        @inbounds while j <= basis.basis_load && !div(basis.lm_masks[j], divm)
+        @inbounds while j <= basis.basis_load && !divch(basis.lm_masks[j], divm)
             j += 1 
         end
 
@@ -127,7 +127,7 @@ function symbolic_pp!(basis::Basis{N},
             # now that we found a reducer, we start looking for a better one
             @label target2
             j += 1
-            @inbounds while j <= basis.basis_load && !div(basis.lm_masks[j], divm)
+            @inbounds while j <= basis.basis_load && !divch(basis.lm_masks[j], divm)
                 j += 1 
             end
 
@@ -168,7 +168,7 @@ function symbolic_pp!(basis::Basis{N},
 
                 # check if new candidate rewrites reducer
                 # TODO: in theory the following is correct?
-                if (div(monomial(cand_sig),
+                if (divch(monomial(cand_sig),
                         mul(monomial(mult), monomial(red_sig)))
                     comp_sigratio(basis, j, red_ind))
                     mult = mult2
