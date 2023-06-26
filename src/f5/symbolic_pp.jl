@@ -47,18 +47,17 @@ function select_normal!(pairset::Pairset{SPair{N}},
         mult = divide(monomial(pair.top_sig),
                       monomial(basis.sigs[pair.top_index]))
         write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
-                             ht, mult) 
+                             ht, mult, pair.top_sig) 
         mult = divide(monomial(reducer_sig),
                       monomial(basis.sigs[reducer_ind]))
-        lead_col_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
-                                            symbol_ht, ht, mult)
+        lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
+                                            symbol_ht, ht, mult,
+                                            reducer_sig)
 
-        # resize pivots array if needed
-        if matrix.pivot_size < symbol_ht.load - 1
-            resize!(matrix.pivots, 2 * (matrix.symbol_ht.load - 1))
-            matrix.pivot_size = 2 * (matrix.symbol_ht.load - 1)
-        end
-        matrix.pivots[lead_col_idx] = matrix.nrows 
+
+        # set pivot
+        resize_pivots!(matrix, symbol_ht)
+        matrix.pivots[lead_idx] = matrix.nrows 
     end
 
     # remove selected pairs from pairset
@@ -73,7 +72,6 @@ function symbolic_pp!(basis::Basis{N},
                       ht::MonomialHashtable,
                       symbol_ht::MonomialHashtable) where N
 
-    pivots = matrix.pivots
     i = MonIdx(symbol_ht.offset)
 
     # iterate over monomials in symbolic ht
@@ -88,6 +86,7 @@ function symbolic_pp!(basis::Basis{N},
         if matrix.size == matrix.nrows
             matrix.size *= 2
             resize!(matrix.rows, matrix.size)
+            resize!(matrix.sigs, matrix.size)
             resize!(matrix.sig_order, matrix.size)
             resize!(matrix.coeffs, matrix.size)
         end
@@ -95,6 +94,7 @@ function symbolic_pp!(basis::Basis{N},
         exp = symbol_ht.exponents[i]
         divm = symbol_ht.hashdata[i].divmask
         mult = SVector{N, Exp}()
+        mult2 = SVector{N, Exp}()
         
         j = 1
         @label target
@@ -105,7 +105,6 @@ function symbolic_pp!(basis::Basis{N},
 
         if j <= basis.basis_load
             @inbounds red_exp = leading_monomial(basis, ht, j)
-            red_ind = j
 
             # actual divisibility check
             div_flag = true
@@ -122,6 +121,7 @@ function symbolic_pp!(basis::Basis{N},
             end
 
             # set reducer
+            red_ind = j
             @inbounds red_sig = basis.sigs[j]
 
             # now that we found a reducer, we start looking for a better one
@@ -142,7 +142,6 @@ function symbolic_pp!(basis::Basis{N},
 
                 # actual divisibility check
                 div_flag = true
-                mult2 = SVector{N, Exp}()
                 @inbounds cand_exp = leading_monomial(basis, ht, j)
                 @inbounds for k in 1:N
                     mult2[k] = exp.exps[k] - cand_exp.exps[k]
@@ -177,20 +176,99 @@ function symbolic_pp!(basis::Basis{N},
                     @goto target2
                 end
             end
-            @inbounds lead_col_idx = write_to_matrix_row!(matrix, basis,
-                                                          red_ind, symbol_ht,
-                                                          ht, mult)
-            pivots[lead_col_idx] = matrix.nrows
+            @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
+                                                      red_ind, symbol_ht,
+                                                      ht, mult,
+                                                      red_sig)
+            
+            resize_pivots!(matrix, symbol_ht)
+            matrix.pivots[lead_idx] = matrix.nrows
         end
     end
 end
 
+function finalize_matrix!(matrix::MacaulayMatrix,
+                          symbol_ht::MonomialHashtable)
+
+    # store indices into hashtable in a sorted way
+    ncols = symbol_ht.load - symbol_ht.offset + 1
+    matrix.ncols = ncols
+
+    hash2col = collect(1:ncols)
+    exps = symbol_ht.exponents
+    function cmp(h1, h2)
+        @inbounds e1 = exps[h1 + symbol_ht.offset]
+        @inbounds e2 = exps[h2 + symbol_ht.offset]
+        return !lt_drl(e1, e2)
+    end
+    sort!(hash2col, lt = cmp)
+    matrix.hash2col = hash2col
+
+    # TODO: is this correct?
+    # set pivots correctly
+    @inbounds for i in 1:ncols
+        pivots[hash2col[i]] = pivots[i] 
+    end
+
+    # sort signatures
+    sortperm!(matrix.sig_order, matrix.sigs,
+              lt = (sig1, sig2) -> lt_pot(sig1, sig2))
+end
+
+# TODO: later to optimize: mem allocations for matrix
+# helper functions
+function initialize_matrix(::Type{C}, ::Type{N}) where {C, N}
+    rows = Vector{Vector{MonIdx}}(undef, 0)
+    pivots = Vector{Int}(undef, 0)
+    sigs = Vector{Sig{N}}(undef, 0)
+    sig_order = Vector{Int}(undef, 0)
+    hash2col = Vector{MonIdx}(undef, 0)
+    coeffs = Vector{Vector{C}}(undef, 0)
+
+    size = 0
+    npivots = 0
+    nrows = 0
+    ncols = 0
+
+    return MacaulayMatrix(rows, pivots, npivots, sigs,
+                          sig_order, hash2col, coeffs,
+                          size, nrows, ncols)
+end
+    
+# Refresh and initialize matrix for `npairs` elements
+function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
+    matrix.size = 2 * npairs
+    matrix.pivot_size = 2 * npairs
+    resize!(matrix.rows, matrix.size)
+    resize!(matrix.pivots, matrix.pivot_size)
+    resize!(matrix.sigs, matrix.size)
+    resize!(matrix.sig_order, matrix.size)
+    resize!(matrix.coeffs, matrix.size)
+    return matrix
+end
+
+# resize pivots array if needed
+@inline function resize_pivots!(matrix::MacaulayMatrix,
+                                symbol_ht::MonomialHashtable)
+    if matrix.pivot_size < symbol_ht.load - 1
+        pv_size = matrix.pivot_size
+        new_pv_size = 2 * (matrix.symbol_ht.load - 1)
+        resize!(matrix.pivots, new_pv_size)
+        @inbounds for j in pv_size+1:new_pv_size 
+            matrix.pivots[j] = 0
+        end
+        matrix.pivot_size = new_pv_size
+    end
+end
+    
+# helper function to write row to matrix
 function write_to_matrix_row!(matrix::MacaulayMatrix,
                               basis::Basis,
                               basis_idx::Int,
                               symbol_ht::MonomialHashtable,
                               ht::MonomialHashtable,
-                              mult::Monomial)
+                              mult::Monomial,
+                              sig::Sig)
 
     hsh = Base.hash(mult)
     row_ind = matrix.nrows + 1
@@ -200,7 +278,8 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
     @inbounds matrix.rows[row_ind] =
         insert_multiplied_poly_in_hash_table!(row, hsh, mult, poly,
                                               ht, symbol_ht)
-    matrix.coeffs[row_ind] = basis.coefficients[basis_idx]
+    @inbounds matrix.coeffs[row_ind] = basis.coefficients[basis_idx]
+    @inbounds matrix.sigs = sig
     matrix.nrows += 1
     return first(matrix.rows[row_ind])
 end

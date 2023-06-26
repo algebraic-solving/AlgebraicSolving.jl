@@ -63,21 +63,21 @@ end
 
 const Pairset{N} = LoadVector{SPair{N}}
 
-mutable struct MacaulayMatrix{C}
+mutable struct MacaulayMatrix{C, N}
 
     # stored as vectors of corresponding exponents (already hashed and sorted)
-    rows::Vector{Vector{ColIdx}}
+    rows::Vector{Vector{MonIdx}}
 
     # pivot row index for colidx is pivots[colidx] 
     pivots::Vector{Int}
     pivot_size::Int
 
+    sigs::Vector{Sig{N}}
     # sig(row[i]) < sig(row[j]) <=> sig_order[i] < sig_order[j]
     sig_order::Vector{Int}
 
-    # maps column idx {1 ... ncols} to monomial hash idx {2 ... ht.load}
-    # in some hashtable
-    col2hash::Vector{MonIdx}
+    # maps index in hash table to corresponding column index
+    hash2col::Vector{ColIdx}
 
     # row coefficients
     coeffs::Vector{Vector{C}}
@@ -87,4 +87,6 @@ mutable struct MacaulayMatrix{C}
     size::Int
     # number of filled rows, nrows <= size
     nrows::Int
+    # number of columns
+    ncols::Int
 end
