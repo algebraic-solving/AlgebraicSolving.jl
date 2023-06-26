@@ -9,6 +9,9 @@ const MonHash = UInt32
 const DivMask = UInt32
 # stuff for matrix
 const ColIdx = UInt32
+const Coeff = UInt32
+# 64 bit buffer
+const Cbuf = UInt64
 
 struct Monomial{N}
     deg::Exp
@@ -25,7 +28,7 @@ mutable struct LoadVector{P}
     load::Int
 end
 
-mutable struct Basis{N, C}
+mutable struct Basis{N}
     sigs::Vector{Monomial{N}}
     sigmasks::Vector{MaskSig}
 
@@ -34,7 +37,7 @@ mutable struct Basis{N, C}
     lm_masks::Vector{DivMask}
 
     monomials::Vector{Vector{MonIdx}}
-    coefficients::Vector{Vector{C}}
+    coefficients::Vector{Vector{Coeff}}
 
     is_red::Vector{Bool}
 
@@ -63,7 +66,7 @@ end
 
 const Pairset{N} = LoadVector{SPair{N}}
 
-mutable struct MacaulayMatrix{C, N}
+mutable struct MacaulayMatrix{N}
 
     # stored as vectors of corresponding exponents (already hashed and sorted)
     rows::Vector{Vector{MonIdx}}
@@ -80,7 +83,7 @@ mutable struct MacaulayMatrix{C, N}
     hash2col::Vector{ColIdx}
 
     # row coefficients
-    coeffs::Vector{Vector{C}}
+    coeffs::Vector{Vector{Coeff}}
 
     #= sizes info =#
     # total number of allocated rows
