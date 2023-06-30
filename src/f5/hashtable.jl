@@ -363,12 +363,11 @@ function multiplied_poly_to_matrix_row!(
 end
 
 #------------------------------------------------------------------------------
-
-function insert_in_basis_hash_table_pivots(
-    row::Vector{ColIdx},
+# TODO: this writes into row the indices into basis ht?
+function insert_in_basis_hash_table_pivots!(
+    row::Vector{MonIdx},
     ht::MonomialHashtable{N},
-    symbol_ht::MonomialHashtable{N},
-    col2hash::Vector{MonIdx}) where {N}
+    symbol_ht::MonomialHashtable{N}) where {N}
 
     check_enlarge_hashtable!(ht, length(row))
 
@@ -383,7 +382,7 @@ function insert_in_basis_hash_table_pivots(
     l = 1
     @label Letsgo
     @inbounds while l <= length(row)
-        hidx = col2hash[row[l]]
+        hidx = row[l]
 
         # symbolic hash
         h = sdata[hidx].hash

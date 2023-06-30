@@ -1,22 +1,90 @@
 # updating the pairset and basis
 
-# for readability
-function leading_monomial(basis::Basis,
-                          basis_ht::MonomialHashtable,
-                          i)
+# add new reduced rows to basis/syzygies
+# TODO: make a new symbol ht everytime?
+function update_basis!(basis::Basis,
+                       matrix::MacaulayMatrix,
+                       pairset::Pairset{SPair{N}},
+                       symbol_ht::MonomialHashtable,
+                       basis_ht::MonomialHashtable)
 
-    return basis_ht.exponents[first(basis.monomials[i])]
-end
+    add_indices = matrix.toadd
+    # for now make sure that we add elements in signature order
+    # TODO: shouldn't these be already sorted?
+    sort!(add_indices,
+          lt = (i1, i2) -> matrix.sig_order[i1] < matrix.sig_order[i2]) 
 
-@inline function comp_sigratio(basis::Basis, ind1::Int, ind2::Int)
+    @inbounds for i in add_indices
+        # determine if row is zero
+        row = matrix.rows[i]
+        new_sig = matrix.sigs[i]
+        new_idx = index(new_sig)
+        new_sig_mon = monomial(new_sig)
+        new_sig_mask = (new_idx, divmask(new_sig_mon, basis_ht.divmap,
+                                         basis_ht.ndivbits))
+        if isempty(row)
+            # make sure we have enough space
+            if basis.syz_load == basis.syz_size
+                basis.syz_size *= 2
+                resize!(basis.syz_sigs, basis.syz_size)
+                resize!(basis.syz_masks, basis.syz_size)
+            end
+            
+            # add new syz sig
+            l = basis.syz_load + 1
+            basis.syz_sigs[l] = new_sig
+            basis.syz_masks[l] = new_sig_mask
+            basis.syz_load += 1
 
-    rat1 = basis.sigratios[ind1]
-    rat2 = basis.sigratios[ind2]
-    if rat1 == rat2
-        return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
+            # kill pairs with known syz signature
+            @inbounds for j in 1:pairset.load
+                p = pairset.pairs[j]
+                index(p.top_sig) != new_idx && continue
+                if divch(new_sig_mon, p.top_sig, new_sig_mask, p.top_sig_mask)
+                    pairset.pairs[j].top_index = 0
+                end
+                index(p.bot_sig) != new_idx && continue
+                if divch(new_sig_mon, p.bot_sig, new_sig_mask, p.bot_sig_mask)
+                    pairset.pairs[i].top_index = 0
+                end
+            end
+
+            # remove pairs that became rewriteable in previous loop
+            remove_red_pairs!(pairset)
+        else
+            # make sure we have enough space
+            if basis.basis_load == basis.basis_size
+                basis.basis_size *= 2
+                resize!(basis.sigs, basis.basis_size)
+                resize!(sigmasks, basis.basis_size)
+                resize!(sigratios, basis.basis_size)
+                resize!(lm_masks, basis.basis_size)
+                resize!(monomials, basis.basis_size)
+                resize!(coefficients, basis.basis_size)
+                resize!(is_red, basis.basis_size)
+            end
+            
+            # add to basis hashtable
+            insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
+            # TODO: check that this is correct
+            lm = basis_ht.exponents[first(row)]
+
+            # add everything to basis
+            l = basis.basis_load + 1
+            basis.sigs[l] = new_sig
+            basis.sigmasks[l] = new_sig_mask
+            basis.sigratios[l] = divide(new_sig_mon, lm)
+            basis.lm_masks[l] = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
+            basis.monomials[l] = row
+            basis.coefficients[l] = matrix.coeffs[i]
+            basis.basis_load = l
+
+            # build new pairs
+            update_pairset!(pairset, basis, basis_ht, l)
+        end
     end
-    return lt_drl(rat1, rat2)
 end
+
 
 # construct all pairs with basis element at new_basis_idx
 # and perform corresponding rewrite checks
@@ -51,20 +119,15 @@ function update_pairset!(pairset::Pairset{SPair{N}},
         end
     end
 
-    # remove pairs that are rewriteable
-    j = 1
-    @inbounds for i in 1:pairset.load
-        iszero(pairset.pairs[i].top_index) && continue
-        pairset[j] = pairset[i]
-        j += 1
-    end
-    pairset.load -= (pairset.load - j)
+    # kill pairs that became rewriteable in the previous round
+    remove_red_pairs!(pairset)
 
     # resize pairset if needed
-    pair_size = length(pairset.pairs)
     num_new_pairs = new_basis_idx - 1
-    if pairset.load + num_new_pairs >= pair_size
-        resize!(pairset.pairs, max(2 * pair_size, pair.load - num_new_pairs))
+    if pairset.load + num_new_pairs >= pairset.size
+          resize!(pairset.pairs, max(2 * pairset.size,
+                                     pair.load - num_new_pairs))
+          pairset.size *= 2
     end
 
     new_sig_ratio = basis.sigratios[new_basis_idx]
@@ -165,4 +228,33 @@ function update_pairset!(pairset::Pairset{SPair{N}},
         pairset.pairs[pairset.load + 1] = new_pair
         pairset.load += 1
     end
+end
+
+# helper functions for readability
+function leading_monomial(basis::Basis,
+                          basis_ht::MonomialHashtable,
+                          i)
+
+    return basis_ht.exponents[first(basis.monomials[i])]
+end
+
+@inline function comp_sigratio(basis::Basis, ind1::Int, ind2::Int)
+
+    rat1 = basis.sigratios[ind1]
+    rat2 = basis.sigratios[ind2]
+    if rat1 == rat2
+        return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
+    end
+    return lt_drl(rat1, rat2)
+end
+
+# remove pairs that are rewriteable
+function remove_red_pairs!(pairset::Pairset)
+    j = 1
+    @inbounds for i in 1:pairset.load
+        iszero(pairset.pairs[i].top_index) && continue
+        pairset[j] = pairset[i]
+        j += 1
+    end
+    pairset.load = pairset.load - j - 1
 end

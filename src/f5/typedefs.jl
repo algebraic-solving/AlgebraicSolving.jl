@@ -26,6 +26,7 @@ const MaskSig = Tuple{SigIndex, DivMask}
 mutable struct LoadVector{P}
     elems::Vector{P}
     load::Int
+    size::Int
 end
 
 mutable struct Basis{N}
@@ -45,11 +46,12 @@ mutable struct Basis{N}
     syz_masks::Vector{MaskSig}
 
     # degrees of input elements
-    # TODO: do we ever need this
     degs::Vector{Exp}
 
     basis_load::Int
+    basis_size::Int
     syz_load::Int
+    syz_size::Int
 end
 
 # TODO: should these be stored in a more vectorized way?
