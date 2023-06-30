@@ -50,6 +50,8 @@ mutable struct Basis{N}
 
     basis_load::Int
     basis_size::Int
+    # for storing the initial polynomials from 1 to offset-1
+    basis_offset::Int
     syz_load::Int
     syz_size::Int
 end

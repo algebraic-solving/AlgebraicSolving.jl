@@ -43,7 +43,7 @@ end
 #------------------------------------------------------------------------------
 
 # initialize and set fields for basis hashtable
-function initialize_basis_hash_table(::Val{N}, initial_size::Int=2^16) where N
+function initialize_basis_hash_table(::Val{N}) where N
 
     # for now at most 32 variables
     if N > 32
@@ -51,14 +51,14 @@ function initialize_basis_hash_table(::Val{N}, initial_size::Int=2^16) where N
     end
     
     # not necessary to create `initial_size` exponents
-    exponents = Vector{Monomial{N}}(undef, initial_size)
-    hashdata = Vector{Hashvalue}(undef, initial_size)
-    hashtable = zeros(MonIdx, initial_size)
+    exponents = Vector{Monomial{N}}(undef, init_ht_size)
+    hashdata = Vector{Hashvalue}(undef, init_ht_size)
+    hashtable = zeros(MonIdx, init_ht_size)
 
     # exponents[1:load] cover all stored exponents
     # , also exponents[1] is zeroed by default
     load = 1
-    size = initial_size
+    size = init_ht_size
 
     # exponents array starts from index offset,
     # We store buffer array at index 1
@@ -238,7 +238,6 @@ function fill_divmask!(ht::MonomialHashtable{N}) where N
     end
 
    @inbounds for i in ht.offset:ht.load # TODO: offset
-       make_dense!(e, ht.exponents[i])
        e = ht.exponents[i].exps
        for j in 1:N
            if e[j] > max_exp[j]

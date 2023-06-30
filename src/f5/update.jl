@@ -133,7 +133,7 @@ function update_pairset!(pairset::Pairset{SPair{N}},
     new_sig_ratio = basis.sigratios[new_basis_idx]
     new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
     # pair construction loop
-    @inbounds for i in 1:(new_basis_idx - 1)
+    @inbounds for i in basis.basis_offset:(new_basis_idx - 1)
         basis_lm = basis_ht.exponents[basis.lms[i]]
         basis_sig_idx = index(basis.sigs[i])
 
@@ -170,7 +170,7 @@ function update_pairset!(pairset::Pairset{SPair{N}},
         is_rewr && continue
 
         # check both pair sigs against basis sigs
-        @inbounds for j in 1:basis.basis_load-1
+        @inbounds for j in basis.basis_offset:basis.basis_load-1
             j == new_basis_idx && continue
             j_sig_idx = index(basis.sigmasks[j])
             (j_sig_idx != new_sig_idx && j_sig_idx != basis_sig_idx) && continue

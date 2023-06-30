@@ -31,18 +31,7 @@ function select_normal!(pairset::Pairset{SPair{N}},
         # for each unique pair signature
         curr_top_sig = pair.top_sig
         reducer_sig = pair.bot_sig
-
-        # find the minimal top reducing bottom signature
-        @inbounds for j in (i+1):npairs
-            pair2 = pairset.pairs[j]
-            if pair2.top_sig == curr_top_sig
-                skip[j] = true
-                if lt_pot(pair2.bot_sig, reducer_sig)
-                    reducer_sig = pair2.bot_sig
-                    reducer_ind = pair2.bot_index
-                end
-            end
-        end
+        reducer_ind = pair.bot_index
 
         # add row to be reduced to matrix
         mult = divide(monomial(pair.top_sig),
@@ -54,16 +43,32 @@ function select_normal!(pairset::Pairset{SPair{N}},
         matrix.toadd[k] = matrix.nrows
         k += 1
 
-        # add reducer row
-        mult = divide(monomial(reducer_sig),
-                      monomial(basis.sigs[reducer_ind]))
-        lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
+        # find the minimal top reducing bottom signature
+        # input elements are stored as pairs with bot_index = 0
+        if !iszero(reducer_ind)
+            # add reducer row
+            @inbounds for j in (i+1):npairs
+                pair2 = pairset.pairs[j]
+                if pair2.top_sig == curr_top_sig
+                    skip[j] = true
+                    if lt_pot(pair2.bot_sig, reducer_sig)
+                        reducer_sig = pair2.bot_sig
+                        reducer_ind = pair2.bot_index
+                    end
+                end
+            end
+
+
+            mult = divide(monomial(reducer_sig),
+                          monomial(basis.sigs[reducer_ind]))
+            lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
                                             symbol_ht, ht, mult,
                                             reducer_sig)
 
-        # set pivot
-        resize_pivots!(matrix, symbol_ht)
-        matrix.pivots[lead_idx] = matrix.nrows 
+            # set pivot
+            resize_pivots!(matrix, symbol_ht)
+            matrix.pivots[lead_idx] = matrix.nrows 
+        end
     end
 
     # remove selected pairs from pairset
@@ -102,7 +107,7 @@ function symbolic_pp!(basis::Basis{N},
         mult = SVector{N, Exp}()
         mult2 = SVector{N, Exp}()
         
-        j = 1
+        j = basis.basis_offset 
         @label target
         # find element in basis which divmask divides divmask of monomial
         @inbounds while j <= basis.basis_load && !divch(basis.lm_masks[j], divm)
