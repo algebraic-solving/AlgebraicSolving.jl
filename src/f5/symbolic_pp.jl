@@ -13,10 +13,10 @@ function select_normal!(pairset::Pairset{SPair{N}},
     deg = zero(Exp) 
     for i in 1:pairset.load
         if iszero(deg)
-            deg = pairset.pairs[i].deg
+            deg = pairset.elems[i].deg
             npairs += 1
         end
-        if pairset.pairs[i].deg == deg
+        if pairset.elems[i].deg == deg
             npairs += 1
         else
             break
@@ -32,7 +32,7 @@ function select_normal!(pairset::Pairset{SPair{N}},
     k = 1
     @inbounds for i in 1:npairs
         skip[i] && continue
-        pair = pairset.pairs[i]
+        pair = pairset.elems[i]
         # for each unique pair signature
         curr_top_sig = pair.top_sig
         reducer_sig = pair.bot_sig
@@ -53,7 +53,7 @@ function select_normal!(pairset::Pairset{SPair{N}},
         if !iszero(reducer_ind)
             # add reducer row
             @inbounds for j in (i+1):npairs
-                pair2 = pairset.pairs[j]
+                pair2 = pairset.elems[j]
                 if pair2.top_sig == curr_top_sig
                     skip[j] = true
                     if lt_pot(pair2.bot_sig, reducer_sig)
@@ -78,7 +78,7 @@ function select_normal!(pairset::Pairset{SPair{N}},
 
     # remove selected pairs from pairset
     @inbounds for i in 1:pairset.load-npairs
-        pairset.pairs[i] = pairset.pairs[i+npairs]
+        pairset.elems[i] = pairset.elems[i+npairs]
     end
     pairset.load -= npairs
 end

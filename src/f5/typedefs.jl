@@ -18,7 +18,7 @@ struct Monomial{N}
     exps::SVector{N, Exp}
 end
 function monomial(exps::SVector{N, Exp}) where N
-    return Monomial{N, Exp}(sum(exps), exps)
+    return Monomial{N}(sum(exps), exps)
 end
 const Sig{N} = Tuple{SigIndex, Monomial{N}}
 const MaskSig = Tuple{SigIndex, DivMask}

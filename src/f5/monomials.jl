@@ -90,9 +90,9 @@ end
 
 @generated function makehash(::Val{N}, m) where {N}
     rng = MersenneTwister(18121987)
-    hash = :( $(UInt64(0)) )
+    hash = :( $(MonHash(0)) )
     for i in 1:N
-        hash = :($hash + $(rand(rng, UInt))*UInt(m[$i]))
+        hash = :($hash + $(rand(rng, MonHash))*MonHash(m[$i]))
     end
     return hash
 end

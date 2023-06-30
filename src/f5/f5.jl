@@ -1,6 +1,3 @@
-using StaticArrays
-
-using Test: Logging
 # sizes for initialization
 const init_ht_size = 2^17
 const init_basis_size = 10000
@@ -15,10 +12,8 @@ include("update.jl")
 include("symbolic_pp.jl")
 include("linear_algebra.jl")
 
-export f5
-
 function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
-    R = first(F).parent
+    R = first(sys).parent
     Rchar = characteristic(R)
 
     # check if input is ok
@@ -33,15 +28,15 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
             error("input degrees too large.")
         end
         degs[i] = Exp(deg)
-        for m in monomials(f)
-            if total_degree(m) != deg
+        for m in exponent_vectors(f)
+            if sum(m) != deg
                 error("input system must be homogeneous.")
             end
         end
     end
 
     # convert to and initialize our data structures
-    nv = ngens(R)
+    nv = nvars(R)
     basis_ht = initialize_basis_hash_table(Val(nv))
 
     # initialize basis
@@ -50,21 +45,21 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
     sigratios = Vector{Monomial{nv}}(undef, init_basis_size)
     lm_masks = Vector{DivMask}(undef, init_basis_size)
     monomials = Vector{Vector{MonIdx}}(undef, init_basis_size)
-    coefficients = Vector{Vector{Coeff}}(undef, init_basis_size)
+    coeffs = Vector{Vector{Coeff}}(undef, init_basis_size)
     is_red = Vector{Bool}(undef, init_basis_size)
-    sys_sigs = Vector{Monomial{nv}}(undef, init_syz_size)
+    syz_sigs = Vector{Monomial{nv}}(undef, init_syz_size)
     syz_masks = Vector{MaskSig}(undef, init_syz_size)
     basis = Basis(sigs, sigmasks, sigratios, lm_masks,
-                  monomials, coefficients, is_red,
+                  monomials, coeffs, is_red,
                   syz_sigs, syz_masks, degs, sysl,
                   init_basis_size, sysl + 1, 0, init_syz_size)
 
     # initialize pairset
-    pairset = Pairset(Vector{Spair{nv}}(undef, init_pair_size),
-                      sysl,
-                      init_pair_size)
+    pairset = LoadVector(Vector{SPair{nv}}(undef, init_pair_size),
+                         sysl,
+                         init_pair_size)
 
-    one_mon = monomial(zeros(Exp, nv))
+    one_mon = monomial(SVector{nv}(zeros(Exp, nv)))
     zero_sig = (zero(SigIndex), one_mon)
     # store initial pols in basis and pairset
     @inbounds for i in 1:sysl
@@ -72,31 +67,32 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
         lf = length(f)
 
         # gather up monomials and coeffs
-        exps = [exponent_vector(f,j) for j in 1:lf]
+        exps = collect(exponent_vectors(f))
         cfs = collect(coefficients(f))
         mons = Vector{MonIdx}(undef, lf)
         coeffs = Vector{Coeff}(undef, lf)
         @inbounds for j in 1:lf
-            eidx = insert_in_hash_table!(basis_ht, monomial(exps[j]))
+            m = monomial(SVector{nv}((Exp).(exps[j])))
+            eidx = insert_in_hash_table!(basis_ht, m)
             cf = Coeff(cfs[j].data)
             mons[j] = eidx
             coeffs[j] = cf
         end
 
         # signatures
-        sig = (SigIndex(j), one_mon)
-        lm_exps = SVector{nv}(exps[1])
+        sig = (SigIndex(i), one_mon)
+        lm_exps = SVector{nv}((Exp).(exps[1]))
         sigr = monomial(-lm_exps)
 
         # store stuff in basis
-        basis.sigs[i] = sig
+        basis.sigs[i] = one_mon
         basis.sigratios[i] = sigr
         basis.monomials[i] = mons
         basis.coefficients[i] = coeffs
         basis.is_red[i] = false
 
         # add unitvector as pair
-        pairset.pairs[i] = SPair{nv}(sig, zero_sig, zero(DivMask),
+        pairset.elems[i] = SPair{nv}(sig, zero_sig, zero(DivMask),
                                      zero(DivMask), i, 0, degs[i])
     end
 
@@ -105,7 +101,7 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
     fill_divmask!(basis_ht)
     for i in 1:sysl
         basis.sigmasks[i] = (SigIndex(i), dm_one_mon)
-        pairset.pairs[i].top_sig_mask = basis.sigmasks[i]
+        pairset.elems[i].top_sig_mask = basis.sigmasks[i][2]
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
@@ -113,8 +109,8 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
     char = Val(Coeff(Rchar.d))
     shift = Val(maxshift(char))
 
-    logger = Logging.SimpleLogger(stdout, min_level = infolevel)
-    Logging.with_logger(logger) do
+    logger = SimpleLogger(stdout, infolevel)
+    with_logger(logger) do
         f5!(basis, pairset, basis_ht, char, shift)
     end
 
@@ -143,5 +139,5 @@ end
 # miscallaneous helper functions
 function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
     ordr = Base.Sort.ord(isless, identity, false, Base.Sort.Forward)
-    sort!(pairset.pairs, from, from+sz, def_sort_alg, ordr) 
+    sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
 end

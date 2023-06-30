@@ -210,7 +210,7 @@ function insert_in_hash_table!(ht::MonomialHashtable{N}, e::Monomial{N}) where {
     # add its position to hashtable, and insert exponent to that position
     vidx = MonIdx(ht.load + 1)
     @inbounds ht.hashtable[hidx] = vidx
-    @inbounds ht.exponents[vidx] = copy(e)
+    @inbounds ht.exponents[vidx] = e
     divm = divmask(e, ht.divmap, ht.ndivbits)
     @inbounds ht.hashdata[vidx] = Hashvalue(he, divm)  
 

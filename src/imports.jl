@@ -3,6 +3,10 @@ using Test
 using msolve_jll
 using Nemo
 using LinearAlgebra
+using StaticArrays
+
+import Random: MersenneTwister
+import Logging: SimpleLogger, with_logger
 
 import Nemo:
     bell,

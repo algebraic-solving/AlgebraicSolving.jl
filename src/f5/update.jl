@@ -38,14 +38,14 @@ function update_basis!(basis::Basis,
 
             # kill pairs with known syz signature
             @inbounds for j in 1:pairset.load
-                p = pairset.pairs[j]
+                p = pairset.elems[j]
                 index(p.top_sig) != new_idx && continue
                 if divch(new_sig_mon, p.top_sig, new_sig_mask, p.top_sig_mask)
-                    pairset.pairs[j].top_index = 0
+                    pairset.elems[j].top_index = 0
                 end
                 index(p.bot_sig) != new_idx && continue
                 if divch(new_sig_mon, p.bot_sig, new_sig_mask, p.bot_sig_mask)
-                    pairset.pairs[i].top_index = 0
+                    pairset.elems[i].top_index = 0
                 end
             end
 
@@ -102,18 +102,18 @@ function update_pairset!(pairset::Pairset{SPair{N}},
     # at new_basis_idx
     bmask = basis.sigmasks[new_basis_idx]
     @inbounds for i in 1:pairset.load
-        p = pairset.pairs[i]
+        p = pairset.elems[i]
         (iszero(p.top_index) || index(p.top_sig) != new_sig_idx) && continue
         if divch(new_sig_mon, p.top_sig, bmask, p.top_sig_mask)
             if comp_sigratio(basis, new_sig_idx, p.top_index)
-                pairset.pairs[i].top_index = 0
+                pairset.elems[i].top_index = 0
                 continue
             end
         end
         new_sig_idx != index(p.bot_sig) && continue
         if divch(new_sig_mon, p.bot_sig, bmask, p.bot_sig_mask)
             if comp_sigratio(basis, new_sig_idx, p.bot_index)
-                pairset.pairs[i].top_index = 0
+                pairset.elems[i].top_index = 0
                 continue
             end
         end
@@ -125,7 +125,7 @@ function update_pairset!(pairset::Pairset{SPair{N}},
     # resize pairset if needed
     num_new_pairs = new_basis_idx - 1
     if pairset.load + num_new_pairs >= pairset.size
-          resize!(pairset.pairs, max(2 * pairset.size,
+          resize!(pairset.elems, max(2 * pairset.size,
                                      pair.load - num_new_pairs))
           pairset.size *= 2
     end
@@ -225,7 +225,7 @@ function update_pairset!(pairset::Pairset{SPair{N}},
                       i, new_basis_idx, pair_deg)
         end
         
-        pairset.pairs[pairset.load + 1] = new_pair
+        pairset.elems[pairset.load + 1] = new_pair
         pairset.load += 1
     end
 end
@@ -252,7 +252,7 @@ end
 function remove_red_pairs!(pairset::Pairset)
     j = 1
     @inbounds for i in 1:pairset.load
-        iszero(pairset.pairs[i].top_index) && continue
+        iszero(pairset.elems[i].top_index) && continue
         pairset[j] = pairset[i]
         j += 1
     end
