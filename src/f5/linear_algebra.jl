@@ -7,8 +7,15 @@ function echelonize!(matrix::MacaulayMatrix,
     buffer = zeros(Cbuf, matrix.ncols)
     pivrow = Vector{ColIdx}(undef, matrix.ncols)
     col2hash = Vector{MonIdx}(undef, matrix.ncols)
+
+    # TODO: rethink the whole hash2col, col2hash business
+    hash2col_start = 0 
+    @inbounds for i in hash2col
+        !iszero(i) && break
+        hash2col_start += 1
+    end
     @inbounds for i in 1:matrix.ncols
-        col2hash[hash2col[i]] = MonIdx(i)
+        col2hash[hash2col[i+hash2col_start]] = MonIdx(i)
     end
 
     @inbounds for i in 2:matrix.nrows
@@ -19,26 +26,25 @@ function echelonize!(matrix::MacaulayMatrix,
         does_red = false
         for m_idx in row_cols
             colidx = hash2col[m_idx]
-            pividx = pivots[hash2col[m_idx]]
+            pividx = pivots[colidx]
             does_red = !iszero(pividx) && pividx != i
             does_red && break
         end
         !does_red && continue
 
         # buffer the row
-        row_coeffs = matrix.coeffs[i]
-        @inbounds for j in row_cols
+        # TODO: might not be happy with enumerate
+        row_coeffs = matrix.coeffs[row_ind]
+        @inbounds for (k, j) in enumerate(row_cols)
             col_idx = matrix.hash2col[j]
-            buffer[col_idx] = row_coeffs[j]
+            buffer[col_idx] = row_coeffs[k]
         end
 
         # do the reduction
-        new_row_length = 0
         @inbounds for j in 1:matrix.ncols
             buffer[j] = buffer[j] % Char
             iszero(buffer[j]) && continue
             if iszero(pivots[j])
-                new_row_length += 1
                 continue
             end
 
@@ -49,7 +55,7 @@ function echelonize!(matrix::MacaulayMatrix,
             m = mul(a, b, char)
 
             nops = 0
-            pivmons = matrix.rows[pivots[k]]
+            pivmons = matrix.rows[pivots[j]]
             @inbounds for (k, m_idx) in enumerate(pivmons)
                 pivrow[k] = hash2col[m_idx]
                 if !isone(k)
@@ -65,11 +71,20 @@ function echelonize!(matrix::MacaulayMatrix,
             end
         end
 
+        # TODO: not so happy with this
+        new_row_length = 0
+        @inbounds for j in 1:matrix.ncols
+            iszero(buffer[j]) && continue
+            new_row_length += 1
+        end
+
         # write out matrix row again
         j = 1
         new_row = Vector{MonIdx}(undef, new_row_length)
         new_coeffs = Vector{Coeff}(undef, new_row_length)
         @inbounds for k in 1:matrix.ncols
+            # TODO: we shouldnt have to do this here
+            buffer[k] = buffer[k] % Char
             iszero(buffer[k]) && continue
             new_row[j] = col2hash[k]
             new_coeffs[j] = buffer[k]

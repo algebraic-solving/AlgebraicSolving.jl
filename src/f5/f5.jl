@@ -40,7 +40,7 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
     basis_ht = initialize_basis_hash_table(Val(nv))
 
     # initialize basis
-    sigs = Vector{Monomial{nv}}(undef, init_basis_size)
+    sigs = Vector{Sig{nv}}(undef, init_basis_size)
     sigmasks = Vector{MaskSig}(undef, init_basis_size)
     sigratios = Vector{Monomial{nv}}(undef, init_basis_size)
     lm_masks = Vector{DivMask}(undef, init_basis_size)
@@ -55,9 +55,9 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
                   init_basis_size, sysl + 1, 0, init_syz_size)
 
     # initialize pairset
-    pairset = LoadVector(Vector{SPair{nv}}(undef, init_pair_size),
-                         sysl,
-                         init_pair_size)
+    pairset = Pairset{nv}(Vector{SPair{nv}}(undef, init_pair_size),
+                          sysl,
+                          init_pair_size)
 
     one_mon = monomial(SVector{nv}(zeros(Exp, nv)))
     zero_sig = (zero(SigIndex), one_mon)
@@ -85,7 +85,7 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
         sigr = monomial(-lm_exps)
 
         # store stuff in basis
-        basis.sigs[i] = one_mon
+        basis.sigs[i] = sig
         basis.sigratios[i] = sigr
         basis.monomials[i] = mons
         basis.coefficients[i] = coeffs
@@ -109,7 +109,7 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
     char = Val(Coeff(Rchar.d))
     shift = Val(maxshift(char))
 
-    logger = SimpleLogger(stdout, infolevel)
+    logger = ConsoleLogger(stdout, infolevel)
     with_logger(logger) do
         f5!(basis, pairset, basis_ht, char, shift)
     end
@@ -138,6 +138,6 @@ end
 
 # miscallaneous helper functions
 function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
-    ordr = Base.Sort.ord(isless, identity, false, Base.Sort.Forward)
+    ordr = Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
 end

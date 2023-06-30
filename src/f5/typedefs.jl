@@ -23,14 +23,8 @@ end
 const Sig{N} = Tuple{SigIndex, Monomial{N}}
 const MaskSig = Tuple{SigIndex, DivMask}
 
-mutable struct LoadVector{P}
-    elems::Vector{P}
-    load::Int
-    size::Int
-end
-
 mutable struct Basis{N}
-    sigs::Vector{Monomial{N}}
+    sigs::Vector{Sig{N}}
     sigmasks::Vector{MaskSig}
 
     sigratios::Vector{Monomial{N}}
@@ -68,7 +62,11 @@ mutable struct SPair{N}
     deg::Exp
 end
 
-const Pairset{N} = LoadVector{SPair{N}}
+mutable struct Pairset{N}
+    elems::Vector{SPair{N}}
+    load::Int
+    size::Int
+end
 
 mutable struct MacaulayMatrix{N}
 

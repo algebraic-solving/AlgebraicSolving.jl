@@ -276,6 +276,7 @@ end
 # add monomials from `poly` multiplied by exponent vector `etmp`
 # with hash `htmp` to hashtable `symbol_ht`,
 # and substitute hashes in row
+# TODO: Figure out if you want to use some kind of monomial buffer
 function insert_multiplied_poly_in_hash_table!(row::Vector{MonIdx},
                                                htmp::MonHash,
                                                etmp::Monomial{N},
@@ -308,8 +309,7 @@ function insert_multiplied_poly_in_hash_table!(row::Vector{MonIdx},
         e = bexps[poly[l]]
 
         lastidx = symbol_ht.load + 1
-        enew = sexps[1]
-        enew = mul!(enew, etmp, e)
+        enew = mul(etmp, e)
 
         # insert into hashtable
         k = h

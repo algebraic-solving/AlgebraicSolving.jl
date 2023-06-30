@@ -6,7 +6,7 @@ using LinearAlgebra
 using StaticArrays
 
 import Random: MersenneTwister
-import Logging: SimpleLogger, with_logger
+import Logging: ConsoleLogger, with_logger
 
 import Nemo:
     bell,

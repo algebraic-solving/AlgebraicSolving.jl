@@ -1,5 +1,5 @@
 # TODO: enforce some type restrictions
-function select_normal!(pairset::Pairset{SPair{N}},
+function select_normal!(pairset::Pairset{N},
                         basis::Basis{N},
                         matrix::MacaulayMatrix,
                         ht::MonomialHashtable,
@@ -15,6 +15,7 @@ function select_normal!(pairset::Pairset{SPair{N}},
         if iszero(deg)
             deg = pairset.elems[i].deg
             npairs += 1
+            continue
         end
         if pairset.elems[i].deg == deg
             npairs += 1
@@ -63,7 +64,6 @@ function select_normal!(pairset::Pairset{SPair{N}},
                 end
             end
 
-
             mult = divide(monomial(reducer_sig),
                           monomial(basis.sigs[reducer_ind]))
             lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
@@ -77,7 +77,7 @@ function select_normal!(pairset::Pairset{SPair{N}},
     end
 
     # remove selected pairs from pairset
-    @inbounds for i in 1:pairset.load-npairs
+    @inbounds for i in 1:(pairset.load-npairs)
         pairset.elems[i] = pairset.elems[i+npairs]
     end
     pairset.load -= npairs
@@ -103,14 +103,13 @@ function symbolic_pp!(basis::Basis{N},
             matrix.size *= 2
             resize!(matrix.rows, matrix.size)
             resize!(matrix.sigs, matrix.size)
-            resize!(matrix.sig_order, matrix.size)
             resize!(matrix.coeffs, matrix.size)
         end
 
         exp = symbol_ht.exponents[i]
         divm = symbol_ht.hashdata[i].divmask
-        mult = SVector{N, Exp}()
-        mult2 = SVector{N, Exp}()
+        mult = similar(exp.exps)
+        mult2 = similar(exp.exps)
         
         j = basis.basis_offset 
         @label target
@@ -192,14 +191,16 @@ function symbolic_pp!(basis::Basis{N},
                     @goto target2
                 end
             end
+            mm = monomial(SVector(mult))
             @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
                                                       red_ind, symbol_ht,
-                                                      ht, mult,
+                                                      ht, mm,
                                                       red_sig)
             
             resize_pivots!(matrix, symbol_ht)
             matrix.pivots[lead_idx] = matrix.nrows
         end
+        i += one(MonIdx)
     end
 end
 
@@ -210,11 +211,15 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     ncols = symbol_ht.load - symbol_ht.offset + 1
     matrix.ncols = ncols
 
-    hash2col = collect(1:ncols)
+    hash2col = Vector{ColIdx}(undef, symbol_ht.load)
+    @inbounds for i in 1:symbol_ht.load
+        hash2col[i] = i - symbol_ht.offset + 1
+    end
     exps = symbol_ht.exponents
     function cmp(h1, h2)
-        @inbounds e1 = exps[h1 + symbol_ht.offset]
-        @inbounds e2 = exps[h2 + symbol_ht.offset]
+        iszero(h2) && return false
+        @inbounds e1 = exps[h1 + symbol_ht.offset - 1]
+        @inbounds e2 = exps[h2 + symbol_ht.offset - 1]
         return !lt_drl(e1, e2)
     end
     sort!(hash2col, lt = cmp)
@@ -223,12 +228,14 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     # TODO: is this correct?
     # set pivots correctly
     @inbounds for i in 1:ncols
-        pivots[hash2col[i]] = pivots[i] 
+        iszero(matrix.pivots[i]) && continue
+        matrix.pivots[i] = hash2col[matrix.pivots[i]]
     end
 
     # sort signatures
-    @info "matrix of size $((matrix.nrows, matrix.ncols)), density $(sum((length).(matrix.rows))/(matrix.nrows * matrix.ncols))"
-    sortperm!(matrix.sig_order, matrix.sigs,
+    @info "matrix of size $((matrix.nrows, matrix.ncols)), density $(sum((length).(matrix.rows[1:matrix.nrows]))/(matrix.nrows * matrix.ncols))"
+    matrix.sig_order = Vector{Int}(undef, matrix.nrows)
+    sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
               lt = (sig1, sig2) -> lt_pot(sig1, sig2))
 end
 
@@ -237,19 +244,21 @@ end
 function initialize_matrix(::Val{N}) where {N}
     rows = Vector{Vector{MonIdx}}(undef, 0)
     pivots = Vector{Int}(undef, 0)
+    pivot_size = 0
     sigs = Vector{Sig{N}}(undef, 0)
     sig_order = Vector{Int}(undef, 0)
-    hash2col = Vector{MonIdx}(undef, 0)
-    coeffs = Vector{Vector{C}}(undef, 0)
+    hash2col = Vector{ColIdx}(undef, 0)
+    coeffs = Vector{Vector{Coeff}}(undef, 0)
+    toadd = Vector{Int}(undef, 0)
 
     size = 0
-    npivots = 0
     nrows = 0
     ncols = 0
 
-    return MacaulayMatrix(rows, pivots, npivots, sigs,
-                          sig_order, hash2col, coeffs,
-                          size, nrows, ncols)
+    return MacaulayMatrix(rows, pivots, pivot_size,
+                          sigs, sig_order, hash2col,
+                          coeffs, size, nrows, ncols,
+                          toadd)
 end
     
 # Refresh and initialize matrix for `npairs` elements
@@ -258,8 +267,10 @@ function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
     matrix.pivot_size = 2 * npairs
     resize!(matrix.rows, matrix.size)
     resize!(matrix.pivots, matrix.pivot_size)
+    for i in 1:matrix.pivot_size
+        matrix.pivots[i] = 0
+    end
     resize!(matrix.sigs, matrix.size)
-    resize!(matrix.sig_order, matrix.size)
     resize!(matrix.coeffs, matrix.size)
     resize!(matrix.toadd, npairs)
     for i in 1:npairs
@@ -271,9 +282,9 @@ end
 # resize pivots array if needed
 @inline function resize_pivots!(matrix::MacaulayMatrix,
                                 symbol_ht::MonomialHashtable)
-    if matrix.pivot_size < symbol_ht.load - 1
+    if matrix.pivot_size < symbol_ht.load 
         pv_size = matrix.pivot_size
-        new_pv_size = 2 * (matrix.symbol_ht.load - 1)
+        new_pv_size = 2 * (symbol_ht.load)
         resize!(matrix.pivots, new_pv_size)
         @inbounds for j in pv_size+1:new_pv_size 
             matrix.pivots[j] = 0
@@ -294,13 +305,13 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
     hsh = Base.hash(mult)
     row_ind = matrix.nrows + 1
     poly = basis.monomials[basis_idx]
-    row = similar(row)
+    row = similar(basis.monomials[basis_idx])
     check_enlarge_hashtable!(symbol_ht, length(basis.monomials[basis_idx]))
     @inbounds matrix.rows[row_ind] =
         insert_multiplied_poly_in_hash_table!(row, hsh, mult, poly,
                                               ht, symbol_ht)
     @inbounds matrix.coeffs[row_ind] = basis.coefficients[basis_idx]
-    @inbounds matrix.sigs = sig
+    @inbounds matrix.sigs[row_ind] = sig
     matrix.nrows += 1
     return first(matrix.rows[row_ind])
 end

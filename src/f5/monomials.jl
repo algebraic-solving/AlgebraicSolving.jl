@@ -4,9 +4,8 @@ function mul(a::Monomial, b::Monomial)
     return Monomial(a.deg + b.deg, a.exps + b.exps)
 end
 
-function mul!(buf::Monomial, a::Monomial, b::Monomial)
-    buf.deg = a.deg + b.deg
-    buf.exps = a.exps + b.exps
+function mul!(buf::MVector{N, Exp}, a::Monomial{N}, b::Monomial{N}) where N
+    buf = a.exps + b.exps
     return buf
 end
 
@@ -18,7 +17,7 @@ end
 function lcm_div(a::Monomial{N}, b::Monomial{N}) where N
     e1 = a.exps
     e2 = b.exps
-    @inbounds exps = [e1[i] >= e2[i] ? zero(Exp) : e2[i] - e1[i] for i in 1:N]
+    @inbounds exps = SVector{N, Exp}([e1[i] >= e2[i] ? zero(Exp) : e2[i] - e1[i] for i in 1:N])
     return Monomial(sum(exps), exps)
 end
 
@@ -29,7 +28,7 @@ end
 end
 
 @inline function divch(a::Monomial, b::Monomial)
-    return a.deg <= b.deg && (a.exps .<= b.exps)
+    return a.deg <= b.deg && (a.exps <= b.exps)
 end
 
 # TODO: inlining should make memory access nice
@@ -78,7 +77,7 @@ function divmask(e::Monomial{N},
     o = one(DivMask)
     for i in 1:N
         for j in 1:ndivbits
-            @inbounds if e.exps[i + 1] >= divmap[ctr]
+            @inbounds if e.exps[i] >= divmap[ctr]
                 res |= o << (ctr - 1)
             end
             ctr += o
