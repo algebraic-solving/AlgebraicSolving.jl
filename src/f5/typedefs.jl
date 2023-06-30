@@ -92,4 +92,7 @@ mutable struct MacaulayMatrix{N}
     nrows::Int
     # number of columns
     ncols::Int
+
+    # for each i in toadd rows[i] should be added to basis/syzygies
+    toadd::Vector{Int}
 end

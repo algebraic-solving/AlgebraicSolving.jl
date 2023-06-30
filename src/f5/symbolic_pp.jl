@@ -24,6 +24,7 @@ function select_normal!(pairset::Pairset{SPair{N}},
     reinitialize_matrix!(matrix, npairs)
     skip = falses(npairs)
 
+    k = 1
     @inbounds for i in 1:npairs
         skip[i] && continue
         pair = pairset.pairs[i]
@@ -43,17 +44,22 @@ function select_normal!(pairset::Pairset{SPair{N}},
             end
         end
 
-        # add both as rows to matrix
+        # add row to be reduced to matrix
         mult = divide(monomial(pair.top_sig),
                       monomial(basis.sigs[pair.top_index]))
         write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
                              ht, mult, pair.top_sig) 
+
+        # mark it to be added later
+        matrix.toadd[k] = matrix.nrows
+        k += 1
+
+        # add reducer row
         mult = divide(monomial(reducer_sig),
                       monomial(basis.sigs[reducer_ind]))
         lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
                                             symbol_ht, ht, mult,
                                             reducer_sig)
-
 
         # set pivot
         resize_pivots!(matrix, symbol_ht)
@@ -244,6 +250,10 @@ function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
     resize!(matrix.sigs, matrix.size)
     resize!(matrix.sig_order, matrix.size)
     resize!(matrix.coeffs, matrix.size)
+    resize!(matrix.toadd, npairs)
+    for i in 1:npairs
+        matrix.toadd[i] = 0
+    end
     return matrix
 end
 
