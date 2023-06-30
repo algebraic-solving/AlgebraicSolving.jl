@@ -23,6 +23,8 @@ function select_normal!(pairset::Pairset{SPair{N}},
         end
     end
 
+    @info "selected $(npairs) pairs, degree $(deg)"
+
     # allocate matrix
     reinitialize_matrix!(matrix, npairs)
     skip = falses(npairs)
@@ -225,6 +227,7 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     end
 
     # sort signatures
+    @info "matrix of size $((matrix.nrows, matrix.ncols)), density $(sum((length).(matrix.rows))/(matrix.nrows * matrix.ncols))"
     sortperm!(matrix.sig_order, matrix.sigs,
               lt = (sig1, sig2) -> lt_pot(sig1, sig2))
 end

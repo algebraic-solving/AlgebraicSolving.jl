@@ -1,5 +1,6 @@
 using StaticArrays
 
+using Test: Logging
 # sizes for initialization
 const init_ht_size = 2^17
 const init_basis_size = 10000
@@ -16,7 +17,7 @@ include("linear_algebra.jl")
 
 export f5
 
-function f5(sys::Vector{T}) where {T <: MPolyElem}
+function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
     R = first(F).parent
     Rchar = characteristic(R)
 
@@ -112,7 +113,10 @@ function f5(sys::Vector{T}) where {T <: MPolyElem}
     char = Val(Coeff(Rchar.d))
     shift = Val(maxshift(char))
 
-    f5!(basis, pairset, basis_ht, char, shift)
+    logger = Logging.SimpleLogger(stdout, min_level = infolevel)
+    Logging.with_logger(logger) do
+        f5!(basis, pairset, basis_ht, char, shift)
+    end
 
 end
 
