@@ -18,10 +18,10 @@ export f5
 
 function f5(sys::Vector{T}) where {T <: MPolyElem}
     R = first(F).parent
-    char = characteristic(R)
+    Rchar = characteristic(R)
 
     # check if input is ok
-    if char > 2^31
+    if Rchar > 2^31
         error("At the moment we only support finite fields up to prime characteristic < 2^31.")
     end
     sysl = length(sys)
@@ -108,6 +108,31 @@ function f5(sys::Vector{T}) where {T <: MPolyElem}
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
+    # constants for fast arithmetic
+    char = Val(Coeff(Rchar.d))
+    shift = Val(maxshift(char))
+
+    f5!(basis, pairset, basis_ht, char, shift)
+
+end
+
+function f5!(basis::Basis{N},
+             pairset::Pairset,
+             basis_ht::MonomialHashtable,
+             char::Val{Char},
+             shift::Val{Shift}) where {N, Char, Shift}
+
+    while !iszero(pairset.load)
+	matrix = initialize_matrix(Val(N))
+        symbol_ht = initialize_secondary_hash_table(basis_ht)
+
+        select_normal!(pairset, basis, matrix, basis_ht, symbol_ht)
+        symbolic_pp!(basis, matrix, basis_ht, symbol_ht)
+        finalize_matrix!(matrix, symbol_ht)
+        echelonize!(matrix, char, shift)
+
+        update_basis!(basis, matrix, pairset, symbol_ht, basis_ht)
+    end
 end
 
 

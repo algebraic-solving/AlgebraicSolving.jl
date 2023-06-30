@@ -231,7 +231,7 @@ end
 
 # TODO: later to optimize: mem allocations for matrix
 # helper functions
-function initialize_matrix(::Type{C}, ::Type{N}) where {C, N}
+function initialize_matrix(::Val{N}) where {N}
     rows = Vector{Vector{MonIdx}}(undef, 0)
     pivots = Vector{Int}(undef, 0)
     sigs = Vector{Sig{N}}(undef, 0)
