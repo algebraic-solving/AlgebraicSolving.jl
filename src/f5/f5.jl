@@ -5,7 +5,8 @@ const init_ht_size = 2^17
 const init_basis_size = 10000
 const init_syz_size = 1000
 const init_pair_size = 10000
-
+# default sorting alg
+const def_sort_alg = Base.Sort.DEFAULT_UNSTABLE
 include("typedefs.jl")
 include("monomials.jl")
 include("hashtable.jl")
@@ -107,4 +108,11 @@ function f5(sys::Vector{T}) where {T <: MPolyElem}
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
+end
+
+
+# miscallaneous helper functions
+function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
+    ordr = Base.Sort.ord(isless, identity, false, Base.Sort.Forward)
+    sort!(pairset.pairs, from, from+sz, def_sort_alg, ordr) 
 end
