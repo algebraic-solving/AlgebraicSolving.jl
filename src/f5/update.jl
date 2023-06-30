@@ -6,7 +6,7 @@ function update_basis!(basis::Basis,
                        matrix::MacaulayMatrix,
                        pairset::Pairset{SPair{N}},
                        symbol_ht::MonomialHashtable,
-                       basis_ht::MonomialHashtable)
+                       basis_ht::MonomialHashtable) where N
 
     add_indices = matrix.toadd
     # for now make sure that we add elements in signature order

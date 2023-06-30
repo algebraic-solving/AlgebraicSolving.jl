@@ -96,7 +96,7 @@ end
 @inline function submul(a::Cbuf, b::Coeff, c::Coeff, ::Val{Shift}) where Shift
     r0 = a - Cbuf(b)*Cbuf(c)
     r1 = r0 + Shift
-    r0 > a ? return r1 : return r0
+    r0 > a ? r1 : r0
 end
 
 # TODO: why is there typecasting in SignatureGB.jl

@@ -1,9 +1,9 @@
 # TODO: enforce some type restrictions
 function select_normal!(pairset::Pairset{SPair{N}},
-                        basis::Basis{N, C},
-                        matrix::MacaulayMatrix{C},
+                        basis::Basis{N},
+                        matrix::MacaulayMatrix,
                         ht::MonomialHashtable,
-                        symbol_ht::MonomialHashtable) where {N, C}
+                        symbol_ht::MonomialHashtable) where N
 
     # sort pairset
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
