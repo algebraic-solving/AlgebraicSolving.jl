@@ -99,7 +99,7 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
     # compute divmasks
     dm_one_mon = divmask(one_mon, basis_ht.divmap, basis_ht.ndivbits)
     fill_divmask!(basis_ht)
-    for i in 1:sysl
+    @inbounds for i in 1:sysl
         basis.sigmasks[i] = (SigIndex(i), dm_one_mon)
         pairset.elems[i].top_sig_mask = basis.sigmasks[i][2]
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
@@ -114,6 +114,17 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
         f5!(basis, pairset, basis_ht, char, shift)
     end
 
+    # output
+    outp = typeof(first(sys))[]
+    @inbounds for i in basis.basis_offset:basis.basis_load
+        exps = [basis_ht.exponents[m].exps for m in basis.monomials[i]]
+        ctx = MPolyBuildCtx(R)
+        for (e, c) in zip(exps, basis.coefficients[i])
+            push_term!(ctx, c, Vector{Int}(e))
+        end
+        push!(outp, finish(ctx))
+    end
+    return outp
 end
 
 function f5!(basis::Basis{N},
