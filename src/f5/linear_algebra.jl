@@ -15,11 +15,11 @@ function echelonize!(matrix::MacaulayMatrix,
     # TODO: rethink the whole hash2col, col2hash business
     hash2col_start = 0 
     @inbounds for i in hash2col
-        !iszero(i) && break
         hash2col_start += 1
+        !iszero(i) && break
     end
-    @inbounds for i in 1:matrix.ncols
-        col2hash[hash2col[i+hash2col_start]] = MonIdx(i)
+    @inbounds for i in hash2col_start:(matrix.ncols+hash2col_start)
+        col2hash[hash2col[i]] = MonIdx(i)
     end
 
     @inbounds for i in 2:matrix.nrows
@@ -93,13 +93,13 @@ function echelonize!(matrix::MacaulayMatrix,
             new_row[j] = col2hash[k]
             new_coeffs[j] = buffer[k]
             if isone(j)
-                pivots[k] = i
+                pivots[k] = row_ind
             end
             buffer[k] = zero(Cbuf)
             j += 1
         end
-        matrix.rows[i] = new_row
-        matrix.coeffs[i] = new_coeffs
+        matrix.rows[row_ind] = new_row
+        matrix.coeffs[row_ind] = new_coeffs
     end
 end
 

@@ -207,7 +207,7 @@ end
 
 function finalize_matrix!(matrix::MacaulayMatrix,
                           symbol_ht::MonomialHashtable)
-
+    
     # store indices into hashtable in a sorted way
     ncols = symbol_ht.load - symbol_ht.offset + 1
     matrix.ncols = ncols
