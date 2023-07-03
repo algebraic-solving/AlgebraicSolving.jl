@@ -72,7 +72,7 @@ function select_normal!(pairset::Pairset{N},
 
             # set pivot
             resize_pivots!(matrix, symbol_ht)
-            matrix.pivots[lead_idx] = matrix.nrows 
+            matrix.pivots[lead_idx] = matrix.nrows
         end
     end
 
@@ -192,10 +192,11 @@ function symbolic_pp!(basis::Basis{N},
                 end
             end
             mm = monomial(SVector(mult))
+            mul_red_sig = (index(red_sig), mul(mm, monomial(red_sig)))
             @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
                                                       red_ind, symbol_ht,
                                                       ht, mm,
-                                                      red_sig)
+                                                      mul_red_sig)
             
             resize_pivots!(matrix, symbol_ht)
             matrix.pivots[lead_idx] = matrix.nrows
@@ -225,11 +226,9 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     sort!(hash2col, lt = cmp)
     matrix.hash2col = hash2col
 
-    # TODO: is this correct?
     # set pivots correctly
-    @inbounds for i in 1:ncols
-        iszero(matrix.pivots[i]) && continue
-        matrix.pivots[i] = hash2col[matrix.pivots[i]]
+    @inbounds for i in symbol_ht.offset:symbol_ht.load
+        matrix.pivots[hash2col[i]] = matrix.pivots[i]
     end
 
     # sort signatures

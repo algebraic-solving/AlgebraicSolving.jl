@@ -7,6 +7,10 @@ function echelonize!(matrix::MacaulayMatrix,
     buffer = zeros(Cbuf, matrix.ncols)
     pivrow = Vector{ColIdx}(undef, matrix.ncols)
     col2hash = Vector{MonIdx}(undef, matrix.ncols)
+    rev_sigorder = Vector{Int}(undef, matrix.nrows)
+    @inbounds for i in 1:matrix.nrows
+        rev_sigorder[matrix.sig_order[i]] = i
+    end
 
     # TODO: rethink the whole hash2col, col2hash business
     hash2col_start = 0 
@@ -27,7 +31,7 @@ function echelonize!(matrix::MacaulayMatrix,
         for m_idx in row_cols
             colidx = hash2col[m_idx]
             pividx = pivots[colidx]
-            does_red = !iszero(pividx) && pividx != i
+            does_red = !iszero(pividx) && rev_sigorder[pividx] < i
             does_red && break
         end
         !does_red && continue
@@ -42,20 +46,21 @@ function echelonize!(matrix::MacaulayMatrix,
 
         # do the reduction
         @inbounds for j in 1:matrix.ncols
-            buffer[j] = buffer[j] % Char
-            iszero(buffer[j]) && continue
-            if iszero(pivots[j])
+            pividx = pivots[j]
+            if iszero(pividx) || rev_sigorder[pividx] >= i
                 continue
             end
+            buffer[j] = buffer[j] % Char
+            iszero(buffer[j]) && continue
 
             # subtract m*rows[pivots[j]] from buffer
             a = buffer[j]
-            pivcoeffs = matrix.coeffs[pivots[j]]
+            pivcoeffs = matrix.coeffs[pividx]
             b = inv(pivcoeffs[1], char)
             m = mul(a, b, char)
 
             nops = 0
-            pivmons = matrix.rows[pivots[j]]
+            pivmons = matrix.rows[pividx]
             @inbounds for (k, m_idx) in enumerate(pivmons)
                 pivrow[k] = hash2col[m_idx]
                 if !isone(k)
@@ -65,8 +70,8 @@ function echelonize!(matrix::MacaulayMatrix,
 
             buffer[j] = zero(Cbuf)
             @inbounds for k in 1:nops
-                c = pivcoeffs[k]
-                colidx = pivrow[k]
+                c = pivcoeffs[k+1]
+                colidx = pivrow[k+1]
                 buffer[colidx] = submul(buffer[colidx], m, c, shift)
             end
         end
@@ -74,6 +79,7 @@ function echelonize!(matrix::MacaulayMatrix,
         # TODO: not so happy with this
         new_row_length = 0
         @inbounds for j in 1:matrix.ncols
+            buffer[j] = buffer[j] % Char
             iszero(buffer[j]) && continue
             new_row_length += 1
         end
@@ -83,8 +89,6 @@ function echelonize!(matrix::MacaulayMatrix,
         new_row = Vector{MonIdx}(undef, new_row_length)
         new_coeffs = Vector{Coeff}(undef, new_row_length)
         @inbounds for k in 1:matrix.ncols
-            # TODO: we shouldnt have to do this here
-            buffer[k] = buffer[k] % Char
             iszero(buffer[k]) && continue
             new_row[j] = col2hash[k]
             new_coeffs[j] = buffer[k]

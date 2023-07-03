@@ -171,7 +171,7 @@ function ishashcollision(ht::MonomialHashtable, vidx, e, he)
         return true
     end
     # if not free and not same monomial
-    @inbounds if ht.exponents[vidx].exps != e
+    @inbounds if ht.exponents[vidx].exps != e.exps
         return true
     end
     false
