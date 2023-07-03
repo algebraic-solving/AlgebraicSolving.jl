@@ -104,15 +104,15 @@ function update_pairset!(pairset::Pairset{N},
     @inbounds for i in 1:pairset.load
         p = pairset.elems[i]
         (iszero(p.top_index) || index(p.top_sig) != new_sig_idx) && continue
-        if divch(new_sig_mon, p.top_sig, bmask, p.top_sig_mask)
-            if comp_sigratio(basis, new_sig_idx, p.top_index)
+        if divch(new_sig_mon, monomial(p.top_sig), mask(bmask), p.top_sig_mask)
+            if comp_sigratio(basis, new_basis_idx, p.top_index)
                 pairset.elems[i].top_index = 0
                 continue
             end
         end
         new_sig_idx != index(p.bot_sig) && continue
-        if divch(new_sig_mon, p.bot_sig, bmask, p.bot_sig_mask)
-            if comp_sigratio(basis, new_sig_idx, p.bot_index)
+        if divch(new_sig_mon, monomial(p.bot_sig), mask(bmask), p.bot_sig_mask)
+            if comp_sigratio(basis, new_basis_idx, p.bot_index)
                 pairset.elems[i].top_index = 0
                 continue
             end
@@ -138,6 +138,7 @@ function update_pairset!(pairset::Pairset{N},
         basis_sig_idx = index(basis.sigs[i])
 
         mult_new_elem = lcm_div(new_lm, basis_lm)
+        all(iszero, mult_new_elem.exps) && error("no")
         new_pair_sig_mon = mul(mult_new_elem, new_sig_mon)
 
         mult_basis_elem = lcm_div(basis_lm, new_lm)
@@ -220,7 +221,7 @@ function update_pairset!(pairset::Pairset{N},
                       new_basis_idx, i, pair_deg)
             else
                 SPair((basis_sig_idx, basis_pair_sig_mon),
-                      (new_sigidx, new_pair_sig_mon),
+                      (new_sig_idx, new_pair_sig_mon),
                       basis_pair_sig_mask, new_pair_sig_mask,
                       i, new_basis_idx, pair_deg)
         end

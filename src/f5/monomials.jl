@@ -102,5 +102,6 @@ Base.hash(a::Monomial{N}) where N = makehash(Val(N), a.exps)
 
 # for readibility
 index(a::Sig) = a[1]
-index(a::MaskSig) = a[1]
 monomial(a::Sig) = a[2]
+index(a::MaskSig) = a[1]
+mask(a::MaskSig) = a[2]

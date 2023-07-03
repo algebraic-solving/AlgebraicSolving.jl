@@ -152,3 +152,20 @@ function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
     ordr = Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
 end
+
+# homogenize w.r.t. the last variable
+function _homogenize(F::Vector{P}) where {P <: MPolyRingElem}
+    R = parent(first(F))
+    S, vars = PolynomialRing(base_ring(R), ["x$i" for i in 1:nvars(R)+1])
+    res = typeof(first(F))[]
+    for f in F
+        ctx = MPolyBuildCtx(S)
+        d = total_degree(f)
+        for (e, c) in zip(exponent_vectors(f), coefficients(f))
+            enew = push!(e, d - sum(e))
+            push_term!(ctx, c, e)
+        end
+        push!(res, finish(ctx))
+    end
+    return res
+end

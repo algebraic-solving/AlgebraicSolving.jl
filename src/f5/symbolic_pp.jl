@@ -80,6 +80,7 @@ function select_normal!(pairset::Pairset{N},
     @inbounds for i in 1:(pairset.load-npairs)
         pairset.elems[i] = pairset.elems[i+npairs]
     end
+    resize_pivots!(matrix, symbol_ht)
     pairset.load -= npairs
 end
 

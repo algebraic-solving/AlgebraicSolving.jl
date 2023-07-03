@@ -14,11 +14,13 @@ function echelonize!(matrix::MacaulayMatrix,
 
     # TODO: rethink the whole hash2col, col2hash business
     hash2col_start = 0 
-    @inbounds for i in hash2col
-        hash2col_start += 1
-        !iszero(i) && break
+    @inbounds for (i, c) in enumerate(hash2col)
+        if !iszero(c)
+            hash2col_start = i
+            break
+        end
     end
-    @inbounds for i in hash2col_start:(matrix.ncols+hash2col_start)
+    @inbounds for i in hash2col_start:(matrix.ncols+hash2col_start-1)
         col2hash[hash2col[i]] = MonIdx(i)
     end
 
