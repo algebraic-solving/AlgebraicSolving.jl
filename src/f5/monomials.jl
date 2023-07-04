@@ -31,11 +31,24 @@ end
     return a.deg <= b.deg && (a.exps <= b.exps)
 end
 
-# TODO: inlining should make memory access nice
 @inline function divch(a::Monomial, b::Monomial,
                      am::DivMask, bm::DivMask)
 
     return divch(am, bm) && divch(a, b)
+end
+
+# TODO: unroll this loop
+@inline function divch!(buf::MVector{N, Exp},
+                        a::Monomial{N},
+                        b::Monomial{N}) where N
+
+    for i in 1:N
+        buf[i] = a.exps[i] - b.exps[i]
+        if buf[i] < 0
+            return false
+        end
+    end
+    return true
 end
 
 #-- Monomial Orders --#
