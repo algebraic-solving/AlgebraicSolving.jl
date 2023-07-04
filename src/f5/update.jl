@@ -8,6 +8,9 @@ function update_basis!(basis::Basis,
                        symbol_ht::MonomialHashtable,
                        basis_ht::MonomialHashtable) where N
 
+    new_basis_c = 0
+    new_syz_c = 0
+
     add_indices = matrix.toadd
     # for now make sure that we add elements in signature order
     # TODO: shouldn't these be already sorted?
@@ -23,6 +26,8 @@ function update_basis!(basis::Basis,
         new_sig_mask = (new_idx, divmask(new_sig_mon, basis_ht.divmap,
                                          basis_ht.ndivbits))
         if isempty(row)
+            new_syz_c += 1
+
             # make sure we have enough space
             if basis.syz_load == basis.syz_size
                 basis.syz_size *= 2
@@ -32,7 +37,7 @@ function update_basis!(basis::Basis,
             
             # add new syz sig
             l = basis.syz_load + 1
-            basis.syz_sigs[l] = new_sig
+            basis.syz_sigs[l] = monomial(new_sig)
             basis.syz_masks[l] = new_sig_mask
             basis.syz_load += 1
 
@@ -52,6 +57,8 @@ function update_basis!(basis::Basis,
             # remove pairs that became rewriteable in previous loop
             remove_red_pairs!(pairset)
         else
+            new_basis_c += 1
+
             # make sure we have enough space
             if basis.basis_load == basis.basis_size
                 basis.basis_size *= 2
@@ -83,6 +90,7 @@ function update_basis!(basis::Basis,
             update_pairset!(pairset, basis, basis_ht, l)
         end
     end
+    @info "$(new_basis_c) new, $(new_syz_c) zero"
 end
 
 
@@ -250,11 +258,11 @@ end
 # remove pairs that are rewriteable
 function remove_red_pairs!(pairset::Pairset)
     iszero(pairset.load) && return
-    j = 1
+    j = 0 
     @inbounds for i in 1:pairset.load
         iszero(pairset.elems[i].top_index) && continue
-        pairset.elems[j] = pairset.elems[i]
         j += 1
+        pairset.elems[j] = pairset.elems[i]
     end
     pairset.load = j 
 end

@@ -195,7 +195,7 @@ function insert_in_hash_table!(ht::MonomialHashtable{N}, e::Monomial{N}) where {
         iszero(vidx) && break
 
         # if not free and not same hash
-        if ishashcollision(ht, vidx, e, he)
+        if ishashcollision(ht, vidx, e.exps, he)
             i += MonHash(1)
             continue
         end
