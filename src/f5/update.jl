@@ -138,7 +138,6 @@ function update_pairset!(pairset::Pairset{N},
         basis_sig_idx = index(basis.sigs[i])
 
         mult_new_elem = lcm_div(new_lm, basis_lm)
-        all(iszero, mult_new_elem.exps) && error("no")
         new_pair_sig_mon = mul(mult_new_elem, new_sig_mon)
 
         mult_basis_elem = lcm_div(basis_lm, new_lm)

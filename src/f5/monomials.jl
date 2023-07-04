@@ -5,8 +5,9 @@ function mul(a::Monomial, b::Monomial)
 end
 
 function mul!(buf::MVector{N, Exp}, a::Monomial{N}, b::Monomial{N}) where N
-    buf = a.exps + b.exps
-    return buf
+    @inbounds for i in 1:N
+        buf[i] = a.exps[i] + b.exps[i]
+    end
 end
 
 function divide(a::Monomial, b::Monomial)
@@ -42,7 +43,7 @@ end
                         a::Monomial{N},
                         b::Monomial{N}) where N
 
-    for i in 1:N
+    @inbounds for i in 1:N
         buf[i] = a.exps[i] - b.exps[i]
         if buf[i] < 0
             return false

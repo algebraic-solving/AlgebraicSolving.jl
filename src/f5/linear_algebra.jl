@@ -5,22 +5,13 @@ function echelonize!(matrix::MacaulayMatrix,
     pivots = matrix.pivots
     hash2col = matrix.hash2col
     buffer = zeros(Cbuf, matrix.ncols)
-    pivrow = Vector{ColIdx}(undef, matrix.ncols)
     col2hash = Vector{MonIdx}(undef, matrix.ncols)
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
     @inbounds for i in 1:matrix.nrows
         rev_sigorder[matrix.sig_order[i]] = i
     end
 
-    # TODO: rethink the whole hash2col, col2hash business
-    hash2col_start = 0 
-    @inbounds for (i, c) in enumerate(hash2col)
-        if !iszero(c)
-            hash2col_start = i
-            break
-        end
-    end
-    @inbounds for i in hash2col_start:(matrix.ncols+hash2col_start-1)
+    @inbounds for i in 1:matrix.ncols
         col2hash[hash2col[i]] = MonIdx(i)
     end
 
@@ -39,7 +30,6 @@ function echelonize!(matrix::MacaulayMatrix,
         !does_red && continue
 
         # buffer the row
-        # TODO: might not be happy with enumerate
         row_coeffs = matrix.coeffs[row_ind]
         @inbounds for (k, j) in enumerate(row_cols)
             col_idx = matrix.hash2col[j]
@@ -48,12 +38,12 @@ function echelonize!(matrix::MacaulayMatrix,
 
         # do the reduction
         @inbounds for j in 1:matrix.ncols
+            buffer[j] = buffer[j] % Char
+            iszero(buffer[j]) && continue
             pividx = pivots[j]
             if iszero(pividx) || rev_sigorder[pividx] >= i
                 continue
             end
-            buffer[j] = buffer[j] % Char
-            iszero(buffer[j]) && continue
 
             # subtract m*rows[pivots[j]] from buffer
             a = buffer[j]
@@ -61,24 +51,15 @@ function echelonize!(matrix::MacaulayMatrix,
             b = inv(pivcoeffs[1], char)
             m = mul(a, b, char)
 
-            nops = 0
-            pivmons = matrix.rows[pividx]
-            @inbounds for (k, m_idx) in enumerate(pivmons)
-                pivrow[k] = hash2col[m_idx]
-                if !isone(k)
-                    nops += 1
-                end
-            end
-
             buffer[j] = zero(Cbuf)
-            @inbounds for k in 1:nops
-                c = pivcoeffs[k+1]
-                colidx = pivrow[k+1]
+            @inbounds for (k, m_idx) in enumerate(matrix.rows[pividx])
+                isone(k) && continue
+                c = pivcoeffs[k]
+                colidx = hash2col[m_idx]
                 buffer[colidx] = submul(buffer[colidx], m, c, shift)
             end
         end
 
-        # TODO: not so happy with this
         new_row_length = 0
         @inbounds for j in 1:matrix.ncols
             buffer[j] = buffer[j] % Char

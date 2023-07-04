@@ -112,10 +112,10 @@ function select_tablesize(nvars, syssize)
     end
 
     if syssize < 3
-        tablesize = divch(tablesize, 2)
+        tablesize = div(tablesize, 2)
     end
     if syssize < 2
-        tablesize = divch(tablesize, 2)
+        tablesize = div(tablesize, 2)
     end
 
     return tablesize
@@ -159,16 +159,19 @@ end
 #------------------------------------------------------------------------------
 
 # if hash collision happened
-function ishashcollision(ht::MonomialHashtable, vidx, exps, he)
+function ishashcollision(ht::MonomialHashtable{N}, vidx, exps, he) where N
     # if not free and not same hash
     @inbounds if ht.hashdata[vidx].hash != he
         return true
     end
     # if not free and not same monomial
-    @inbounds if ht.exponents[vidx].exps != exps
-        return true
+    # TODO: is this shitty?
+    @inbounds for i in 1:N
+        if ht.exponents[vidx].exps[i] != exps[i]
+            return true
+        end
     end
-    false
+    return false
 end
 
 function insert_in_hash_table!(ht::MonomialHashtable{N}, e::Monomial{N}) where {N}
@@ -330,7 +333,8 @@ function insert_multiplied_poly_in_hash_table!(row::Vector{MonIdx},
         # miss
 
         # add multiplied exponent to hash table        
-        sexps[lastidx] = Monomial(etmp.deg + e.deg, copy(symbol_ht.buffer))
+        sexps[lastidx] = Monomial(etmp.deg + e.deg,
+                                  SVector(copy(symbol_ht.buffer)))
         symbol_ht.hashtable[k] = lastidx
 
         divm = divmask(sexps[lastidx], symbol_ht.divmap, symbol_ht.ndivbits)
@@ -390,7 +394,7 @@ function insert_in_basis_hash_table_pivots!(
 
             iszero(hm) && break
 
-            if ishashcollision(ht, hm, e, h)
+            if ishashcollision(ht, hm, e.exps, h)
                 i += MonHash(1)
                 continue
             end

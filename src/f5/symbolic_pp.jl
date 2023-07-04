@@ -1,4 +1,3 @@
-# TODO: enforce some type restrictions
 function select_normal!(pairset::Pairset{N},
                         basis::Basis{N},
                         matrix::MacaulayMatrix,
@@ -80,8 +79,8 @@ function select_normal!(pairset::Pairset{N},
     @inbounds for i in 1:(pairset.load-npairs)
         pairset.elems[i] = pairset.elems[i+npairs]
     end
-    resize_pivots!(matrix, symbol_ht)
     pairset.load -= npairs
+    resize_pivots!(matrix, symbol_ht)
 end
 
 function symbolic_pp!(basis::Basis{N},
@@ -89,7 +88,9 @@ function symbolic_pp!(basis::Basis{N},
                       ht::MonomialHashtable,
                       symbol_ht::MonomialHashtable) where N
 
-    i = MonIdx(symbol_ht.offset)
+    i = one(MonIdx)
+    mult = similar(ht.buffer)
+    mult2 = similar(ht.buffer)
 
     # iterate over monomials in symbolic ht
     @inbounds while i <= symbol_ht.load
@@ -109,8 +110,6 @@ function symbolic_pp!(basis::Basis{N},
 
         exp = symbol_ht.exponents[i]
         divm = symbol_ht.hashdata[i].divmask
-        mult = similar(exp.exps)
-        mult2 = similar(exp.exps)
         
         j = basis.basis_offset 
         @label target
@@ -123,15 +122,7 @@ function symbolic_pp!(basis::Basis{N},
             @inbounds red_exp = leading_monomial(basis, ht, j)
 
             # actual divisibility check
-            div_flag = true
-            @inbounds for k in 1:N
-                mult[k] = exp.exps[k] - red_exp.exps[k]
-                if mult[k] < 0
-                    div_flag = false
-                    break
-                end
-            end
-            if !div_flag
+            if !(divch!(mult, exp, red_exp))
                 j += 1
                 @goto target
             end
@@ -159,14 +150,7 @@ function symbolic_pp!(basis::Basis{N},
                 # actual divisibility check
                 div_flag = true
                 @inbounds cand_exp = leading_monomial(basis, ht, j)
-                @inbounds for k in 1:N
-                    mult2[k] = exp.exps[k] - cand_exp.exps[k]
-                    if mult2[k] < 0
-                        div_flag = false
-                        break
-                    end
-                end
-                if !div_flag
+                if !(divch!(mult2, exp, cand_exp))
                     @goto target2
                 end
 
@@ -184,7 +168,7 @@ function symbolic_pp!(basis::Basis{N},
                 # check if new candidate rewrites reducer
                 # TODO: in theory the following is correct?
                 if (divch(monomial(cand_sig),
-                        mul(monomial(mult), monomial(red_sig))) &&
+                          mul(monomial(mult), monomial(red_sig))) &&
                     comp_sigratio(basis, j, red_ind))
                     mult = mult2
                     red_ind = j
@@ -198,7 +182,6 @@ function symbolic_pp!(basis::Basis{N},
                                                       red_ind, symbol_ht,
                                                       ht, mm,
                                                       mul_red_sig)
-            
             resize_pivots!(matrix, symbol_ht)
             matrix.pivots[lead_idx] = matrix.nrows
         end
@@ -210,25 +193,24 @@ function finalize_matrix!(matrix::MacaulayMatrix,
                           symbol_ht::MonomialHashtable)
     
     # store indices into hashtable in a sorted way
-    ncols = symbol_ht.load - symbol_ht.offset + 1
+    ncols = symbol_ht.load
     matrix.ncols = ncols
 
-    hash2col = Vector{ColIdx}(undef, symbol_ht.load)
-    @inbounds for i in 1:symbol_ht.load
-        hash2col[i] = i - symbol_ht.offset + 1
+    hash2col = Vector{ColIdx}(undef, ncols)
+    @inbounds for i in 1:ncols
+        hash2col[i] = i
     end
     exps = symbol_ht.exponents
     function cmp(h1, h2)
-        iszero(h2) && return false
-        @inbounds e1 = exps[h1 + symbol_ht.offset - 1]
-        @inbounds e2 = exps[h2 + symbol_ht.offset - 1]
+        @inbounds e1 = exps[h1]
+        @inbounds e2 = exps[h2]
         return !lt_drl(e1, e2)
     end
     sort!(hash2col, lt = cmp)
     matrix.hash2col = hash2col
 
     # set pivots correctly
-    @inbounds for i in symbol_ht.offset:symbol_ht.load
+    @inbounds for i in 1:matrix.ncols
         matrix.pivots[hash2col[i]] = matrix.pivots[i]
     end
 
