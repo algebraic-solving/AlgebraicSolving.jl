@@ -2,17 +2,19 @@ function echelonize!(matrix::MacaulayMatrix,
                      char::Val{Char},
                      shift::Val{Shift}) where {Char, Shift}
 
-    pivots = matrix.pivots
-    hash2col = matrix.hash2col
+
+    col2hash = matrix.col2hash
     buffer = zeros(Cbuf, matrix.ncols)
-    col2hash = Vector{MonIdx}(undef, matrix.ncols)
+    hash2col = Vector{MonIdx}(undef, matrix.ncols)
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
+    pivots = matrix.pivots
+    
     @inbounds for i in 1:matrix.nrows
         rev_sigorder[matrix.sig_order[i]] = i
     end
 
     @inbounds for i in 1:matrix.ncols
-        col2hash[hash2col[i]] = MonIdx(i)
+        hash2col[col2hash[i]] = MonIdx(i)
     end
 
     @inbounds for i in 2:matrix.nrows
@@ -32,13 +34,12 @@ function echelonize!(matrix::MacaulayMatrix,
         # buffer the row
         row_coeffs = matrix.coeffs[row_ind]
         @inbounds for (k, j) in enumerate(row_cols)
-            col_idx = matrix.hash2col[j]
+            col_idx = hash2col[j]
             buffer[col_idx] = row_coeffs[k]
         end
 
         # do the reduction
         @inbounds for j in 1:matrix.ncols
-            buffer[j] = buffer[j] % Char
             iszero(buffer[j]) && continue
             pividx = pivots[j]
             if iszero(pividx) || rev_sigorder[pividx] >= i
@@ -84,6 +85,26 @@ function echelonize!(matrix::MacaulayMatrix,
         matrix.rows[row_ind] = new_row
         matrix.coeffs[row_ind] = new_coeffs
     end
+
+    # check if matrix is triangular
+    # for i in 1:matrix.nrows
+    #     row_ind = matrix.sig_order[i]
+    #     row_cols = matrix.rows[row_ind]
+    #     row_coeffs = matrix.coeffs[row_ind]
+    #     @inbounds for (k, j) in enumerate(row_cols)
+    #         col_idx = matrix.col2hash[j]
+    #         c = row_coeffs[k]
+    #         buffer[col_idx] = c
+    #     end
+    #     s = matrix.sigs[row_ind]
+    #     print("$((Int(s[1]), s[2].exps)): ")
+    #     println((Int).(buffer))
+    #     buffer = zeros(Cbuf, matrix.ncols)
+    # end
+        
+    # l_col_idcs = [minimum([hash2col[m_idx] for m_idx in row])
+    #               for row in matrix.rows[1:matrix.nrows]]
+    # @assert length(unique(l_col_idcs)) == length(l_col_idcs)
 end
 
 

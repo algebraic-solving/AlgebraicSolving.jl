@@ -196,9 +196,9 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     ncols = symbol_ht.load
     matrix.ncols = ncols
 
-    hash2col = Vector{ColIdx}(undef, ncols)
+    col2hash = Vector{ColIdx}(undef, ncols)
     @inbounds for i in 1:ncols
-        hash2col[i] = i
+        col2hash[i] = i
     end
     exps = symbol_ht.exponents
     function cmp(h1, h2)
@@ -206,13 +206,20 @@ function finalize_matrix!(matrix::MacaulayMatrix,
         @inbounds e2 = exps[h2]
         return !lt_drl(e1, e2)
     end
-    sort!(hash2col, lt = cmp)
-    matrix.hash2col = hash2col
+    sort!(col2hash, lt = cmp)
+    matrix.col2hash = col2hash
+    nc = matrix.ncols
+    @inbounds matrix.pivots[1:nc] = matrix.pivots[1:nc][col2hash]
 
     # set pivots correctly
-    @inbounds for i in 1:matrix.ncols
-        matrix.pivots[hash2col[i]] = matrix.pivots[i]
-    end
+    # println("PIVOTS: ")
+    # println((Int).(matrix.pivots[1:matrix.ncols]))
+    # @inbounds for i in 1:matrix.ncols
+    #     matrix.pivots[hash2col[i]] = matrix.pivots[i]
+    # end
+    # @inbounds matrix.pivots = matrix.pivots[hash2col]
+    # println("PIVOTS: ")
+    # println((Int).(matrix.pivots[1:matrix.ncols]))
 
     # sort signatures
     @info "matrix of size $((matrix.nrows, matrix.ncols)), density $(sum((length).(matrix.rows[1:matrix.nrows]))/(matrix.nrows * matrix.ncols))"
@@ -229,7 +236,7 @@ function initialize_matrix(::Val{N}) where {N}
     pivot_size = 0
     sigs = Vector{Sig{N}}(undef, 0)
     sig_order = Vector{Int}(undef, 0)
-    hash2col = Vector{ColIdx}(undef, 0)
+    col2hash = Vector{ColIdx}(undef, 0)
     coeffs = Vector{Vector{Coeff}}(undef, 0)
     toadd = Vector{Int}(undef, 0)
 
@@ -238,7 +245,7 @@ function initialize_matrix(::Val{N}) where {N}
     ncols = 0
 
     return MacaulayMatrix(rows, pivots, pivot_size,
-                          sigs, sig_order, hash2col,
+                          sigs, sig_order, col2hash,
                           coeffs, size, nrows, ncols,
                           toadd)
 end

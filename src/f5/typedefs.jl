@@ -81,8 +81,8 @@ mutable struct MacaulayMatrix{N}
     # sig(row[i]) < sig(row[j]) <=> sig_order[i] < sig_order[j]
     sig_order::Vector{Int}
 
-    # maps index in hash table to corresponding column index
-    hash2col::Vector{ColIdx}
+    # maps column index to corresponding hash index
+    col2hash::Vector{ColIdx}
 
     # row coefficients
     coeffs::Vector{Vector{Coeff}}
