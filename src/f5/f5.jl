@@ -12,7 +12,7 @@ include("update.jl")
 include("symbolic_pp.jl")
 include("linear_algebra.jl")
 
-function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
+function f5(sys::Vector{T}; infolevel = 0) where {T <: MPolyElem}
     R = first(sys).parent
     Rchar = characteristic(R)
 
@@ -109,7 +109,7 @@ function f5(sys::Vector{T}; infolevel = Logging.Warn) where {T <: MPolyElem}
     char = Val(Coeff(Rchar.d))
     shift = Val(maxshift(char))
 
-    logger = ConsoleLogger(stdout, infolevel)
+    logger = ConsoleLogger(stdout, infolevel == 0 ? Warn : Info)
     with_logger(logger) do
         f5!(basis, pairset, basis_ht, char, shift)
     end
@@ -156,7 +156,8 @@ end
 # homogenize w.r.t. the last variable
 function _homogenize(F::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
-    S, vars = PolynomialRing(base_ring(R), ["x$i" for i in 1:nvars(R)+1])
+    S, vars = PolynomialRing(base_ring(R), ["x$i" for i in 1:nvars(R)+1],
+                             ordering = :degrevlex)
     res = typeof(first(F))[]
     for f in F
         ctx = MPolyBuildCtx(S)

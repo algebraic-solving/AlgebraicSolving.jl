@@ -85,26 +85,6 @@ function echelonize!(matrix::MacaulayMatrix,
         matrix.rows[row_ind] = new_row
         matrix.coeffs[row_ind] = new_coeffs
     end
-
-    # check if matrix is triangular
-    # for i in 1:matrix.nrows
-    #     row_ind = matrix.sig_order[i]
-    #     row_cols = matrix.rows[row_ind]
-    #     row_coeffs = matrix.coeffs[row_ind]
-    #     @inbounds for (k, j) in enumerate(row_cols)
-    #         col_idx = matrix.col2hash[j]
-    #         c = row_coeffs[k]
-    #         buffer[col_idx] = c
-    #     end
-    #     s = matrix.sigs[row_ind]
-    #     print("$((Int(s[1]), s[2].exps)): ")
-    #     println((Int).(buffer))
-    #     buffer = zeros(Cbuf, matrix.ncols)
-    # end
-        
-    # l_col_idcs = [minimum([hash2col[m_idx] for m_idx in row])
-    #               for row in matrix.rows[1:matrix.nrows]]
-    # @assert length(unique(l_col_idcs)) == length(l_col_idcs)
 end
 
 
