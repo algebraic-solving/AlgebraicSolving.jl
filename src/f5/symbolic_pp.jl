@@ -224,7 +224,7 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     # println((Int).(matrix.pivots[1:matrix.ncols]))
 
     # sort signatures
-    @info "matrix of size $((matrix.nrows, matrix.ncols)), density $(sum((length).(matrix.rows[1:matrix.nrows]))/(matrix.nrows * matrix.ncols))"
+    @info "matrix of size $((matrix.nrows, matrix.ncols)), density $(@sprintf "%.2f" sum((length).(matrix.rows[1:matrix.nrows]))/(matrix.nrows * matrix.ncols))"
     matrix.sig_order = Vector{Int}(undef, matrix.nrows)
     sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
               lt = (sig1, sig2) -> lt_pot(sig1, sig2))
