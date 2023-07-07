@@ -17,7 +17,7 @@ struct Monomial{N}
     deg::Exp
     exps::SVector{N, Exp}
 end
-function monomial(exps::SVector{N, Exp}) where N
+function monomial(exps::SV) where {N, SV <: StaticArray{Tuple{N}}}
     return Monomial{N}(sum(exps), exps)
 end
 const Sig{N} = Tuple{SigIndex, Monomial{N}}
