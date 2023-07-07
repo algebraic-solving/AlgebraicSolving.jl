@@ -41,8 +41,8 @@ function select_normal!(pairset::Pairset{N},
         # add row to be reduced to matrix
         mult = divide(monomial(pair.top_sig),
                       monomial(basis.sigs[pair.top_index]))
-        write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
-                             ht, mult, pair.top_sig) 
+        l_idx = write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
+                                     ht, mult, pair.top_sig) 
 
         # mark it to be added later
         matrix.toadd[k] = matrix.nrows
@@ -50,13 +50,23 @@ function select_normal!(pairset::Pairset{N},
 
         # find the minimal top reducing bottom signature
         # input elements are stored as pairs with bot_index = 0
-        if !iszero(reducer_ind)
-            # add reducer row
+        if !iszero(reducer_ind) && iszero(matrix.pivots[l_idx])
+
             @inbounds for j in (i+1):npairs
                 pair2 = pairset.elems[j]
-                if pair2.top_sig == curr_top_sig
-                    skip[j] = true
-                    if lt_pot(pair2.bot_sig, reducer_sig)
+                if lt_pot(pair2.bot_sig, reducer_sig)
+                    new_red = false
+                    if pair2.top_sig == curr_top_sig
+                        skip[j] = true
+                        new_red = true
+                    else
+                        ind = pair2.bot_index
+                        mult = divide(monomial(pair2.bot_sig),
+                                      monomial(basis.sigs[ind]))
+                        lm = mul(mult, leading_monomial(basis, ht, ind))
+                        new_red = lm == symbol_ht.exponents[l_idx]
+                    end
+                    if new_red
                         reducer_sig = pair2.bot_sig
                         reducer_ind = pair2.bot_index
                     end
@@ -291,10 +301,10 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
                               symbol_ht::MonomialHashtable,
                               ht::MonomialHashtable,
                               mult::Monomial,
-                              sig::Sig)
+                              sig::Sig,
+                              row_ind=matrix.nrows+1)
 
     hsh = Base.hash(mult)
-    row_ind = matrix.nrows + 1
     poly = basis.monomials[basis_idx]
     row = similar(basis.monomials[basis_idx])
     check_enlarge_hashtable!(symbol_ht, length(basis.monomials[basis_idx]))
@@ -303,6 +313,8 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
                                               ht, symbol_ht)
     @inbounds matrix.coeffs[row_ind] = basis.coefficients[basis_idx]
     @inbounds matrix.sigs[row_ind] = sig
-    matrix.nrows += 1
+    if row_ind == matrix.nrows + 1
+        matrix.nrows += 1
+    end
     return first(matrix.rows[row_ind])
 end

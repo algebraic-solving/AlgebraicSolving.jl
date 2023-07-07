@@ -103,11 +103,11 @@ end
 
 @generated function makehash(::Val{N}, m) where {N}
     rng = MersenneTwister(18121987)
-    hash = :( $(MonHash(0)) )
+    hash = :( $(UInt64(0)) )
     for i in 1:N
-        hash = :($hash + $(rand(rng, MonHash))*MonHash(m[$i]))
+        hash = :($hash + $(rand(rng, MonHash))*(m[$i]))
     end
-    return hash
+    return :($hash % MonHash)
 end
 
 Base.hash(a::Monomial{N}) where N = makehash(Val(N), a.exps)
