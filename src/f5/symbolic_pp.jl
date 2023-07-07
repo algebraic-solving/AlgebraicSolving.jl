@@ -169,7 +169,7 @@ function symbolic_pp!(basis::Basis{N},
                 # TODO: in theory the following is correct?
                 if (divch(monomial(cand_sig),
                           mul(monomial(mult), monomial(red_sig))) &&
-                    comp_sigratio(basis, j, red_ind))
+                    comp_sigratio(basis, red_ind, j))
                     mult = mult2
                     red_ind = j
                     red_sig = cand_sig

@@ -187,14 +187,14 @@ function update_pairset!(pairset::Pairset{N},
                                                   new_pair_sig_mon,
                                                   j_sig_mask,
                                                   new_pair_sig_mask))
-                is_rewr = comp_sigratio(basis, j, new_basis_idx)
+                is_rewr = comp_sigratio(basis, new_basis_idx, j)
                 is_rewr && break
             end
-            if (j_sig_idx == basis_sig_idx && divch(monomial(basis.sigs[j]),
-                                                    basis_pair_sig_mon,
-                                                    j_sig_mask,
-                                                    basis_pair_sig_mask))
-                is_rewr = comp_sigratio(basis, j, i)
+            if (j != i && j_sig_idx == basis_sig_idx && divch(monomial(basis.sigs[j]),
+                                                              basis_pair_sig_mon,
+                                                              j_sig_mask,
+                                                              basis_pair_sig_mask))
+                is_rewr = comp_sigratio(basis, i, j)
                 is_rewr && break
             end
         end
@@ -203,16 +203,16 @@ function update_pairset!(pairset::Pairset{N},
         # check both pair signatures against koszul syzygies
         # TODO: should we store the indices with the lm masks
         @inbounds for j in basis.basis_offset:(new_basis_idx-1)
-            if index(basis.sigs[j]) < new_basis_idx
+            if index(basis.sigs[j]) < new_sig_idx
                 is_rewr = divch(leading_monomial(basis, basis_ht, j),
-                              new_pair_sig_mon,
-                              basis.lm_masks[j], new_pair_sig_mask)
+                                new_pair_sig_mon,
+                                basis.lm_masks[j], new_pair_sig_mask)
                 is_rewr && break
             end
             if index(basis.sigs[j]) < basis_sig_idx
                 is_rewr = divch(leading_monomial(basis, basis_ht, j),
-                              basis_pair_sig_mon,
-                              basis.lm_masks[j], basis_pair_sig_mask)
+                                basis_pair_sig_mon,
+                                basis.lm_masks[j], basis_pair_sig_mask)
                 is_rewr && break
             end
         end
