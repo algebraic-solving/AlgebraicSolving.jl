@@ -20,6 +20,9 @@ function f5(sys::Vector{T}; infolevel = 0) where {T <: MPolyElem}
     if Rchar > 2^31
         error("At the moment we only support finite fields up to prime characteristic < 2^31.")
     end
+    if R.ord != 2
+        error("Please set `ordering = :degrevlex` when specifying your ring")
+    end
     sysl = length(sys)
     degs = Vector{Exp}(undef, sysl)
     @inbounds for (i, f) in enumerate(sys)
