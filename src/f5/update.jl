@@ -12,12 +12,8 @@ function update_basis!(basis::Basis,
     new_syz_c = 0
 
     add_indices = matrix.toadd
-    # for now make sure that we add elements in signature order
-    # TODO: shouldn't these be already sorted?
-    sort!(add_indices,
-          lt = (i1, i2) -> matrix.sig_order[i1] < matrix.sig_order[i2]) 
 
-    @inbounds for i in add_indices
+    @inbounds for i in add_indices[1:matrix.toadd_length]
         # determine if row is zero
         row = matrix.rows[i]
         new_sig = matrix.sigs[i]
@@ -109,21 +105,22 @@ function update_pairset!(pairset::Pairset{N},
     # check existing pairs for rewriteability against element
     # at new_basis_idx
     bmask = basis.sigmasks[new_basis_idx]
+    # TODO: do we need to check sigratios here
     @inbounds for i in 1:pairset.load
         p = pairset.elems[i]
         (iszero(p.top_index) || index(p.top_sig) != new_sig_idx) && continue
         if divch(new_sig_mon, monomial(p.top_sig), mask(bmask), p.top_sig_mask)
-            if comp_sigratio(basis, new_basis_idx, p.top_index)
-                pairset.elems[i].top_index = 0
-                continue
-            end
+            # if comp_sigratio(basis, new_basis_idx, p.top_index)
+            pairset.elems[i].top_index = 0
+            continue
+            # end
         end
         new_sig_idx != index(p.bot_sig) && continue
         if divch(new_sig_mon, monomial(p.bot_sig), mask(bmask), p.bot_sig_mask)
-            if comp_sigratio(basis, new_basis_idx, p.bot_index)
-                pairset.elems[i].top_index = 0
-                continue
-            end
+            # if comp_sigratio(basis, new_basis_idx, p.bot_index)
+            pairset.elems[i].top_index = 0
+            continue
+            # end
         end
     end
 
@@ -147,10 +144,10 @@ function update_pairset!(pairset::Pairset{N},
 
         mult_new_elem = lcm_div(new_lm, basis_lm)
         new_pair_sig_mon = mul(mult_new_elem, new_sig_mon)
-
+        
         mult_basis_elem = lcm_div(basis_lm, new_lm)
         basis_pair_sig_mon = mul(mult_basis_elem, monomial(basis.sigs[i]))
-
+        
         # check if S-pair is singular
         new_sig_idx == basis_sig_idx && new_pair_sig_mon == basis_pair_sig_mon && continue
 
@@ -175,7 +172,9 @@ function update_pairset!(pairset::Pairset{N},
                 is_rewr && break
             end
         end
-        is_rewr && continue
+        if is_rewr
+            continue
+        end
 
         # check both pair sigs against basis sigs
         @inbounds for j in basis.basis_offset:basis.basis_load-1
@@ -198,7 +197,9 @@ function update_pairset!(pairset::Pairset{N},
                 is_rewr && break
             end
         end
-        is_rewr && continue
+        if is_rewr
+            continue
+        end
             
         # check both pair signatures against koszul syzygies
         # TODO: should we store the indices with the lm masks
@@ -216,19 +217,23 @@ function update_pairset!(pairset::Pairset{N},
                 is_rewr && break
             end
         end
-        is_rewr && continue
+        if is_rewr
+            continue
+        end
         
         # TODO: do we need to distinguish between top and bottom sig
-        # TODO: this is wrong
+        # TODO: to optimize maybe
         pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
-        new_pair = if basis_sig_idx < new_sig_idx || (basis_sig_idx == new_sig_idx && comp_sigratio(basis, new_basis_idx, i))
-                SPair((new_sig_idx, new_pair_sig_mon),
-                      (basis_sig_idx, basis_pair_sig_mon),
+        new_pair_sig = (new_sig_idx, new_pair_sig_mon)
+        basis_pair_sig = (basis_sig_idx, basis_pair_sig_mon)
+        new_pair = if lt_pot(basis_pair_sig, new_pair_sig)
+                SPair(new_pair_sig,
+                      basis_pair_sig,
                       new_pair_sig_mask, basis_pair_sig_mask,
                       new_basis_idx, i, pair_deg)
             else
-                SPair((basis_sig_idx, basis_pair_sig_mon),
-                      (new_sig_idx, new_pair_sig_mon),
+                SPair(basis_pair_sig,
+                      new_pair_sig,
                       basis_pair_sig_mask, new_pair_sig_mask,
                       i, new_basis_idx, pair_deg)
         end

@@ -29,9 +29,12 @@ function select_normal!(pairset::Pairset{N},
     reinitialize_matrix!(matrix, npairs)
     skip = falses(npairs)
 
-    k = 1
     @inbounds for i in 1:npairs
-        skip[i] && continue
+        if skip[i]
+            curr_top_sig = pair.top_sig
+            continue
+        end
+
         pair = pairset.elems[i]
         # for each unique pair signature
         curr_top_sig = pair.top_sig
@@ -45,8 +48,10 @@ function select_normal!(pairset::Pairset{N},
                                      ht, mult, pair.top_sig) 
 
         # mark it to be added later
-        matrix.toadd[k] = matrix.nrows
-        k += 1
+        if iszero(reducer_ind)
+            matrix.toadd[matrix.toadd_length+1] = matrix.nrows
+            matrix.toadd_length += 1
+        end
 
         # find the minimal top reducing bottom signature
         # input elements are stored as pairs with bot_index = 0
@@ -89,8 +94,6 @@ function select_normal!(pairset::Pairset{N},
     @inbounds for i in 1:(pairset.load-npairs)
         pairset.elems[i] = pairset.elems[i+npairs]
     end
-    # only keep relevant part of toadd
-    @inbounds matrix.toadd = matrix.toadd[1:k-1]
     pairset.load -= npairs
     resize_pivots!(matrix, symbol_ht)
 end
@@ -118,6 +121,7 @@ function symbolic_pp!(basis::Basis{N},
             resize!(matrix.rows, matrix.size)
             resize!(matrix.sigs, matrix.size)
             resize!(matrix.coeffs, matrix.size)
+            resize!(matrix.toadd, matrix.size)
         end
 
         exp = symbol_ht.exponents[i]
@@ -223,16 +227,6 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     nc = matrix.ncols
     @inbounds matrix.pivots[1:nc] = matrix.pivots[1:nc][col2hash]
 
-    # set pivots correctly
-    # println("PIVOTS: ")
-    # println((Int).(matrix.pivots[1:matrix.ncols]))
-    # @inbounds for i in 1:matrix.ncols
-    #     matrix.pivots[hash2col[i]] = matrix.pivots[i]
-    # end
-    # @inbounds matrix.pivots = matrix.pivots[hash2col]
-    # println("PIVOTS: ")
-    # println((Int).(matrix.pivots[1:matrix.ncols]))
-
     # sort signatures
     @info "matrix of size $((matrix.nrows, matrix.ncols)), density $(@sprintf "%.2f" sum((length).(matrix.rows[1:matrix.nrows]))/(matrix.nrows * matrix.ncols))"
     matrix.sig_order = Vector{Int}(undef, matrix.nrows)
@@ -255,11 +249,12 @@ function initialize_matrix(::Val{N}) where {N}
     size = 0
     nrows = 0
     ncols = 0
+    toadd_length = 0
 
     return MacaulayMatrix(rows, pivots, pivot_size,
                           sigs, sig_order, col2hash,
                           coeffs, size, nrows, ncols,
-                          toadd)
+                          toadd, toadd_length)
 end
     
 # Refresh and initialize matrix for `npairs` elements
@@ -273,7 +268,7 @@ function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
     end
     resize!(matrix.sigs, matrix.size)
     resize!(matrix.coeffs, matrix.size)
-    resize!(matrix.toadd, npairs)
+    resize!(matrix.toadd, matrix.size)
     for i in 1:npairs
         matrix.toadd[i] = 0
     end

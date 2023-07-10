@@ -23,7 +23,7 @@ function echelonize!(matrix::MacaulayMatrix,
 
         # check if the row can be reduced
         does_red = false
-        for m_idx in row_cols
+        for (j, m_idx) in enumerate(row_cols)
             colidx = hash2col[m_idx]
             pividx = pivots[colidx]
             does_red = !iszero(pividx) && rev_sigorder[pividx] < i
@@ -82,6 +82,15 @@ function echelonize!(matrix::MacaulayMatrix,
             buffer[k] = zero(Cbuf)
             j += 1
         end
+
+        # check if row lead reduced, TODO: dont know if this is reliable
+        s = matrix.sigs[row_ind]
+        m = monomial(s)
+        @inbounds if matrix.rows[row_ind][1] != new_row[1] && any(!iszero, m.exps)
+            matrix.toadd[matrix.toadd_length+1] = row_ind
+            matrix.toadd_length += 1
+        end
+
         matrix.rows[row_ind] = new_row
         matrix.coeffs[row_ind] = new_coeffs
     end
