@@ -118,14 +118,22 @@ function f5(sys::Vector{T}; infolevel = 0) where {T <: MPolyElem}
     end
 
     # output
-    outp = typeof(first(sys))[]
+    eltp = typeof(first(sys))
+    outp = Tuple{Tuple{Int, eltp}, eltp}[]
     @inbounds for i in basis.basis_offset:basis.basis_load
         exps = [basis_ht.exponents[m].exps for m in basis.monomials[i]]
         ctx = MPolyBuildCtx(R)
         for (e, c) in zip(exps, basis.coefficients[i])
             push_term!(ctx, c, Vector{Int}(e))
         end
-        push!(outp, finish(ctx))
+        pol = finish(ctx)
+
+        s = basis.sigs[i]
+        ctx = MPolyBuildCtx(R)
+        push_term!(ctx, 1, Vector{Int}(monomial(s).exps))
+        sig = (Int(index(s)), finish(ctx))
+
+        push!(outp, (sig, pol))
     end
     return outp
 end

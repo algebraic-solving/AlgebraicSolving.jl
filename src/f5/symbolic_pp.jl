@@ -31,7 +31,6 @@ function select_normal!(pairset::Pairset{N},
 
     @inbounds for i in 1:npairs
         if skip[i]
-            curr_top_sig = pair.top_sig
             continue
         end
 
