@@ -174,7 +174,7 @@ function _homogenize(F::Vector{P}) where {P <: MPolyRingElem}
         ctx = MPolyBuildCtx(S)
         d = total_degree(f)
         for (e, c) in zip(exponent_vectors(f), coefficients(f))
-            enew = push!(e, d - sum(e))
+            enew = pushfirst!(e, d - sum(e))
             push_term!(ctx, c, e)
         end
         push!(res, finish(ctx))
