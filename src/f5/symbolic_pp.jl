@@ -153,6 +153,7 @@ function symbolic_pp!(basis::Basis{N},
                 j += 1 
             end
 
+            mul_red_sig = (index(red_sig), mul(monomial(mult), monomial(red_sig)))
             @inbounds if j <= basis.basis_load
                 cand_sig = basis.sigs[j]
                 cand_index = index(cand_sig)
@@ -163,36 +164,42 @@ function symbolic_pp!(basis::Basis{N},
                 end
 
                 # actual divisibility check
-                div_flag = true
                 @inbounds cand_exp = leading_monomial(basis, ht, j)
                 if !(divch!(mult2, exp, cand_exp))
                     @goto target2
                 end
-
+                
                 # check if new candidate reducer has smaller signature
-                if (cand_index < index(red_sig) ||
-                    lt_drl(mul(monomial(mult2), monomial(cand_sig)),
-                           mul(monomial(mult), monomial(red_sig))))
+                mul_cand_sig = (cand_index, mul(monomial(mult2), monomial(cand_sig)))
+                if lt_pot(mul_cand_sig, mul_red_sig)
 
-                    mult = mult2
+                    @inbounds for k in 1:N
+                        mult[k] = mult2[k]
+                    end
                     red_ind = j
                     red_sig = cand_sig
+                    mul_red_sig = mul_cand_sig
                     @goto target2
                 end
 
                 # check if new candidate rewrites reducer
                 # TODO: in theory the following is correct?
-                if (divch(monomial(cand_sig),
+                if (index(red_sig) == index(cand_sig) &&
+                    divch(monomial(cand_sig),
                           mul(monomial(mult), monomial(red_sig))) &&
-                    comp_sigratio(basis, red_ind, j))
-                    mult = mult2
+                    comp_sigratio(basis, j, red_ind))
+                    
+                    @inbounds for k in 1:N
+                        mult[k] = mult2[k]
+                    end
                     red_ind = j
                     red_sig = cand_sig
+                    mul_red_sig = mul_cand_sig
                     @goto target2
                 end
+                @goto target2
             end
             mm = monomial(SVector(mult))
-            mul_red_sig = (index(red_sig), mul(mm, monomial(red_sig)))
             @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
                                                       red_ind, symbol_ht,
                                                       ht, mm,

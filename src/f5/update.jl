@@ -69,14 +69,13 @@ function update_basis!(basis::Basis,
             
             # add to basis hashtable
             insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
-            # TODO: check that this is correct
             lm = basis_ht.exponents[first(row)]
 
             # add everything to basis
             l = basis.basis_load + 1
             basis.sigs[l] = new_sig
             basis.sigmasks[l] = new_sig_mask
-            basis.sigratios[l] = divide(new_sig_mon, lm)
+            basis.sigratios[l] = divide(lm, new_sig_mon)
             basis.lm_masks[l] = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
             basis.monomials[l] = row
             basis.coefficients[l] = matrix.coeffs[i]
@@ -186,14 +185,14 @@ function update_pairset!(pairset::Pairset{N},
                                                   new_pair_sig_mon,
                                                   j_sig_mask,
                                                   new_pair_sig_mask))
-                is_rewr = comp_sigratio(basis, new_basis_idx, j)
+                is_rewr = comp_sigratio(basis, j, new_basis_idx)
                 is_rewr && break
             end
             if (j != i && j_sig_idx == basis_sig_idx && divch(monomial(basis.sigs[j]),
                                                               basis_pair_sig_mon,
                                                               j_sig_mask,
                                                               basis_pair_sig_mask))
-                is_rewr = comp_sigratio(basis, i, j)
+                is_rewr = comp_sigratio(basis, j, i)
                 is_rewr && break
             end
         end
@@ -255,7 +254,7 @@ end
     rat1 = basis.sigratios[ind1]
     rat2 = basis.sigratios[ind2]
     if rat1 == rat2
-        return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
+        return lt_drl(monomial(basis.sigs[ind2]), monomial(basis.sigs[ind1]))
     end
     return lt_drl(rat1, rat2)
 end

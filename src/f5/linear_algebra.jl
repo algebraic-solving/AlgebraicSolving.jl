@@ -8,7 +8,7 @@ function echelonize!(matrix::MacaulayMatrix,
     hash2col = Vector{MonIdx}(undef, matrix.ncols)
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
     pivots = matrix.pivots
-    
+
     @inbounds for i in 1:matrix.nrows
         rev_sigorder[matrix.sig_order[i]] = i
     end

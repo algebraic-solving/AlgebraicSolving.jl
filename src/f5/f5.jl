@@ -20,9 +20,6 @@ function f5(sys::Vector{T}; infolevel = 0) where {T <: MPolyElem}
     if Rchar > 2^31
         error("At the moment we only support finite fields up to prime characteristic < 2^31.")
     end
-    if R.ord != 2
-        error("Please set `ordering = :degrevlex` when specifying your ring")
-    end
     sysl = length(sys)
     degs = Vector{Exp}(undef, sysl)
     @inbounds for (i, f) in enumerate(sys)
@@ -81,11 +78,13 @@ function f5(sys::Vector{T}; infolevel = 0) where {T <: MPolyElem}
             mons[j] = eidx
             coeffs[j] = cf
         end
+        sort!(mons, by = eidx -> basis_ht.exponents[eidx],
+              lt = lt_drl, rev = true)
 
         # signatures
         sig = (SigIndex(i), one_mon)
         lm_exps = SVector{nv}((Exp).(exps[1]))
-        sigr = monomial(-lm_exps)
+        sigr = monomial(lm_exps)
 
         # store stuff in basis
         basis.sigs[i] = sig
