@@ -44,11 +44,12 @@ function select_normal!(pairset::Pairset{N},
         mult = divide(monomial(pair.top_sig),
                       monomial(basis.sigs[pair.top_index]))
         s = basis.sigs[pair.top_index]
-        # println("selected $(mult.exps), $((Int(index(s)), monomial(s).exps))")
         
-        # println("lm $(mul(mult, leading_monomial(basis, ht, pair.top_index)))")
         l_idx = write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
                                      ht, mult, pair.top_sig) 
+        # sig = pair.top_sig
+        # lm = symbol_ht.exponents[l_idx]
+        # println("row $((Int(index(sig)), monomial(sig).exps)), $(lm.exps), $(pair.top_index)")
 
         # mark it to be added later
         if iszero(reducer_ind)
@@ -86,6 +87,9 @@ function select_normal!(pairset::Pairset{N},
             lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
                                             symbol_ht, ht, mult,
                                             reducer_sig)
+            # sig = reducer_sig
+            # lm = symbol_ht.exponents[lead_idx]
+            # println("row $((Int(index(sig)), monomial(sig).exps)), $(lm.exps)")
 
             # set pivot
             resize_pivots!(matrix, symbol_ht)
@@ -108,6 +112,7 @@ function symbolic_pp!(basis::Basis{N},
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
+    mult2 = similar(ht.buffer)
     red_sig_mon = similar(ht.buffer)
 
     # iterate over monomials in symbolic ht
@@ -134,6 +139,7 @@ function symbolic_pp!(basis::Basis{N},
         end
 
         exp = symbol_ht.exponents[i]
+        # println("checking $(exp.exps)")
         divm = symbol_ht.hashdata[i].divmask
         
         j = basis.basis_offset 
@@ -147,7 +153,7 @@ function symbolic_pp!(basis::Basis{N},
             @inbounds red_exp = leading_monomial(basis, ht, j)
 
             # actual divisibility check
-            if !(divch!(mult, exp, red_exp))
+            if !(divch!(mult2, exp, red_exp))
                 j += 1
                 @goto target
             end
@@ -156,7 +162,7 @@ function symbolic_pp!(basis::Basis{N},
             # reducer
             cand_sig = basis.sigs[j]
             mul_cand_sig = (index(cand_sig),
-                            mul(monomial(mult), monomial(cand_sig)))
+                            mul(monomial(mult2), monomial(cand_sig)))
             if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig)
                 j += 1
                 @goto target
@@ -174,6 +180,9 @@ function symbolic_pp!(basis::Basis{N},
             red_ind = j
             mul_red_sig = mul_cand_sig
             j += 1
+            @inbounds for k in 1:N
+                mult[k] = mult2[k]
+            end
             @goto target
         end
 
@@ -292,6 +301,7 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
 
     s = basis.sigs[basis_idx]
     lm = mul(mult, leading_monomial(basis, ht, basis_idx))
+    # println("row $((Int(index(sig)), monomial(sig).exps)), $(lm.exps)")
 
     @inbounds matrix.rows[row_ind] =
         insert_multiplied_poly_in_hash_table!(row, hsh, mult, poly,

@@ -9,21 +9,6 @@ function echelonize!(matrix::MacaulayMatrix,
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
     pivots = matrix.pivots
 
-    bla = matrix.sigs[1:matrix.nrows]
-    if length(bla) != length(unique(bla))
-        for i in 1:matrix.nrows
-            rw = matrix.sig_order[i]
-            if i > 1
-                rw2 = matrix.sig_order[i-1]
-                if matrix.sigs[rw] == matrix.sigs[rw2]
-                    println(matrix.sigs[rw])
-                    println(matrix.sigs[rw2])
-                    error(":(, $(rw), $(rw2)")
-                end
-            end
-        end
-    end
-
     @inbounds for i in 1:matrix.nrows
         rev_sigorder[matrix.sig_order[i]] = i
         row_ind = matrix.sig_order[i]
