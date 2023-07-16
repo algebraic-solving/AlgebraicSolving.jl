@@ -43,6 +43,10 @@ function select_normal!(pairset::Pairset{N},
         # add row to be reduced to matrix
         mult = divide(monomial(pair.top_sig),
                       monomial(basis.sigs[pair.top_index]))
+        s = basis.sigs[pair.top_index]
+        # println("selected $(mult.exps), $((Int(index(s)), monomial(s).exps))")
+        
+        # println("lm $(mul(mult, leading_monomial(basis, ht, pair.top_index)))")
         l_idx = write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
                                      ht, mult, pair.top_sig) 
 
@@ -104,7 +108,7 @@ function symbolic_pp!(basis::Basis{N},
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
-    mult2 = similar(ht.buffer)
+    red_sig_mon = similar(ht.buffer)
 
     # iterate over monomials in symbolic ht
     @inbounds while i <= symbol_ht.load
@@ -113,6 +117,12 @@ function symbolic_pp!(basis::Basis{N},
             i += one(MonIdx)
             continue
         end
+
+        red_ind = 0
+        @inbounds for j in 1:N
+            red_sig_mon[j] = zero(Exp)
+        end
+        mul_red_sig = (zero(SigIndex), monomial(red_sig_mon))
 
         # realloc matrix if necessary
         if matrix.size == matrix.nrows
@@ -142,63 +152,33 @@ function symbolic_pp!(basis::Basis{N},
                 @goto target
             end
 
+            # check if new reducer sig is smaller than possible previous
+            # reducer
+            cand_sig = basis.sigs[j]
+            mul_cand_sig = (index(cand_sig),
+                            mul(monomial(mult), monomial(cand_sig)))
+            if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig)
+                j += 1
+                @goto target
+            end
+
+            # check if reducer is rewriteable
+            cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
+                                    ht.ndivbits)
+            if rewriteable(basis, ht, j, mul_cand_sig, cand_sig_mask)
+                j += 1
+                @goto target
+            end
+
             # set reducer
             red_ind = j
-            @inbounds red_sig = basis.sigs[j]
-
-            # now that we found a reducer, we start looking for a better one
-            @label target2
+            mul_red_sig = mul_cand_sig
             j += 1
-            @inbounds while j <= basis.basis_load && !divch(basis.lm_masks[j], divm)
-                j += 1 
-            end
+            @goto target
+        end
 
-            mul_red_sig = (index(red_sig), mul(monomial(mult), monomial(red_sig)))
-            @inbounds if j <= basis.basis_load
-                cand_sig = basis.sigs[j]
-                cand_index = index(cand_sig)
-
-                # skip if index is larger than current reducer
-                if cand_index > index(red_sig)
-                    @goto target2
-                end
-
-                # actual divisibility check
-                @inbounds cand_exp = leading_monomial(basis, ht, j)
-                if !(divch!(mult2, exp, cand_exp))
-                    @goto target2
-                end
-                
-                # check if new candidate reducer has smaller signature
-                mul_cand_sig = (cand_index, mul(monomial(mult2), monomial(cand_sig)))
-                if lt_pot(mul_cand_sig, mul_red_sig)
-
-                    @inbounds for k in 1:N
-                        mult[k] = mult2[k]
-                    end
-                    red_ind = j
-                    red_sig = cand_sig
-                    mul_red_sig = mul_cand_sig
-                    @goto target2
-                end
-
-                # check if new candidate rewrites reducer
-                # TODO: in theory the following is correct?
-                if (index(red_sig) == index(cand_sig) &&
-                    divch(monomial(cand_sig),
-                          mul(monomial(mult), monomial(red_sig))) &&
-                    comp_sigratio(basis, j, red_ind))
-                    
-                    @inbounds for k in 1:N
-                        mult[k] = mult2[k]
-                    end
-                    red_ind = j
-                    red_sig = cand_sig
-                    mul_red_sig = mul_cand_sig
-                    @goto target2
-                end
-                @goto target2
-            end
+        # write to matrix
+        if !iszero(red_ind)
             mm = monomial(SVector(mult))
             @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
                                                       red_ind, symbol_ht,
@@ -309,6 +289,10 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
     poly = basis.monomials[basis_idx]
     row = similar(basis.monomials[basis_idx])
     check_enlarge_hashtable!(symbol_ht, length(basis.monomials[basis_idx]))
+
+    s = basis.sigs[basis_idx]
+    lm = mul(mult, leading_monomial(basis, ht, basis_idx))
+
     @inbounds matrix.rows[row_ind] =
         insert_multiplied_poly_in_hash_table!(row, hsh, mult, poly,
                                               ht, symbol_ht)

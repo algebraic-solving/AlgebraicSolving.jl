@@ -41,12 +41,14 @@ function update_basis!(basis::Basis,
             @inbounds for j in 1:pairset.load
                 p = pairset.elems[j]
                 index(p.top_sig) != new_idx && continue
-                if divch(new_sig_mon, p.top_sig, new_sig_mask, p.top_sig_mask)
+                if divch(new_sig_mon, monomial(p.top_sig),
+                         new_sig_mask[2], p.top_sig_mask)
                     pairset.elems[j].top_index = 0
                 end
                 index(p.bot_sig) != new_idx && continue
-                if divch(new_sig_mon, p.bot_sig, new_sig_mask, p.bot_sig_mask)
-                    pairset.elems[i].top_index = 0
+                if divch(new_sig_mon, monomial(p.bot_sig),
+                         new_sig_mask[2], p.bot_sig_mask)
+                    pairset.elems[j].top_index = 0
                 end
             end
 
@@ -109,17 +111,17 @@ function update_pairset!(pairset::Pairset{N},
         p = pairset.elems[i]
         (iszero(p.top_index) || index(p.top_sig) != new_sig_idx) && continue
         if divch(new_sig_mon, monomial(p.top_sig), mask(bmask), p.top_sig_mask)
-            # if comp_sigratio(basis, new_basis_idx, p.top_index)
-            pairset.elems[i].top_index = 0
-            continue
-            # end
+            if comp_sigratio(basis, new_basis_idx, p.top_index)
+                pairset.elems[i].top_index = 0
+                continue
+            end
         end
         new_sig_idx != index(p.bot_sig) && continue
         if divch(new_sig_mon, monomial(p.bot_sig), mask(bmask), p.bot_sig_mask)
-            # if comp_sigratio(basis, new_basis_idx, p.bot_index)
-            pairset.elems[i].top_index = 0
-            continue
-            # end
+            if comp_sigratio(basis, new_basis_idx, p.bot_index)
+                pairset.elems[i].top_index = 0
+                continue
+            end
         end
     end
 
@@ -146,11 +148,13 @@ function update_pairset!(pairset::Pairset{N},
         
         mult_basis_elem = lcm_div(basis_lm, new_lm)
         basis_pair_sig_mon = mul(mult_basis_elem, monomial(basis.sigs[i]))
+
+        new_pair_sig = (new_sig_idx, new_pair_sig_mon)
+        basis_pair_sig = (basis_sig_idx, basis_pair_sig_mon)
         
         # check if S-pair is singular
-        new_sig_idx == basis_sig_idx && new_pair_sig_mon == basis_pair_sig_mon && continue
+        new_pair_sig == basis_pair_sig && continue
 
-        is_rewr = false
         new_pair_sig_mask = divmask(new_pair_sig_mon,
                                     basis_ht.divmap,
                                     basis_ht.ndivbits)
@@ -159,72 +163,21 @@ function update_pairset!(pairset::Pairset{N},
                                       basis_ht.ndivbits)
 
         # check both pair sigs against non-trivial syzygies
-        @inbounds for j in 1:basis.syz_load
-            if index(basis.syz_masks[j]) == new_sig_idx
-                is_rewr = divch(basis.syz_sigs[j], new_pair_sig_mon,
-                              basis.syz_masks[j][2], new_pair_sig_mask) 
-                is_rewr && break
-            end
-            if index(basis.syz_masks[j]) == basis_sig_idx
-                is_rewr = divch(basis.syz_sigs[j], basis_pair_sig_mon,
-                              basis.syz_masks[j][2], basis_pair_sig_mask) 
-                is_rewr && break
-            end
-        end
-        if is_rewr
-            continue
-        end
+        rewriteable_syz(basis, new_pair_sig, new_pair_sig_mask) && continue
+        rewriteable_syz(basis, basis_pair_sig, basis_pair_sig_mask) && continue
 
         # check both pair sigs against basis sigs
-        @inbounds for j in basis.basis_offset:basis.basis_load-1
-            j == new_basis_idx && continue
-            j_sig_idx = index(basis.sigmasks[j])
-            (j_sig_idx != new_sig_idx && j_sig_idx != basis_sig_idx) && continue
-            j_sig_mask = basis.sigmasks[j][2]
-            if (j_sig_idx == new_sig_idx && divch(monomial(basis.sigs[j]),
-                                                  new_pair_sig_mon,
-                                                  j_sig_mask,
-                                                  new_pair_sig_mask))
-                is_rewr = comp_sigratio(basis, j, new_basis_idx)
-                is_rewr && break
-            end
-            if (j != i && j_sig_idx == basis_sig_idx && divch(monomial(basis.sigs[j]),
-                                                              basis_pair_sig_mon,
-                                                              j_sig_mask,
-                                                              basis_pair_sig_mask))
-                is_rewr = comp_sigratio(basis, j, i)
-                is_rewr && break
-            end
-        end
-        if is_rewr
-            continue
-        end
+        rewriteable_basis(basis, new_basis_idx, new_pair_sig, new_pair_sig_mask) && continue
+        rewriteable_basis(basis, i, basis_pair_sig, basis_pair_sig_mask) && continue
             
         # check both pair signatures against koszul syzygies
         # TODO: should we store the indices with the lm masks
-        @inbounds for j in basis.basis_offset:(new_basis_idx-1)
-            if index(basis.sigs[j]) < new_sig_idx
-                is_rewr = divch(leading_monomial(basis, basis_ht, j),
-                                new_pair_sig_mon,
-                                basis.lm_masks[j], new_pair_sig_mask)
-                is_rewr && break
-            end
-            if index(basis.sigs[j]) < basis_sig_idx
-                is_rewr = divch(leading_monomial(basis, basis_ht, j),
-                                basis_pair_sig_mon,
-                                basis.lm_masks[j], basis_pair_sig_mask)
-                is_rewr && break
-            end
-        end
-        if is_rewr
-            continue
-        end
+        rewriteable_koszul(basis, basis_ht, new_pair_sig, new_pair_sig_mask) && continue
+        rewriteable_koszul(basis, basis_ht, basis_pair_sig, basis_pair_sig_mask) && continue
         
         # TODO: do we need to distinguish between top and bottom sig
         # TODO: to optimize maybe
         pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
-        new_pair_sig = (new_sig_idx, new_pair_sig_mon)
-        basis_pair_sig = (basis_sig_idx, basis_pair_sig_mon)
         new_pair = if lt_pot(basis_pair_sig, new_pair_sig)
                 SPair(new_pair_sig,
                       basis_pair_sig,
@@ -239,6 +192,71 @@ function update_pairset!(pairset::Pairset{N},
         pairset.elems[pairset.load + 1] = new_pair
         pairset.load += 1
     end
+end
+
+@inline function rewriteable_syz(basis::Basis,
+                                 sig::Sig,
+                                 sigmask::DivMask)
+
+    ind = index(sig)
+
+    @inbounds for i in 1:basis.syz_load
+        if index(basis.syz_masks[i]) == ind
+            is_rewr = divch(basis.syz_sigs[i], monomial(sig),
+                            basis.syz_masks[i][2], sigmask) 
+            is_rewr && return true
+        end
+    end
+    return false
+end
+
+@inline function rewriteable_basis(basis::Basis,
+                                   idx::Int,
+                                   sig::Sig,
+                                   sigmask::DivMask)
+
+    ind = index(sig)
+    
+    @inbounds for i in basis.basis_offset:basis.basis_load
+        i == idx && continue
+        i_sig_idx = index(basis.sigmasks[i])
+        i_sig_idx != ind && continue
+        i_sig_mask = basis.sigmasks[i][2]
+        if divch(monomial(basis.sigs[i]), monomial(sig),
+                 i_sig_mask, sigmask)
+            is_rewr = comp_sigratio(basis, i, idx)
+            is_rewr && return true
+        end
+    end
+    return false
+end
+
+@inline function rewriteable_koszul(basis::Basis,
+                                    basis_ht::MonomialHashtable,
+                                    sig::Sig,
+                                    sigmask::DivMask)
+
+    @inbounds for i in basis.basis_offset:basis.basis_load
+        if index(basis.sigs[i]) < index(sig)
+            is_rewr = divch(leading_monomial(basis, basis_ht, i),
+                            monomial(sig),
+                            basis.lm_masks[i], sigmask)
+            is_rewr && return true
+        end
+    end
+    return false
+end
+
+function rewriteable(basis::Basis,
+                     basis_ht::MonomialHashtable,
+                     idx::Int,
+                     sig::Sig,
+                     sigmask::DivMask)
+
+    rewriteable_syz(basis, sig, sigmask) && return true
+    rewriteable_basis(basis, idx, sig, sigmask) && return true
+    rewriteable_koszul(basis, basis_ht, sig, sigmask) && return true
+    return false
 end
 
 # helper functions for readability

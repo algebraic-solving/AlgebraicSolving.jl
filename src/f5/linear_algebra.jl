@@ -9,8 +9,24 @@ function echelonize!(matrix::MacaulayMatrix,
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
     pivots = matrix.pivots
 
+    bla = matrix.sigs[1:matrix.nrows]
+    if length(bla) != length(unique(bla))
+        for i in 1:matrix.nrows
+            rw = matrix.sig_order[i]
+            if i > 1
+                rw2 = matrix.sig_order[i-1]
+                if matrix.sigs[rw] == matrix.sigs[rw2]
+                    println(matrix.sigs[rw])
+                    println(matrix.sigs[rw2])
+                    error(":(, $(rw), $(rw2)")
+                end
+            end
+        end
+    end
+
     @inbounds for i in 1:matrix.nrows
         rev_sigorder[matrix.sig_order[i]] = i
+        row_ind = matrix.sig_order[i]
     end
 
     @inbounds for i in 1:matrix.ncols
@@ -19,6 +35,7 @@ function echelonize!(matrix::MacaulayMatrix,
 
     @inbounds for i in 2:matrix.nrows
         row_ind = matrix.sig_order[i]
+
         row_cols = matrix.rows[row_ind]
 
         # check if the row can be reduced
@@ -86,7 +103,7 @@ function echelonize!(matrix::MacaulayMatrix,
         # check if row lead reduced, TODO: dont know if this is reliable
         s = matrix.sigs[row_ind]
         m = monomial(s)
-        @inbounds if matrix.rows[row_ind][1] != new_row[1] && any(!iszero, m.exps)
+        @inbounds if isempty(new_row) || (matrix.rows[row_ind][1] != new_row[1] && any(!iszero, m.exps))
             matrix.toadd[matrix.toadd_length+1] = row_ind
             matrix.toadd_length += 1
         end
