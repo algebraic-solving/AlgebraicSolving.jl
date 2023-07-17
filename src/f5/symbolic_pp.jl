@@ -47,9 +47,8 @@ function select_normal!(pairset::Pairset{N},
         
         l_idx = write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
                                      ht, mult, pair.top_sig) 
-        # sig = pair.top_sig
-        # lm = symbol_ht.exponents[l_idx]
-        # println("row $((Int(index(sig)), monomial(sig).exps)), $(lm.exps), $(pair.top_index)")
+        sig = pair.top_sig
+        lm = symbol_ht.exponents[l_idx]
 
         # mark it to be added later
         if iszero(reducer_ind)
@@ -87,9 +86,8 @@ function select_normal!(pairset::Pairset{N},
             lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
                                             symbol_ht, ht, mult,
                                             reducer_sig)
-            # sig = reducer_sig
-            # lm = symbol_ht.exponents[lead_idx]
-            # println("row $((Int(index(sig)), monomial(sig).exps)), $(lm.exps)")
+            sig = reducer_sig
+            lm = symbol_ht.exponents[lead_idx]
 
             # set pivot
             resize_pivots!(matrix, symbol_ht)

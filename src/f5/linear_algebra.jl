@@ -42,14 +42,14 @@ function echelonize!(matrix::MacaulayMatrix,
 
         # do the reduction
         @inbounds for j in 1:matrix.ncols
-            iszero(buffer[j]) && continue
+            iszero(buffer[j] % Char) && continue
             pividx = pivots[j]
             if iszero(pividx) || rev_sigorder[pividx] >= i
                 continue
             end
 
             # subtract m*rows[pivots[j]] from buffer
-            a = buffer[j]
+            a = buffer[j] % Char
             pivcoeffs = matrix.coeffs[pividx]
             b = inv(pivcoeffs[1], char)
             m = mul(a, b, char)
@@ -113,9 +113,8 @@ end
     r0 > a ? r1 : r0
 end
 
-# TODO: why is there typecasting in SignatureGB.jl
 @inline function inv(a::Coeff, ::Val{Char}) where Char
-    return invmod(a, Char)
+    return invmod(Cbuf(a), Cbuf(Char)) % Coeff
 end
 
 @inline function mul(a, b, ::Val{Char}) where Char 
