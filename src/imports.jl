@@ -4,6 +4,7 @@ using msolve_jll
 using Nemo
 using LinearAlgebra
 using StaticArrays
+using LoopVectorization
 
 import Random: MersenneTwister
 import Logging: ConsoleLogger, with_logger, Warn, Info

@@ -55,9 +55,10 @@ function echelonize!(matrix::MacaulayMatrix,
             m = mul(a, b, char)
 
             buffer[j] = zero(Cbuf)
-            @inbounds for (k, m_idx) in enumerate(matrix.rows[pividx])
-                isone(k) && continue
+            l = length(matrix.rows[pividx])
+            @turbo warn_check_args=false for k in 2:l
                 c = pivcoeffs[k]
+                m_idx = matrix.rows[pividx][k]
                 colidx = hash2col[m_idx]
                 buffer[colidx] = submul(buffer[colidx], m, c, shift)
             end
