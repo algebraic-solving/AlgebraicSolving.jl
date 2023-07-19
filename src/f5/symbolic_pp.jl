@@ -67,7 +67,7 @@ function select_normal!(pairset::Pairset{N},
                     if pair2.top_sig == curr_top_sig
                         skip[j] = true
                         new_red = true
-                    else
+                    elseif !iszero(pair2.bot_index)
                         ind = pair2.bot_index
                         mult = divide(monomial(pair2.bot_sig),
                                       monomial(basis.sigs[ind]))
