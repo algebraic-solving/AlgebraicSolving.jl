@@ -22,6 +22,8 @@ function echelonize!(matrix::MacaulayMatrix,
         row_ind = matrix.sig_order[i]
 
         row_cols = matrix.rows[row_ind]
+        l_idx = first(row_cols)
+        pivots[l_idx] == row_ind && continue
 
         # check if the row can be reduced
         does_red = false
@@ -51,8 +53,6 @@ function echelonize!(matrix::MacaulayMatrix,
 
             # subtract m*rows[pivots[j]] from buffer
             pivcoeffs = matrix.coeffs[pividx]
-            b = inv(pivcoeffs[1], char)
-            m = mul(a, b, char)
 
             buffer[j] = zero(Cbuf)
             l = length(matrix.rows[pividx])
@@ -60,12 +60,13 @@ function echelonize!(matrix::MacaulayMatrix,
                 c = pivcoeffs[k]
                 m_idx = matrix.rows[pividx][k]
                 colidx = hash2col[m_idx]
-                buffer[colidx] = submul(buffer[colidx], m, c, shift)
+                buffer[colidx] = submul(buffer[colidx], a, c, shift)
             end
         end
 
         new_row_length = 0
         @inbounds for j in 1:matrix.ncols
+            iszero(buffer[j]) && continue
             buffer[j] = buffer[j] % Char
             iszero(buffer[j]) && continue
             new_row_length += 1
@@ -73,15 +74,17 @@ function echelonize!(matrix::MacaulayMatrix,
 
         # write out matrix row again
         j = 1
+        inver = one(Coeff)
         new_row = Vector{MonIdx}(undef, new_row_length)
         new_coeffs = Vector{Coeff}(undef, new_row_length)
         @inbounds for k in 1:matrix.ncols
             iszero(buffer[k]) && continue
-            new_row[j] = col2hash[k]
-            new_coeffs[j] = buffer[k]
             if isone(j)
                 pivots[k] = row_ind
+                inver = inv(Coeff(buffer[k]), char)
             end
+            new_row[j] = col2hash[k]
+            new_coeffs[j] = isone(j) ? one(Coeff) : mul(inver, buffer[k], char)
             buffer[k] = zero(Cbuf)
             j += 1
         end
@@ -108,8 +111,8 @@ function maxshift(::Val{Char}) where Char
 end
 
 # compute a representation of a - b*c mod char (char ~ Shift)
-@inline function submul(a::Cbuf, b::Coeff, c::Coeff, ::Val{Shift}) where Shift
-    r0 = a - Cbuf(b)*Cbuf(c)
+@inline function submul(a::Cbuf, b::Cbuf, c::Coeff, ::Val{Shift}) where Shift
+    r0 = a - b*Cbuf(c)
     r1 = r0 + Shift
     r0 > a ? r1 : r0
 end
