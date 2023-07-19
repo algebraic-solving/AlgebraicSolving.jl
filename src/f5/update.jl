@@ -41,14 +41,14 @@ function update_basis!(basis::Basis,
             # kill pairs with known syz signature
             @inbounds for j in 1:pairset.load
                 p = pairset.elems[j]
-                index(p.top_sig) != new_idx && continue
-                if divch(new_sig_mon, monomial(p.top_sig),
-                         new_sig_mask[2], p.top_sig_mask)
+                cond = index(p.top_sig) == new_idx
+                if cond && divch(new_sig_mon, monomial(p.top_sig),
+                                 new_sig_mask[2], p.top_sig_mask)
                     pairset.elems[j].top_index = 0
                 end
-                index(p.bot_sig) != new_idx && continue
-                if divch(new_sig_mon, monomial(p.bot_sig),
-                         new_sig_mask[2], p.bot_sig_mask)
+                cond = index(p.bot_sig) == new_idx
+                if cond && divch(new_sig_mon, monomial(p.bot_sig),
+                                 new_sig_mask[2], p.bot_sig_mask)
                     pairset.elems[j].top_index = 0
                 end
             end
@@ -110,15 +110,15 @@ function update_pairset!(pairset::Pairset{N},
     # TODO: do we need to check sigratios here
     @inbounds for i in 1:pairset.load
         p = pairset.elems[i]
-        (iszero(p.top_index) || index(p.top_sig) != new_sig_idx) && continue
-        if divch(new_sig_mon, monomial(p.top_sig), mask(bmask), p.top_sig_mask)
+        cond = !iszero(p.top_index) && index(p.top_sig) == new_sig_idx 
+        if cond && divch(new_sig_mon, monomial(p.top_sig), mask(bmask), p.top_sig_mask)
             if comp_sigratio(basis, new_basis_idx, p.top_index)
                 pairset.elems[i].top_index = 0
                 continue
             end
         end
-        new_sig_idx != index(p.bot_sig) && continue
-        if divch(new_sig_mon, monomial(p.bot_sig), mask(bmask), p.bot_sig_mask)
+        cond = new_sig_idx == index(p.bot_sig)
+        if cond && divch(new_sig_mon, monomial(p.bot_sig), mask(bmask), p.bot_sig_mask)
             if comp_sigratio(basis, new_basis_idx, p.bot_index)
                 pairset.elems[i].top_index = 0
                 continue
