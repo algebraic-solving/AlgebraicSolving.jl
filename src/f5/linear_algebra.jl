@@ -63,6 +63,7 @@ function echelonize!(matrix::MacaulayMatrix,
                 c = pivcoeffs[k]
                 m_idx = matrix.rows[pividx][k]
                 colidx = hash2col[m_idx]
+                # buffer[colidx] = (buffer[colidx] + ((Char - a)*c % Char)) % Char
                 buffer[colidx] = submul(buffer[colidx], a, c, shift)
             end
         end
