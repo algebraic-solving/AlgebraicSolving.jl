@@ -11,9 +11,11 @@ function update_basis!(basis::Basis,
     new_basis_c = 0
     new_syz_c = 0
 
-    add_indices = matrix.toadd
+    # TODO: this can be done more optimally
+    toadd = matrix.toadd[1:matrix.toadd_length]
+    sort!(toadd, by = i -> matrix.sigs[i], lt = lt_pot)
 
-    @inbounds for i in add_indices[1:matrix.toadd_length]
+    @inbounds for i in toadd
         # determine if row is zero
         row = matrix.rows[i]
         new_sig = matrix.sigs[i]
@@ -73,6 +75,8 @@ function update_basis!(basis::Basis,
             # add to basis hashtable
             insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
             lm = basis_ht.exponents[first(row)]
+            s = new_sig
+            # println("new $((Int(s[1]), s[2].exps)), $(lm.exps)")
 
             # add everything to basis
             l = basis.basis_load + 1
@@ -273,7 +277,7 @@ end
     rat1 = basis.sigratios[ind1]
     rat2 = basis.sigratios[ind2]
     if rat1 == rat2
-        return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
+        return lt_drl(monomial(basis.sigs[ind2]), monomial(basis.sigs[ind1]))
     end
     return lt_drl(rat1, rat2)
 end
