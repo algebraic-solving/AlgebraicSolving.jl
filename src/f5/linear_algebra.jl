@@ -2,6 +2,7 @@ function echelonize!(matrix::MacaulayMatrix,
                      char::Val{Char},
                      shift::Val{Shift}) where {Char, Shift}
 
+    arit_ops = 0
 
     col2hash = matrix.col2hash
     buffer = zeros(Cbuf, matrix.ncols)
@@ -22,8 +23,9 @@ function echelonize!(matrix::MacaulayMatrix,
         row_ind = matrix.sig_order[i]
 
         row_cols = matrix.rows[row_ind]
-        l_idx = first(row_cols)
-        pivots[l_idx] == row_ind && continue
+        l_col_idx = hash2col[first(row_cols)]
+        iszero(pivots[l_col_idx]) && continue
+        pivots[l_col_idx] == row_ind && continue
 
         # check if the row can be reduced
         does_red = false
@@ -56,6 +58,7 @@ function echelonize!(matrix::MacaulayMatrix,
 
             buffer[j] = zero(Cbuf)
             l = length(matrix.rows[pividx])
+            arit_ops += (l - 1)
             @turbo warn_check_args=false for k in 2:l
                 c = pivcoeffs[k]
                 m_idx = matrix.rows[pividx][k]
@@ -100,6 +103,7 @@ function echelonize!(matrix::MacaulayMatrix,
         matrix.rows[row_ind] = new_row
         matrix.coeffs[row_ind] = new_coeffs
     end
+    @info "$(arit_ops) submul's"
 end
 
 
