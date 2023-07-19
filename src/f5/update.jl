@@ -13,7 +13,7 @@ function update_basis!(basis::Basis,
 
     # TODO: this can be done more optimally
     toadd = matrix.toadd[1:matrix.toadd_length]
-    sort!(toadd, by = i -> matrix.sigs[i], lt = lt_pot)
+    # sort!(toadd, by = i -> matrix.sigs[i], lt = lt_pot)
 
     @inbounds for i in toadd
         # determine if row is zero
@@ -276,9 +276,9 @@ end
 
     rat1 = basis.sigratios[ind1]
     rat2 = basis.sigratios[ind2]
-    if rat1 == rat2
-        return lt_drl(monomial(basis.sigs[ind2]), monomial(basis.sigs[ind1]))
-    end
+    # if rat1 == rat2
+    #     return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
+    # end
     return lt_drl(rat1, rat2)
 end
 
