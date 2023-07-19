@@ -43,8 +43,6 @@ function select_normal!(pairset::Pairset{N},
         # add row to be reduced to matrix
         mult = divide(monomial(pair.top_sig),
                       monomial(basis.sigs[pair.top_index]))
-        # s = basis.sigs[pair.top_index]
-        # println("selected $((mult.exps, Int(index(s)), monomial(s).exps))")
         
         l_idx = write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
                                      ht, mult, pair.top_sig) 
@@ -66,6 +64,7 @@ function select_normal!(pairset::Pairset{N},
 
         # find the minimal top reducing bottom signature
         # input elements are stored as pairs with bot_index = 0
+        resize_pivots!(matrix, symbol_ht)
         if !iszero(reducer_ind) && iszero(matrix.pivots[l_idx])
 
             @inbounds for j in (i+1):npairs
@@ -97,7 +96,6 @@ function select_normal!(pairset::Pairset{N},
             lm = symbol_ht.exponents[lead_idx]
 
             # set pivot
-            resize_pivots!(matrix, symbol_ht)
             matrix.pivots[lead_idx] = matrix.nrows
         end
     end

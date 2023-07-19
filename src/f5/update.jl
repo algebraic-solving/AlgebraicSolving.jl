@@ -273,7 +273,7 @@ end
     rat1 = basis.sigratios[ind1]
     rat2 = basis.sigratios[ind2]
     if rat1 == rat2
-        return lt_drl(monomial(basis.sigs[ind2]), monomial(basis.sigs[ind1]))
+        return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
     end
     return lt_drl(rat1, rat2)
 end

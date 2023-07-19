@@ -24,7 +24,6 @@ function echelonize!(matrix::MacaulayMatrix,
 
         row_cols = matrix.rows[row_ind]
         l_col_idx = hash2col[first(row_cols)]
-        iszero(pivots[l_col_idx]) && continue
         pivots[l_col_idx] == row_ind && continue
 
         # check if the row can be reduced
@@ -128,4 +127,11 @@ end
 
 @inline function mul(a, b, ::Val{Char}) where Char 
     return Coeff((Cbuf(a) * Cbuf(b)) % Char)
+end
+
+# for debug helping
+
+function is_triangular(matrix::MacaulayMatrix)
+    lms = [first(row) for row in matrix.rows[1:matrix.nrows] if !isempty(row)]
+    return length(lms) == length(unique(lms))
 end
