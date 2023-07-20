@@ -35,6 +35,10 @@ function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
         end
     end
 
+    # constants for fast arithmetic
+    char = Val(Coeff(Rchar.d))
+    shift = Val(maxshift(char))
+
     # convert to and initialize our data structures
     nv = nvars(R)
     basis_ht = initialize_basis_hash_table(Val(nv))
@@ -71,15 +75,21 @@ function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
         cfs = collect(coefficients(f))
         mons = Vector{MonIdx}(undef, lf)
         coeffs = Vector{Coeff}(undef, lf)
+        inver = one(Coeff)
         @inbounds for j in 1:lf
             m = monomial(SVector{nv}((Exp).(exps[j])))
             eidx = insert_in_hash_table!(basis_ht, m)
-            cf = Coeff(cfs[j].data)
+            if isone(j)
+                inver = inv(Coeff(cfs[1].data), char)
+            end
+            cf = isone(j) ? one(Coeff) : mul(inver, Coeff(cfs[j].data), char)
             mons[j] = eidx
             coeffs[j] = cf
         end
-        sort!(mons, by = eidx -> basis_ht.exponents[eidx],
-              lt = lt_drl, rev = true)
+        s = sortperm(mons, by = eidx -> basis_ht.exponents[eidx],
+                     lt = lt_drl, rev = true)
+        @inbounds mons = mons[s]
+        @inbounds coeffs = coeffs[s]
 
         # signatures
         sig = (SigIndex(i), one_mon)
@@ -106,10 +116,6 @@ function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
         pairset.elems[i].top_sig_mask = basis.sigmasks[i][2]
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
-
-    # constants for fast arithmetic
-    char = Val(Coeff(Rchar.d))
-    shift = Val(maxshift(char))
 
     logger = ConsoleLogger(stdout, infolevel == 0 ? Warn : Info)
     with_logger(logger) do
