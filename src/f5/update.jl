@@ -226,7 +226,7 @@ end
         i == idx && continue
         i_sig_idx = index(basis.sigmasks[i])
         i_sig_idx != ind && continue
-        i_sig_mask = basis.sigmasks[i][2]
+        i_sig_mask = mask(basis.sigmasks[i])
         if divch(monomial(basis.sigs[i]), monomial(sig),
                  i_sig_mask, sigmask)
             is_rewr = comp_sigratio(basis, i, idx)

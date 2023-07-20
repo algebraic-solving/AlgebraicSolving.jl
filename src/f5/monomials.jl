@@ -28,12 +28,18 @@ end
     return iszero(a & (~b))
 end
 
-@inline function divch(a::Monomial, b::Monomial)
-    return a.deg <= b.deg && (a.exps <= b.exps)
+@inline function divch(a::Monomial{N}, b::Monomial{N}) where N
+    if a.deg <= b.deg
+        @inbounds for i in 1:N
+            a.exps[i] > b.exps[i] && return false
+        end
+        return true
+    end
+    return false
 end
 
 @inline function divch(a::Monomial, b::Monomial,
-                     am::DivMask, bm::DivMask)
+                       am::DivMask, bm::DivMask)
 
     return divch(am, bm) && divch(a, b)
 end
@@ -89,7 +95,7 @@ function divmask(e::Monomial{N},
     ctr = one(DivMask)
     res = zero(DivMask)
     o = one(DivMask)
-    for i in 1:N
+    for i in N:-1:1
         for j in 1:ndivbits
             @inbounds if e.exps[i] >= divmap[ctr]
                 res |= o << (ctr - 1)

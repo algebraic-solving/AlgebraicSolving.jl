@@ -99,8 +99,8 @@ function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
     end
 
     # compute divmasks
-    dm_one_mon = divmask(one_mon, basis_ht.divmap, basis_ht.ndivbits)
     fill_divmask!(basis_ht)
+    dm_one_mon = divmask(one_mon, basis_ht.divmap, basis_ht.ndivbits)
     @inbounds for i in 1:sysl
         basis.sigmasks[i] = (SigIndex(i), dm_one_mon)
         pairset.elems[i].top_sig_mask = basis.sigmasks[i][2]

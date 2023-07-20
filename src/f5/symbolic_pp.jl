@@ -162,7 +162,6 @@ function symbolic_pp!(basis::Basis{N},
             end
 
             # check if new reducer sig is smaller than possible previous
-            # reducer
             cand_sig = basis.sigs[j]
             mul_cand_sig = (index(cand_sig),
                             mul(monomial(mult2), monomial(cand_sig)))
