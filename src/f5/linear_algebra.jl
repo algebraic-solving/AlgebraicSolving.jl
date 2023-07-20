@@ -58,7 +58,7 @@ function echelonize!(matrix::MacaulayMatrix,
             buffer[j] = zero(Cbuf)
             l = length(matrix.rows[pividx])
             arit_ops += (l - 1)
-            @inbounds for k in 2:l
+            @turbo warn_check_args=false for k in 2:l
                 c = pivcoeffs[k]
                 m_idx = matrix.rows[pividx][k]
                 colidx = hash2col[m_idx]
