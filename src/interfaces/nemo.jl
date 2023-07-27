@@ -37,7 +37,7 @@ function _convert_to_msolve(
     else
         for i in 1:nr_gens
             for cf in coefficients(F[i])
-                push!(cfs, Int32(data(cf)))
+                push!(cfs, Int32(data(prime_field(base_ring(R))(cf))))
             end
         end
     end
@@ -85,7 +85,7 @@ function _convert_finite_field_gb_to_abstract_algebra(
     nr_vars = nvars(R)
     CR      = coefficient_ring(R)
 
-    basis = Nemo.gfp_mpoly[]
+    basis = []
     #= basis = Vector{MPolyElem}(undef, bld) =#
 
     len   = 0
