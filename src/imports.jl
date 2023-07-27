@@ -7,6 +7,7 @@ using LinearAlgebra
 import Nemo:
     bell,
     binomial,
+    degree,
     denominator,
     divexact,
     divides,
