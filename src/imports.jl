@@ -42,6 +42,7 @@ import Nemo:
     PolyElem,
     PolynomialRing,
     PolyRing,
+    prime_field,
     primorial,
     QQ,
     rising_factorial,
