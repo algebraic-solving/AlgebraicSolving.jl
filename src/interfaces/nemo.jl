@@ -18,8 +18,8 @@ function _convert_to_msolve(
     nr_terms   = sum(lens)
     field_char = characteristic(R)
 
-    if field_char > 2^31
-        error("At the moment we only support finite fields up to prime characteristic < 2^31.")
+    if field_char > 2^31 || degree(base_ring(R)) != 1
+        error("At the moment we only support prime fields up to prime characteristic < 2^31.")
     end
     # get coefficients
     if field_char == 0
@@ -37,7 +37,7 @@ function _convert_to_msolve(
     else
         for i in 1:nr_gens
             for cf in coefficients(F[i])
-                push!(cfs, Int32(data(cf)))
+                push!(cfs, Int32(data(prime_field(base_ring(R))(cf))))
             end
         end
     end
@@ -85,7 +85,7 @@ function _convert_finite_field_gb_to_abstract_algebra(
     nr_vars = nvars(R)
     CR      = coefficient_ring(R)
 
-    basis = Nemo.gfp_mpoly[]
+    basis = []
     #= basis = Vector{MPolyElem}(undef, bld) =#
 
     len   = 0

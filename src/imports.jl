@@ -7,6 +7,7 @@ using LinearAlgebra
 import Nemo:
     bell,
     binomial,
+    degree,
     denominator,
     divexact,
     divides,
@@ -42,10 +43,14 @@ import Nemo:
     PolyElem,
     PolynomialRing,
     PolyRing,
+    prime_field,
     primorial,
     QQ,
+    QQFieldElem,
+    QQMPolyRingElem,
     rising_factorial,
     root,
     unit,
     vars,
-    ZZ
+    ZZ,
+    ZZRingElem
