@@ -18,8 +18,8 @@ function _convert_to_msolve(
     nr_terms   = sum(lens)
     field_char = characteristic(R)
 
-    if field_char > 2^31
-        error("At the moment we only support finite fields up to prime characteristic < 2^31.")
+    if field_char > 2^31 || degree(base_ring(R)) != 1
+        error("At the moment we only support prime fields up to prime characteristic < 2^31.")
     end
     # get coefficients
     if field_char == 0
