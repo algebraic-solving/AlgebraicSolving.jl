@@ -216,13 +216,13 @@ is greater then zero an empty array is returned.
 julia> using AlgebraicSolving
 
 julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
-(Multivariate Polynomial Ring in x1, x2, x3 over Rational Field, Nemo.fmpq_mpoly[x1, x2, x3])
+(Multivariate polynomial ring in x1, x2, x3 over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
-Nemo.fmpq_mpoly[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
+Nemo.QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
 
 julia> rational_parametrization(I)
-AlgebraicSolving.RationalParametrization([:x1, :x2, :x3], fmpz[], 84*x^4 - 40*x^3 + x^2 + x, 336*x^3 - 120*x^2 + 2*x + 1, AbstractAlgebra.PolyElem[184*x^3 - 80*x^2 + 4*x + 1, 36*x^3 - 18*x^2 + 2*x])
+AlgebraicSolving.RationalParametrization([:x1, :x2, :x3], Nemo.ZZRingElem[], 84*x^4 - 40*x^3 + x^2 + x, 336*x^3 - 120*x^2 + 2*x + 1, AbstractAlgebra.PolyRingElem[184*x^3 - 80*x^2 + 4*x + 1, 36*x^3 - 18*x^2 + 2*x])
 ```
 """
 function rational_parametrization(
@@ -269,18 +269,18 @@ the rational roots of the ideal.
 julia> using AlgebraicSolving
 
 julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
-(Multivariate Polynomial Ring in x1, x2, x3 over Rational Field, Nemo.fmpq_mpoly[x1, x2, x3])
+(Multivariate polynomial ring in x1, x2, x3 over QQ, Nemo.QQMPolyRingElem[[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
-Nemo.fmpq_mpoly[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
+Nemo.QQMPolyRingElem[[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
 
 julia> rat_sols = rational_solutions(I)
-2-element Vector{Vector{fmpq}}:
+2-element Vector{Vector{Nemo.QQFieldElem}}:
  [1, 0, 0]
  [1//3, 0, 1//3]
 
 julia> map(r->map(p->evaluate(p, r), I.gens), rat_sols)
-2-element Vector{Vector{fmpq}}:
+2-element Vector{Vector{Nemo.QQFieldElem}}:
  [0, 0, 0]
  [0, 0, 0]
 ```

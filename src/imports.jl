@@ -46,8 +46,11 @@ import Nemo:
     prime_field,
     primorial,
     QQ,
+    QQFieldElem,
+    QQMPolyRingElem,
     rising_factorial,
     root,
     unit,
     vars,
-    ZZ
+    ZZ,
+    ZZRingElem
