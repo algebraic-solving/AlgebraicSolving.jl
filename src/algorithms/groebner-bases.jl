@@ -27,7 +27,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 julia> using AlgebraicSolving
 
 julia> R, (x,y,z) = PolynomialRing(GF(101),["x","y","z"], ordering=:degrevlex)
-(Multivariate polynomial ring in x, y, z over GF(101), Nemo.fpMPolyRingElem[x, y, z])
+(Multivariate polynomial ring in 3 variables over GF(101), Nemo.fpMPolyRingElem[x, y, z])
 
 julia> I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
 Nemo.fpMPolyRingElem[x + 2*y + 2*z + 100, x^2 + 2*y^2 + 2*z^2 + 100*x, 2*x*y + 2*y*z + 100*y]
@@ -81,20 +81,20 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 julia> using AlgebraicSolving
 
 julia> R, (x,y,z) = PolynomialRing(GF(101),["x","y","z"], ordering=:degrevlex)
-(Multivariate polynomial ring in x, y, z over GF(101), Nemo.fpMPolyRingElem[x, y, z])
+(Multivariate polynomial ring in 3 variables over GF(101), Nemo.fpMPolyRingElem[x, y, z])
 
 julia> I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
-emo.fpMPolyRingElem[x + 2*y + 2*z + 100, x^2 + 2*y^2 + 2*z^2 + 100*x, 2*x*y + 2*y*z + 100*y]
+Nemo.fpMPolyRingElem[x + 2*y + 2*z + 100, x^2 + 2*y^2 + 2*z^2 + 100*x, 2*x*y + 2*y*z + 100*y]
 
 julia> groebner_basis(I)
-4-element Vector{emo.fpMPolyRingElem}:
+4-element Vector{Nemo.fpMPolyRingElem}:
  x + 2*y + 2*z + 100
  y*z + 82*z^2 + 10*y + 40*z
  y^2 + 60*z^2 + 20*y + 81*z
  z^3 + 28*z^2 + 64*y + 13*z
 
 julia> groebner_basis(I, eliminate=2)
-1-element Vector{emo.fpMPolyRingElem}:
+1-element Vector{Nemo.fpMPolyRingElem}:
  z^4 + 38*z^3 + 95*z^2 + 95*z
 ```
 """

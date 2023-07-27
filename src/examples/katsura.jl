@@ -50,7 +50,7 @@ Returns the Katsura ideal in the given polynomial ring `R`.
 julia> using AlgebraicSolving
 
 julia> R, _ = QQ["x", "y", "z"]
-(Multivariate polynomial ring in x, y, z over Rational Field, Nemo.QQMPolyRingElem[x, y, z])
+(Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x, y, z])
 
 julia> katsura(R)
 Nemo.QQMPolyRingElem[x + 2*y + 2*z - 1, x^2 - x + 2*y^2 + 2*z^2, 2*x*y + 2*y*z - y]

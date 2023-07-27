@@ -216,7 +216,7 @@ is greater then zero an empty array is returned.
 julia> using AlgebraicSolving
 
 julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
-(Multivariate polynomial ring in x1, x2, x3 over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
+(Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
 Nemo.QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
@@ -269,10 +269,10 @@ the rational roots of the ideal.
 julia> using AlgebraicSolving
 
 julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
-(Multivariate polynomial ring in x1, x2, x3 over QQ, Nemo.QQMPolyRingElem[[x1, x2, x3])
+(Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
-Nemo.QQMPolyRingElem[[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
+Nemo.QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
 
 julia> rat_sols = rational_solutions(I)
 2-element Vector{Vector{Nemo.QQFieldElem}}:
@@ -365,13 +365,13 @@ is greater than zero an empty array is returned.
 julia> using AlgebraicSolving
 
 julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
-(Multivariate Polynomial Ring in x1, x2, x3 over Rational Field, Nemo.fmpq_mpoly[x1, x2, x3])
+(Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
-Nemo.fmpq_mpoly[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
+Nemo.QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
 
 julia> real_solutions(I)
-4-element Vector{Vector{fmpq}}:
+4-element Vector{Vector{Nemo.QQFieldElem}}:
  [5416829397//8589934592, 2708414699//8589934592, -2844258330290649520990905062759917788583//21778071482940061661655974875633165533184]
  [1, 0, 0]
  [1945971683//8589934592, 972985841//8589934592, 744426424910260862653434112767010536665//2722258935367507707706996859454145691648]
