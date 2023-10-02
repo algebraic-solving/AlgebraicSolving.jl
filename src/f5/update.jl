@@ -222,7 +222,7 @@ end
 
     ind = index(sig)
     
-    @inbounds for i in basis.basis_offset:basis.basis_load
+    @inbounds for i in basis.basis_load:-1:basis.basis_offset
         i == idx && continue
         i_sig_idx = index(basis.sigmasks[i])
         i_sig_idx != ind && continue
