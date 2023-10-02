@@ -15,5 +15,6 @@ include("algorithms/solvers.jl")
 include("f5/f5.jl")
 #= examples =#
 include("examples/katsura.jl")
+include("examples/cyclic.jl")
 
 end # module AlgebraicSolving
