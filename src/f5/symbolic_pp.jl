@@ -238,6 +238,7 @@ function initialize_matrix(::Val{N}) where {N}
     pivots = Vector{Int}(undef, 0)
     pivot_size = 0
     sigs = Vector{Sig{N}}(undef, 0)
+    parent_inds = Vector{Int}(undef, 0)
     sig_order = Vector{Int}(undef, 0)
     col2hash = Vector{ColIdx}(undef, 0)
     coeffs = Vector{Vector{Coeff}}(undef, 0)
@@ -249,9 +250,9 @@ function initialize_matrix(::Val{N}) where {N}
     toadd_length = 0
 
     return MacaulayMatrix(rows, pivots, pivot_size,
-                          sigs, sig_order, col2hash,
-                          coeffs, size, nrows, ncols,
-                          toadd, toadd_length)
+                          sigs, parent_inds, sig_order,
+                          col2hash, coeffs, size, nrows,
+                          ncols, toadd, toadd_length)
 end
     
 # Refresh and initialize matrix for `npairs` elements
@@ -264,6 +265,7 @@ function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
         matrix.pivots[i] = 0
     end
     resize!(matrix.sigs, matrix.size)
+    resize!(matrix.parent_inds, matrix.size)
     resize!(matrix.coeffs, matrix.size)
     resize!(matrix.toadd, matrix.size)
     for i in 1:npairs
@@ -310,6 +312,7 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
                                               ht, symbol_ht)
     @inbounds matrix.coeffs[row_ind] = basis.coefficients[basis_idx]
     @inbounds matrix.sigs[row_ind] = sig
+    @inbounds matrix.parent_inds[row_ind] = basis_idx
     if row_ind == matrix.nrows + 1
         matrix.nrows += 1
     end

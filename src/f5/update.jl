@@ -24,7 +24,6 @@ function update_basis!(basis::Basis,
         new_sig_mask = (new_idx, divmask(new_sig_mon, basis_ht.divmap,
                                          basis_ht.ndivbits))
         if isempty(row)
-            # println("syzygy $((Int(new_idx), new_sig_mon.exps))")
             new_syz_c += 1
 
             # make sure we have enough space
@@ -64,19 +63,19 @@ function update_basis!(basis::Basis,
             if basis.basis_load == basis.basis_size
                 basis.basis_size *= 2
                 resize!(basis.sigs, basis.basis_size)
-                resize!(sigmasks, basis.basis_size)
-                resize!(sigratios, basis.basis_size)
-                resize!(lm_masks, basis.basis_size)
-                resize!(monomials, basis.basis_size)
-                resize!(coefficients, basis.basis_size)
-                resize!(is_red, basis.basis_size)
+                resize!(basis.sigmasks, basis.basis_size)
+                resize!(basis.sigratios, basis.basis_size)
+                resize!(basis.rewrite_nodes, basis.basis_size)
+                resize!(basis.lm_masks, basis.basis_size)
+                resize!(basis.monomials, basis.basis_size)
+                resize!(basis.coefficients, basis.basis_size)
+                resize!(basis.is_red, basis.basis_size)
             end
             
             # add to basis hashtable
             insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
             lm = basis_ht.exponents[first(row)]
             s = new_sig
-            # println("new $((Int(s[1]), s[2].exps)), $(lm.exps)")
 
             # add everything to basis
             l = basis.basis_load + 1

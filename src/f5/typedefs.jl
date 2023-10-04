@@ -29,6 +29,12 @@ mutable struct Basis{N}
 
     sigratios::Vector{Monomial{N}}
 
+    # tree structure:
+    #   - parent of i is rewrite_nodes[i][1]
+    #   - children of i are rewrite_nodes[i][2:end]
+    # careful: indices are shifted by + 1 compared to basis indices
+    rewrite_nodes::Vector{Vector{Int}}
+
     lm_masks::Vector{DivMask}
 
     monomials::Vector{Vector{MonIdx}}
@@ -77,6 +83,7 @@ mutable struct MacaulayMatrix{N}
     pivots::Vector{Int}
     pivot_size::Int
 
+    parent_inds::Vector{Int}
     sigs::Vector{Sig{N}}
     # sig(row[i]) < sig(row[j]) <=> sig_order[i] < sig_order[j]
     sig_order::Vector{Int}

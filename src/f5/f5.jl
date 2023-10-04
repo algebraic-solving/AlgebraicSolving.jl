@@ -47,14 +47,15 @@ function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
     sigs = Vector{Sig{nv}}(undef, init_basis_size)
     sigmasks = Vector{MaskSig}(undef, init_basis_size)
     sigratios = Vector{Monomial{nv}}(undef, init_basis_size)
+    rewrite_nodes = Vector{Vector{Int}}(undef, init_basis_size+1)
     lm_masks = Vector{DivMask}(undef, init_basis_size)
     monomials = Vector{Vector{MonIdx}}(undef, init_basis_size)
     coeffs = Vector{Vector{Coeff}}(undef, init_basis_size)
     is_red = Vector{Bool}(undef, init_basis_size)
     syz_sigs = Vector{Monomial{nv}}(undef, init_syz_size)
     syz_masks = Vector{MaskSig}(undef, init_syz_size)
-    basis = Basis(sigs, sigmasks, sigratios, lm_masks,
-                  monomials, coeffs, is_red,
+    basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
+                  lm_masks, monomials, coeffs, is_red,
                   syz_sigs, syz_masks, degs, sysl,
                   init_basis_size, sysl + 1, 0, init_syz_size)
 
