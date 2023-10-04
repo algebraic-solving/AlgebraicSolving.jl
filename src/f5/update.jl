@@ -247,8 +247,8 @@ function find_canonical_rewriter(basis::Basis,
 
     node_ind = 1
     while true
-        node = basis.rewrite_nodes[node_ind]
-        node[1] == -1 && break
+        @inbounds node = basis.rewrite_nodes[node_ind]
+        @inbounds node[1] == -1 && break
         found_div = false
         @inbounds for i in 3:3+node[1]
             ch = node[i]
