@@ -137,6 +137,7 @@ function symbolic_pp!(basis::Basis{N},
             matrix.size *= 2
             resize!(matrix.rows, matrix.size)
             resize!(matrix.sigs, matrix.size)
+            resize!(matrix.parent_inds, matrix.size)
             resize!(matrix.coeffs, matrix.size)
             resize!(matrix.toadd, matrix.size)
         end

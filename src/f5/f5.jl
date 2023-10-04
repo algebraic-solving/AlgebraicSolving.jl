@@ -59,6 +59,10 @@ function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
                   syz_sigs, syz_masks, degs, sysl,
                   init_basis_size, sysl + 1, 0, init_syz_size)
 
+    # root node
+    basis.rewrite_nodes[1] = vcat([length(sys)-1, -1],
+                                  collect(2:length(sys)+1))
+
     # initialize pairset
     pairset = Pairset{nv}(Vector{SPair{nv}}(undef, init_pair_size),
                           sysl,
@@ -100,6 +104,7 @@ function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
         # store stuff in basis
         basis.sigs[i] = sig
         basis.sigratios[i] = sigr
+        basis.rewrite_nodes[i+1] = [-1, 1]
         basis.monomials[i] = mons
         basis.coefficients[i] = coeffs
         basis.is_red[i] = false

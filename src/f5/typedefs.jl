@@ -84,8 +84,8 @@ mutable struct MacaulayMatrix{N}
     pivots::Vector{Int}
     pivot_size::Int
 
-    parent_inds::Vector{Int}
     sigs::Vector{Sig{N}}
+    parent_inds::Vector{Int}
     # sig(row[i]) < sig(row[j]) <=> sig_order[i] < sig_order[j]
     sig_order::Vector{Int}
 
