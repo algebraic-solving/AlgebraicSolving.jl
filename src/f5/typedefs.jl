@@ -30,8 +30,9 @@ mutable struct Basis{N}
     sigratios::Vector{Monomial{N}}
 
     # tree structure:
-    #   - parent of i is rewrite_nodes[i][1]
-    #   - children of i are rewrite_nodes[i][2:end]
+    #   - length of data for i is rewrite_nodes[i][1]
+    #   - parent of i is rewrite_nodes[i][2]
+    #   - children of i are rewrite_nodes[i][3:end]
     # careful: indices are shifted by + 1 compared to basis indices
     rewrite_nodes::Vector{Vector{Int}}
 

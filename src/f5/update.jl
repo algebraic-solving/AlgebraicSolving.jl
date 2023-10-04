@@ -81,7 +81,22 @@ function update_basis!(basis::Basis,
             l = basis.basis_load + 1
             basis.sigs[l] = new_sig
             basis.sigmasks[l] = new_sig_mask
-            basis.sigratios[l] = divide(lm, new_sig_mon)
+            new_sig_ratio = divide(lm, new_sig_mon)
+            basis.sigratios[l] = new_sig_ratio
+
+            parent_ind = matrix.parent_inds[i]
+            tree_data = basis.rewrite_nodes[parent_ind]
+            insind = 3 
+            @inbounds for j in insind:insind+tree_data[1]
+                child_ind = tree_data[j]
+                rat = basis.sigratios[child_ind]
+                if lt_drl(new_sig_ratio, rat)
+                    break
+                end
+                insind += 1
+            end
+            insert!(tree_data, insind, l)
+            
             basis.lm_masks[l] = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
             basis.monomials[l] = row
             basis.coefficients[l] = matrix.coeffs[i]
