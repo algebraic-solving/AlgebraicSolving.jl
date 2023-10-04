@@ -53,18 +53,12 @@ function echelonize!(matrix::MacaulayMatrix,
             end
 
             # subtract m*rows[pivots[j]] from buffer
+            pivmons = matrix.rows[pividx]
             pivcoeffs = matrix.coeffs[pividx]
 
-            buffer[j] = zero(Cbuf)
-            l = length(matrix.rows[pividx])
-            arit_ops += (l - 1)
-            @turbo warn_check_args=false for k in 2:l
-                c = pivcoeffs[k]
-                m_idx = matrix.rows[pividx][k]
-                colidx = hash2col[m_idx]
-                # buffer[colidx] = (buffer[colidx] + ((Char - a)*c % Char)) % Char
-                buffer[colidx] = submul(buffer[colidx], a, c, shift)
-            end
+            arit_ops_new = critical_loop!(buffer, j, a, hash2col, pivmons,
+                                          pivcoeffs, shift)
+            arit_ops += arit_ops_new
         end
 
         new_row_length = 0
@@ -106,6 +100,26 @@ function echelonize!(matrix::MacaulayMatrix,
     @info "$(arit_ops) submul's"
 end
 
+# subtract mult
+# TODO: for module tracking we won't be able to assume that mult = buffer[bufind]
+@inline function critical_loop!(buffer::Vector{Cbuf},
+                                bufind::Int,
+                                mult::Cbuf,
+                                hash2col::Vector{MonIdx},
+                                pivmons::Vector{MonIdx},
+                                pivcoeffs::Vector{Coeff},
+                                shift::Val{Shift}) where Shift
+    
+    @inbounds buffer[bufind] = zero(Cbuf)
+    l = length(pivmons)
+    @turbo warn_check_args=false for k in 2:l
+        c = pivcoeffs[k]
+        m_idx = pivmons[k]
+        colidx = hash2col[m_idx]
+        buffer[colidx] = submul(buffer[colidx], mult, c, shift)
+    end
+    return l-1
+end
 
 # helper functions
 # field arithmetic
