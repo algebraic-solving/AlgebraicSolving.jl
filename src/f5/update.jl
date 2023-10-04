@@ -95,10 +95,12 @@ function update_basis!(basis::Basis,
                 end
                 insind += 1
             end
-            insert!(tree_data, insind, l)
+            insert!(tree_data, insind, l+1)
+            tree_data[1] += 1
             basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
             
-            basis.lm_masks[l] = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
+            basis.lm_masks[l] = divmask(lm, basis_ht.divmap,
+                                        basis_ht.ndivbits)
             basis.monomials[l] = row
             basis.coefficients[l] = matrix.coeffs[i]
             basis.basis_load = l
@@ -235,20 +237,34 @@ end
                                    sig::Sig,
                                    sigmask::DivMask)
 
-    ind = index(sig)
-    
-    @inbounds for i in basis.basis_load:-1:basis.basis_offset
-        i == idx && continue
-        i_sig_idx = index(basis.sigmasks[i])
-        i_sig_idx != ind && continue
-        i_sig_mask = mask(basis.sigmasks[i])
-        if divch(monomial(basis.sigs[i]), monomial(sig),
-                 i_sig_mask, sigmask)
-            is_rewr = comp_sigratio(basis, i, idx)
-            is_rewr && return true
+    k = find_canonical_rewriter(basis, sig, sigmask)
+    return k != idx
+end
+
+function find_canonical_rewriter(basis::Basis,
+                                 sig::Sig,
+                                 sigmask::DivMask)
+
+    node_ind = 1
+    while true
+        node = basis.rewrite_nodes[node_ind]
+        node[1] == -1 && break
+        found_div = false
+        @inbounds for i in 3:3+node[1]
+            ch = node[i]
+            basis_sig = basis.sigs[ch - 1]
+            basis_sigmask = basis.sigmasks[ch - 1]
+            index(basis_sig) != index(sig) && continue
+            if divch(monomial(basis_sig), monomial(sig),
+                     mask(basis_sigmask), sigmask)
+                node_ind = ch
+                found_div = true
+                break
+            end
         end
+        !found_div && break
     end
-    return false
+    return node_ind - 1
 end
 
 @inline function rewriteable_koszul(basis::Basis,
