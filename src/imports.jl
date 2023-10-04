@@ -5,6 +5,7 @@ using Nemo
 using LinearAlgebra
 using StaticArrays
 using LoopVectorization
+using AbstractTrees
 
 import Random: MersenneTwister
 import Logging: ConsoleLogger, with_logger, Warn, Info
