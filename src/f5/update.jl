@@ -1,5 +1,6 @@
 # updating the pairset and basis
 
+using LoopVectorization: getloopsym
 # add new reduced rows to basis/syzygies
 # TODO: make a new symbol ht everytime?
 function update_basis!(basis::Basis,
@@ -80,6 +81,7 @@ function update_basis!(basis::Basis,
             # add everything to basis
             l = basis.basis_load + 1
             basis.sigs[l] = new_sig
+            # println("new sig $((index(new_sig), monomial(new_sig).exps))")
             basis.sigmasks[l] = new_sig_mask
             new_sig_ratio = divide(lm, new_sig_mon)
             basis.sigratios[l] = new_sig_ratio
@@ -185,32 +187,41 @@ function update_pairset!(pairset::Pairset{N},
                                       basis_ht.ndivbits)
 
         # check both pair sigs against non-trivial syzygies
-        rewriteable_syz(basis, new_pair_sig, new_pair_sig_mask) && continue
-        rewriteable_syz(basis, basis_pair_sig, basis_pair_sig_mask) && continue
+        rewriteable_syz(basis, new_pair_sig,
+                        new_pair_sig_mask) && continue
+        rewriteable_syz(basis, basis_pair_sig,
+                        basis_pair_sig_mask) && continue
 
-        # check both pair sigs against basis sigs
-        rewriteable_basis(basis, new_basis_idx, new_pair_sig, new_pair_sig_mask) && continue
-        rewriteable_basis(basis, i, basis_pair_sig, basis_pair_sig_mask) && continue
-            
         # check both pair signatures against koszul syzygies
-        # TODO: should we store the indices with the lm masks
-        rewriteable_koszul(basis, basis_ht, new_pair_sig, new_pair_sig_mask) && continue
-        rewriteable_koszul(basis, basis_ht, basis_pair_sig, basis_pair_sig_mask) && continue
-        
-        # TODO: do we need to distinguish between top and bottom sig
-        # TODO: to optimize maybe
-        pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
-        new_pair = if lt_pot(basis_pair_sig, new_pair_sig)
-                SPair(new_pair_sig,
-                      basis_pair_sig,
-                      new_pair_sig_mask, basis_pair_sig_mask,
-                      new_basis_idx, i, pair_deg)
+        rewriteable_koszul(basis, basis_ht, new_pair_sig,
+                           new_pair_sig_mask) && continue
+        rewriteable_koszul(basis, basis_ht, basis_pair_sig,
+                           basis_pair_sig_mask) && continue
+
+        top_sig, top_sig_mask, top_index,
+        bot_sig, bot_sig_mask, bot_index = begin
+	    if lt_pot(basis_pair_sig, new_pair_sig)
+                new_pair_sig, new_pair_sig_mask, new_basis_idx,
+                basis_pair_sig, basis_pair_sig_mask, i
             else
-                SPair(basis_pair_sig,
-                      new_pair_sig,
-                      basis_pair_sig_mask, new_pair_sig_mask,
-                      i, new_basis_idx, pair_deg)
+                basis_pair_sig, basis_pair_sig_mask, i,
+                new_pair_sig, new_pair_sig_mask, new_basis_idx
+            end 
         end
+        
+        # check both pair sigs against basis sigs
+        # rewriteable_basis(basis, new_basis_idx, new_pair_sig,
+        #                   new_pair_sig_mask) && continue
+        rewriteable_basis(basis, bot_index, bot_sig,
+                          bot_sig_mask) && continue
+        
+        pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
+        mult = divide(monomial(top_sig), monomial(basis.sigs[top_index]))
+        # println("new critical signature $(mult.exps), $((index(basis.sigs[top_index]), monomial(basis.sigs[top_index]).exps))")
+        new_pair =  SPair(top_sig, bot_sig,
+                          top_sig_mask, bot_sig_mask,
+                          top_index, bot_index,
+                          pair_deg)
         pairset.elems[pairset.load + 1] = new_pair
         pairset.load += 1
     end

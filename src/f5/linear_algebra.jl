@@ -11,6 +11,7 @@ function echelonize!(matrix::MacaulayMatrix,
     pivots = matrix.pivots
 
     @inbounds for i in 1:matrix.nrows
+        # println("matrix sig $((index(matrix.sigs[i]), monomial(matrix.sigs[i]).exps))")
         rev_sigorder[matrix.sig_order[i]] = i
         row_ind = matrix.sig_order[i]
     end

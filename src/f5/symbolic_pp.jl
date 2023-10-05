@@ -37,66 +37,105 @@ function select_normal!(pairset::Pairset{N},
         pair = pairset.elems[i]
         # for each unique pair signature
         curr_top_sig = pair.top_sig
-        reducer_sig = pair.bot_sig
-        reducer_ind = pair.bot_index
+        # println("considering $((index(curr_top_sig), monomial(curr_top_sig).exps))")
+        rewr_ind = find_canonical_rewriter(basis, pair.top_sig,
+                                           pair.top_sig_mask)
 
-        # add row to be reduced to matrix
-        mult = divide(monomial(pair.top_sig),
-                      monomial(basis.sigs[pair.top_index]))
+        # mult = divide(monomial(curr_top_sig),
+        #               monomial(basis.sigs[rewr_ind]))
+        # rewr_lm = mul(mult, leading_monomial(basis, ht, rewr_ind))
         
-        l_idx = write_to_matrix_row!(matrix, basis, pair.top_index, symbol_ht,
-                                     ht, mult, pair.top_sig) 
-        sig = pair.top_sig
-        lm = symbol_ht.exponents[l_idx]
+        # rewr_does_red = false
+        # for k in basis.basis_offset:basis.basis_load
+        #     basis_lm = leading_monomial(basis, ht, k)
+        #     if divch(basis_lm, rewr_lm)
+        #         mult2 = divide(rewr_lm, basis_lm)
+        #         red_sig = (index(basis.sigs[k]),
+        #                    mul(mult2, monomial(basis.sigs[k])))
+        #         if lt_pot(red_sig, curr_top_sig)
+        #             rewr_does_red = false
+        #             break
+        #         end
+        #     end
+        # end
 
-        # mark it to be added later
-        if iszero(reducer_ind)
-            matrix.toadd[matrix.toadd_length+1] = matrix.nrows
-            matrix.toadd_length += 1
-        end
-
-        @inbounds for j in (i+1):npairs
+        pair_with_rewr_ind = 0
+        for j in i:npairs
             pair2 = pairset.elems[j]
+            if pair2.top_index == rewr_ind && pair2.top_sig == curr_top_sig
+                pair_with_rewr_ind = j
+                skip[j] = true
+            end
             if pair2.top_sig == curr_top_sig
+                # println("del $((index(pair2.top_sig), monomial(pair2.top_sig).exps))")
+                # println("$((index(pair2.bot_sig), monomial(pair2.bot_sig).exps))")
                 skip[j] = true
             end
         end
 
-        # find the minimal top reducing bottom signature
-        # input elements are stored as pairs with bot_index = 0
-        resize_pivots!(matrix, symbol_ht)
-        if !iszero(reducer_ind) && iszero(matrix.pivots[l_idx])
+        # if iszero(pair_with_rewr_ind)
+        #     println("rewriter does not reduce")
+        # end
 
-            @inbounds for j in (i+1):npairs
-                pair2 = pairset.elems[j]
-                if lt_pot(pair2.bot_sig, reducer_sig)
-                    new_red = false
-                    if pair2.top_sig == curr_top_sig
-                        new_red = true
-                    elseif !iszero(pair2.bot_index)
-                        ind = pair2.bot_index
-                        mult = divide(monomial(pair2.bot_sig),
-                                      monomial(basis.sigs[ind]))
-                        lm = mul(mult, leading_monomial(basis, ht, ind))
-                        new_red = lm == symbol_ht.exponents[l_idx]
-                    end
-                    if new_red
-                        reducer_sig = pair2.bot_sig
-                        reducer_ind = pair2.bot_index
-                    end
-                end
+        # if iszero(pair_with_rewr_ind) && rewr_does_red
+        #     println("bla")
+        # end
+
+        if !iszero(pair_with_rewr_ind)
+            # add row to be reduced to matrix
+            mult = divide(monomial(curr_top_sig),
+                          monomial(basis.sigs[rewr_ind]))
+            
+            l_idx = write_to_matrix_row!(matrix, basis, rewr_ind,
+                                         symbol_ht, ht, mult, curr_top_sig) 
+            lm = symbol_ht.exponents[l_idx]
+
+            pair = pairset.elems[pair_with_rewr_ind]
+            reducer_sig = pair.bot_sig
+            reducer_ind = pair.bot_index
+
+            # mark it to be added later
+            if iszero(reducer_ind)
+                matrix.toadd[matrix.toadd_length+1] = matrix.nrows
+                matrix.toadd_length += 1
             end
 
-            mult = divide(monomial(reducer_sig),
-                          monomial(basis.sigs[reducer_ind]))
-            lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
-                                            symbol_ht, ht, mult,
-                                            reducer_sig)
-            sig = reducer_sig
-            lm = symbol_ht.exponents[lead_idx]
+            # find the minimal top reducing bottom signature
+            # input elements are stored as pairs with bot_index = 0
+            resize_pivots!(matrix, symbol_ht)
+            if !iszero(reducer_ind) && iszero(matrix.pivots[l_idx])
 
-            # set pivot
-            matrix.pivots[lead_idx] = matrix.nrows
+                @inbounds for j in (i+1):npairs
+                    pair2 = pairset.elems[j]
+                    if lt_pot(pair2.bot_sig, reducer_sig)
+                        new_red = false
+                        # if pair2.top_sig == curr_top_sig
+                        #     new_red = true
+                        if !iszero(pair2.bot_index)
+                            ind = pair2.bot_index
+                            mult = divide(monomial(pair2.bot_sig),
+                                          monomial(basis.sigs[ind]))
+                            lm = mul(mult, leading_monomial(basis, ht, ind))
+                            new_red = lm == symbol_ht.exponents[l_idx]
+                        end
+                        if new_red
+                            reducer_sig = pair2.bot_sig
+                            reducer_ind = pair2.bot_index
+                        end
+                    end
+                end
+
+                mult = divide(monomial(reducer_sig),
+                              monomial(basis.sigs[reducer_ind]))
+                lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
+                                                symbol_ht, ht, mult,
+                                                reducer_sig)
+                sig = reducer_sig
+                lm = symbol_ht.exponents[lead_idx]
+
+                # set pivot
+                matrix.pivots[lead_idx] = matrix.nrows
+            end
         end
     end
 
