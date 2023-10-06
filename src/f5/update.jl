@@ -80,7 +80,6 @@ function update_basis!(basis::Basis,
             # add everything to basis
             l = basis.basis_load + 1
             basis.sigs[l] = new_sig
-            # println("new sig $((index(new_sig), monomial(new_sig).exps))")
             basis.sigmasks[l] = new_sig_mask
             new_sig_ratio = divide(lm, new_sig_mon)
             basis.sigratios[l] = new_sig_ratio
@@ -202,18 +201,11 @@ function update_pairset!(pairset::Pairset{N},
             end 
         end
         
-        # check both pair sigs against basis sigs
-        # rewriteable_basis(basis, new_basis_idx, new_pair_sig,
-        #                   new_pair_sig_mask) && continue
+        # check bottom pair sig against basis sigs
         rewriteable_basis(basis, bot_index, bot_sig,
                           bot_sig_mask) && continue
         
         pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
-        mult = divide(monomial(top_sig), monomial(basis.sigs[top_index]))
-        if all(iszero, mult.exps)
-            println("WARNING: sig re-reduces")
-        end
-        # println("new critical signature $(mult.exps), $((index(basis.sigs[top_index]), monomial(basis.sigs[top_index]).exps))")
         new_pair =  SPair(top_sig, bot_sig,
                           top_sig_mask, bot_sig_mask,
                           top_index, bot_index,

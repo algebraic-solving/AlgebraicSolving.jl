@@ -37,27 +37,8 @@ function select_normal!(pairset::Pairset{N},
         pair = pairset.elems[i]
         # for each unique pair signature
         curr_top_sig = pair.top_sig
-        # println("considering $((index(curr_top_sig), monomial(curr_top_sig).exps))")
         rewr_ind = find_canonical_rewriter(basis, pair.top_sig,
                                            pair.top_sig_mask)
-
-        # mult = divide(monomial(curr_top_sig),
-        #               monomial(basis.sigs[rewr_ind]))
-        # rewr_lm = mul(mult, leading_monomial(basis, ht, rewr_ind))
-        
-        # rewr_does_red = false
-        # for k in basis.basis_offset:basis.basis_load
-        #     basis_lm = leading_monomial(basis, ht, k)
-        #     if divch(basis_lm, rewr_lm)
-        #         mult2 = divide(rewr_lm, basis_lm)
-        #         red_sig = (index(basis.sigs[k]),
-        #                    mul(mult2, monomial(basis.sigs[k])))
-        #         if lt_pot(red_sig, curr_top_sig)
-        #             rewr_does_red = false
-        #             break
-        #         end
-        #     end
-        # end
 
         pair_with_rewr_ind = 0
         for j in i:npairs
@@ -67,19 +48,9 @@ function select_normal!(pairset::Pairset{N},
                 skip[j] = true
             end
             if pair2.top_sig == curr_top_sig
-                # println("del $((index(pair2.top_sig), monomial(pair2.top_sig).exps))")
-                # println("$((index(pair2.bot_sig), monomial(pair2.bot_sig).exps))")
                 skip[j] = true
             end
         end
-
-        # if iszero(pair_with_rewr_ind)
-        #     println("rewriter does not reduce")
-        # end
-
-        # if iszero(pair_with_rewr_ind) && rewr_does_red
-        #     println("bla")
-        # end
 
         if !iszero(pair_with_rewr_ind)
             # add row to be reduced to matrix
@@ -187,7 +158,6 @@ function symbolic_pp!(basis::Basis{N},
         end
 
         exp = symbol_ht.exponents[i]
-        # println("checking $(exp.exps)")
         divm = symbol_ht.hashdata[i].divmask
         
         j = basis.basis_offset 
@@ -270,7 +240,7 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     @inbounds matrix.pivots[1:nc] = matrix.pivots[1:nc][col2hash]
 
     if !iszero(matrix.nrows)
-        @info "matrix of size $((matrix.nrows, matrix.ncols)), density $(@sprintf "%.2f" sum((length).(matrix.rows[1:matrix.nrows]))/(matrix.nrows * matrix.ncols))"
+        @info "matrix of size $((matrix.nrows, matrix.ncols)), density $(@sprintf "%.2f" 100*sum((length).(matrix.rows[1:matrix.nrows]))/(matrix.nrows * matrix.ncols))%"
     end
     matrix.sig_order = Vector{Int}(undef, matrix.nrows)
     # sort signatures
@@ -352,7 +322,6 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
 
     s = basis.sigs[basis_idx]
     lm = mul(mult, leading_monomial(basis, ht, basis_idx))
-    # println("row $((Int(index(sig)), monomial(sig).exps)), $(lm.exps)")
 
     @inbounds matrix.rows[row_ind] =
         insert_multiplied_poly_in_hash_table!(row, hsh, mult, poly,
