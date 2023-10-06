@@ -128,25 +128,17 @@ function update_pairset!(pairset::Pairset{N},
 
     # check existing pairs for rewriteability against element
     # at new_basis_idx
-    bmask = basis.sigmasks[new_basis_idx]
-    # TODO: do we need to check sigratios here
-    # @inbounds for i in 1:pairset.load
-    #     p = pairset.elems[i]
-    #     cond = !iszero(p.top_index) && index(p.top_sig) == new_sig_idx 
-    #     if cond && divch(new_sig_mon, monomial(p.top_sig), mask(bmask), p.top_sig_mask)
-    #         if comp_sigratio(basis, new_basis_idx, p.top_index)
-    #             pairset.elems[i].top_index = 0
-    #             continue
-    #         end
-    #     end
-    #     cond = new_sig_idx == index(p.bot_sig)
-    #     if cond && divch(new_sig_mon, monomial(p.bot_sig), mask(bmask), p.bot_sig_mask)
-    #         if comp_sigratio(basis, new_basis_idx, p.bot_index)
-    #             pairset.elems[i].top_index = 0
-    #             continue
-    #         end
-    #     end
-    # end
+    @inbounds bmask = basis.sigmasks[new_basis_idx]
+    @inbounds parent_ind = basis.rewrite_nodes[new_basis_idx+1][2]
+    @inbounds for i in 1:pairset.load
+        p = pairset.elems[i]
+        if p.top_index == parent_ind-1
+            if divch(new_sig_mon, monomial(p.top_sig),
+                     mask(bmask), p.top_sig_mask)
+                pairset.elems[i].top_index = 0
+            end
+        end
+    end
 
     # kill pairs that became rewriteable in the previous round
     remove_red_pairs!(pairset)
