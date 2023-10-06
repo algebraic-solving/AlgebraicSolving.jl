@@ -81,8 +81,6 @@ function select_normal!(pairset::Pairset{N},
                     pair2 = pairset.elems[j]
                     if lt_pot(pair2.bot_sig, reducer_sig)
                         new_red = false
-                        # if pair2.top_sig == curr_top_sig
-                        #     new_red = true
                         if !iszero(pair2.bot_index)
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
@@ -112,7 +110,7 @@ function select_normal!(pairset::Pairset{N},
     end
     if !iszero(added_to_matrix)
         @info "selected $(npairs) pairs, degree $(deg)"
-        @info "$(added_to_matrix) added to matrix"
+        @info "$(added_to_matrix) non-rewriteable critical signatures added to matrix"
     end
 
     # remove selected pairs from pairset
