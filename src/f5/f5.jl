@@ -12,7 +12,7 @@ include("update.jl")
 include("symbolic_pp.jl")
 include("linear_algebra.jl")
 
-function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
+function sig_groebner_basis(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
     R = first(sys).parent
     Rchar = characteristic(R)
 
@@ -125,7 +125,7 @@ function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
 
     logger = ConsoleLogger(stdout, infolevel == 0 ? Warn : Info)
     with_logger(logger) do
-        f5!(basis, pairset, basis_ht, char, shift, degbound = degbound)
+        siggb!(basis, pairset, basis_ht, char, shift, degbound = degbound)
     end
 
     # output
@@ -149,12 +149,12 @@ function f5(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
     return outp
 end
 
-function f5!(basis::Basis{N},
-             pairset::Pairset,
-             basis_ht::MonomialHashtable,
-             char::Val{Char},
-             shift::Val{Shift};
-             degbound = 0) where {N, Char, Shift}
+function siggb!(basis::Basis{N},
+                pairset::Pairset,
+                basis_ht::MonomialHashtable,
+                char::Val{Char},
+                shift::Val{Shift};
+                degbound = 0) where {N, Char, Shift}
 
     while !iszero(pairset.load)
         if !iszero(degbound) && first(pairset.elems).deg > degbound
