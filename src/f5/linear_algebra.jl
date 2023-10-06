@@ -98,7 +98,9 @@ function echelonize!(matrix::MacaulayMatrix,
         matrix.rows[row_ind] = new_row
         matrix.coeffs[row_ind] = new_coeffs
     end
-    @info "$(arit_ops) submul's"
+    if !iszero(arit_ops)
+        @info "$(arit_ops) submul's"
+    end
 end
 
 # subtract mult

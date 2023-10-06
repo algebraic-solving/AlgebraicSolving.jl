@@ -110,7 +110,9 @@ function update_basis!(basis::Basis,
             update_pairset!(pairset, basis, basis_ht, l)
         end
     end
-    @info "$(new_basis_c) new, $(new_syz_c) zero"
+    if new_basis_c != 0 || new_syz_c != 0
+        @info "$(new_basis_c) new, $(new_syz_c) zero"
+    end
 end
 
 
