@@ -43,50 +43,56 @@ function select_normal!(pairset::Pairset{N},
         pair_with_rewr_ind = 0
         for j in i:npairs
             pair2 = pairset.elems[j]
-            if pair2.top_index == rewr_ind && pair2.top_sig == curr_top_sig
-                pair_with_rewr_ind = j
-                skip[j] = true
-            end
             if pair2.top_sig == curr_top_sig
                 skip[j] = true
+                if pair2.top_index == rewr_ind
+                    pair_with_rewr_ind = j
+                end
             end
         end
 
         if !iszero(pair_with_rewr_ind)
-            # add row to be reduced to matrix
-            mult = divide(monomial(curr_top_sig),
-                          monomial(basis.sigs[rewr_ind]))
-            
-            l_idx = write_to_matrix_row!(matrix, basis, rewr_ind,
-                                         symbol_ht, ht, mult, curr_top_sig)
-            added_to_matrix += 1
-            lm = symbol_ht.exponents[l_idx]
 
+            # take pair with non-rewr top signature
             pair = pairset.elems[pair_with_rewr_ind]
-            reducer_sig = pair.bot_sig
-            reducer_ind = pair.bot_index
+            
+            # add if pair is a unit vector
+            add_cond = iszero(pair.bot_index)
 
-            # mark it to be added later
-            if iszero(reducer_ind)
-                matrix.toadd[matrix.toadd_length+1] = matrix.nrows
-                matrix.toadd_length += 1
+            # check if we have a pivot already
+            if !add_cond
+                mult = divide(monomial(curr_top_sig),
+                              monomial(basis.sigs[rewr_ind]))
+                lm = mul(mult, leading_monomial(basis, ht, rewr_ind))
+                add_cond = !iszero(find_in_hash_table(symbol_ht, lm))
             end
-
-            # find the minimal top reducing bottom signature
-            # input elements are stored as pairs with bot_index = 0
-            resize_pivots!(matrix, symbol_ht)
-            if !iszero(reducer_ind) && iszero(matrix.pivots[l_idx])
-
-                @inbounds for j in (i+1):npairs
+                
+            # check if there is a non-rewriteable reducer
+            if !add_cond
+                mult = divide(monomial(curr_top_sig),
+                              monomial(basis.sigs[rewr_ind]))
+                lm = mul(mult, leading_monomial(basis, ht, rewr_ind))
+                red_sig_mon = similar(symbol_ht.buffer)
+                @inbounds for j in 1:N
+                    red_sig_mon[j] = zero(Exp)
+                end
+                reducer_sig = (zero(SigIndex), monomial(red_sig_mon))
+                reducer_ind = zero(SigIndex)
+                
+                @inbounds for j in 1:npairs
                     pair2 = pairset.elems[j]
-                    if lt_pot(pair2.bot_sig, reducer_sig)
+                    if iszero(reducer_ind) || lt_pot(pair2.bot_sig,
+                                                     reducer_sig)
                         new_red = false
                         if !iszero(pair2.bot_index)
+                            rewriteable_basis(basis, pair2.bot_index,
+                                              pair2.bot_sig,
+                                              pair2.bot_sig_mask) && continue
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
                                           monomial(basis.sigs[ind]))
-                            lm = mul(mult, leading_monomial(basis, ht, ind))
-                            new_red = lm == symbol_ht.exponents[l_idx]
+                            lm2 = mul(mult, leading_monomial(basis, ht, ind))
+                            new_red = lm2 == lm
                         end
                         if new_red
                             reducer_sig = pair2.bot_sig
@@ -95,19 +101,37 @@ function select_normal!(pairset::Pairset{N},
                     end
                 end
 
-                mult = divide(monomial(reducer_sig),
-                              monomial(basis.sigs[reducer_ind]))
-                lead_idx = write_to_matrix_row!(matrix, basis, reducer_ind,
-                                                symbol_ht, ht, mult,
-                                                reducer_sig)
-                sig = reducer_sig
-                lm = symbol_ht.exponents[lead_idx]
+                add_cond = !iszero(reducer_ind)
+                if add_cond
+                    resize_pivots!(matrix, symbol_ht)
+                    mult = divide(monomial(reducer_sig),
+                                  monomial(basis.sigs[reducer_ind]))
+                    lead_idx = write_to_matrix_row!(matrix, basis,
+                                                    reducer_ind,
+                                                    symbol_ht, ht, mult,
+                                                    reducer_sig)
 
-                # set pivot
-                matrix.pivots[lead_idx] = matrix.nrows
+                    # set pivot
+                    matrix.pivots[lead_idx] = matrix.nrows
+                end
+            end
+
+            # add row to matrix if any of the add conds is true
+            if add_cond
+                mult = divide(monomial(curr_top_sig),
+                              monomial(basis.sigs[rewr_ind]))
+                l_idx = write_to_matrix_row!(matrix, basis, rewr_ind,
+                                             symbol_ht, ht, mult,
+                                             curr_top_sig)
+                added_to_matrix += 1
+                if iszero(pair.bot_index)
+                    matrix.toadd[matrix.toadd_length+1] = matrix.nrows
+                    matrix.toadd_length += 1
+                end
             end
         end
     end
+                
     if !iszero(added_to_matrix)
         @info "selected $(npairs) pairs, degree $(deg)"
         @info "$(added_to_matrix) non-rewriteable critical signatures added to matrix"
@@ -133,8 +157,12 @@ function symbolic_pp!(basis::Basis{N},
 
     # iterate over monomials in symbolic ht
     @inbounds while i <= symbol_ht.load
+        found_reducer = false
         # skip if reducer already exists
         if !iszero(matrix.pivots[i])
+            # exp = symbol_ht.exponents[i]
+            # println("mon: $(exp.exps)")
+            # println("reducer exists")
             i += one(MonIdx)
             continue
         end
@@ -173,17 +201,18 @@ function symbolic_pp!(basis::Basis{N},
                 j += 1
                 @goto target
             end
+            # found_reducer = true
 
             # check if new reducer sig is smaller than possible previous
-            cand_sig = basis.sigs[j]
-            mul_cand_sig = (index(cand_sig),
-                            mul(monomial(mult2), monomial(cand_sig)))
             if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig)
                 j += 1
                 @goto target
             end
 
             # check if reducer is rewriteable
+            cand_sig = basis.sigs[j]
+            mul_cand_sig = (index(cand_sig),
+                            mul(monomial(mult2), monomial(cand_sig)))
             cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
                                     ht.ndivbits)
             if rewriteable(basis, ht, j, mul_cand_sig, cand_sig_mask)

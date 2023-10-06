@@ -216,6 +216,39 @@ function insert_in_hash_table!(ht::MonomialHashtable{N}, e::Monomial{N}) where {
     return vidx
 end
 
+function find_in_hash_table(ht::MonomialHashtable{N}, e::Monomial{N}) where {N}
+    # generate hash
+    he = Base.hash(e)
+
+    # find new elem position in the table
+    hidx = he
+    # power of twoooo
+    @assert ispow2(ht.size)
+    mod = MonHash(ht.size - 1)
+    i = MonHash(1)
+    hsize = MonHash(ht.size)
+
+    @inbounds while i < hsize
+        hidx = nexthashindex(he, i, mod)
+
+        vidx = ht.hashtable[hidx]
+
+        # if free
+        iszero(vidx) && break
+
+        # if not free and not same hash
+        if ishashcollision(ht, vidx, e.exps, he)
+            i += MonHash(1)
+            continue
+        end
+
+        # already present in hashtable
+        return vidx
+    end
+
+    return zero(MonIdx)
+end
+
 #------------------------------------------------------------------------------
 
 #=

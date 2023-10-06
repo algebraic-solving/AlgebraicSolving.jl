@@ -76,6 +76,7 @@ function update_basis!(basis::Basis,
             insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
             lm = basis_ht.exponents[first(row)]
             s = new_sig
+            # println("new $s, $(lm.exps)")
 
             # add everything to basis
             l = basis.basis_load + 1
@@ -136,6 +137,13 @@ function update_pairset!(pairset::Pairset{N},
         if p.top_index == parent_ind-1
             if divch(new_sig_mon, monomial(p.top_sig),
                      mask(bmask), p.top_sig_mask)
+                pairset.elems[i].top_index = 0
+                continue
+            end
+        end
+        if p.bot_index == parent_ind-1
+            if divch(new_sig_mon, monomial(p.bot_sig),
+                     mask(bmask), p.bot_sig_mask)
                 pairset.elems[i].top_index = 0
             end
         end
@@ -202,9 +210,9 @@ function update_pairset!(pairset::Pairset{N},
         end
         
         # check bottom pair sig against basis sigs
-        rewriteable_basis(basis, bot_index, bot_sig,
-                          bot_sig_mask) && continue
-        
+        # rewriteable_basis(basis, bot_index, bot_sig,
+        #                   bot_sig_mask) && continue
+
         pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
         new_pair =  SPair(top_sig, bot_sig,
                           top_sig_mask, bot_sig_mask,
@@ -239,6 +247,27 @@ end
     k = find_canonical_rewriter(basis, sig, sigmask)
     return k != idx
 end
+
+# @inline function rewriteable_basis(basis::Basis,
+#                                    idx::Int,
+#                                    sig::Sig,
+#                                    sigmask::DivMask)
+
+#     ind = index(sig)
+    
+#     @inbounds for i in basis.basis_load:-1:basis.basis_offset
+#         i == idx && continue
+#         i_sig_idx = index(basis.sigmasks[i])
+#         i_sig_idx != ind && continue
+#         i_sig_mask = mask(basis.sigmasks[i])
+#         if divch(monomial(basis.sigs[i]), monomial(sig),
+#                  i_sig_mask, sigmask)
+#             is_rewr = comp_sigratio(basis, i, idx)
+#             is_rewr && return true
+#         end
+#     end
+#     return false
+# end
 
 function find_canonical_rewriter(basis::Basis,
                                  sig::Sig,
@@ -306,9 +335,9 @@ end
 
     rat1 = basis.sigratios[ind1]
     rat2 = basis.sigratios[ind2]
-    # if rat1 == rat2
-    #     return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
-    # end
+    if rat1 == rat2
+        return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
+    end
     return lt_drl(rat1, rat2)
 end
 

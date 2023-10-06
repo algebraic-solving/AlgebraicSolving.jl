@@ -10,6 +10,22 @@ function echelonize!(matrix::MacaulayMatrix,
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
     pivots = matrix.pivots
 
+    if length(unique(matrix.sigs[1:matrix.nrows])) != length(matrix.sigs[1:matrix.nrows])
+        for i in 1:matrix.nrows
+            sig = matrix.sigs[i]
+            for j in (i+1):matrix.nrows
+                sig2 = matrix.sigs[j]
+                if sig == sig2
+                    println("$(sig)")
+                    println("$(sig2)")
+                    println("$(matrix.parent_inds[i])")
+                    println("$(matrix.parent_inds[j])")
+                    error("double sig")
+                end
+            end
+        end
+    end
+    
     @inbounds for i in 1:matrix.nrows
         # println("matrix sig $((index(matrix.sigs[i]), monomial(matrix.sigs[i]).exps))")
         rev_sigorder[matrix.sig_order[i]] = i
@@ -101,6 +117,7 @@ function echelonize!(matrix::MacaulayMatrix,
     if !iszero(arit_ops)
         @info "$(arit_ops) submul's"
     end
+    @assert is_triangular(matrix)
 end
 
 # subtract mult
