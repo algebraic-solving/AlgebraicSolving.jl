@@ -24,6 +24,7 @@ function select_normal!(pairset::Pairset{N},
     end
 
     @info "selected $(npairs) pairs, degree $(deg)"
+    added_to_matrix = 0
 
     # allocate matrix
     reinitialize_matrix!(matrix, npairs)
@@ -87,7 +88,8 @@ function select_normal!(pairset::Pairset{N},
                           monomial(basis.sigs[rewr_ind]))
             
             l_idx = write_to_matrix_row!(matrix, basis, rewr_ind,
-                                         symbol_ht, ht, mult, curr_top_sig) 
+                                         symbol_ht, ht, mult, curr_top_sig)
+            added_to_matrix += 1
             lm = symbol_ht.exponents[l_idx]
 
             pair = pairset.elems[pair_with_rewr_ind]
@@ -138,6 +140,7 @@ function select_normal!(pairset::Pairset{N},
             end
         end
     end
+    @info "$(added_to_matrix) added to matrix"
 
     # remove selected pairs from pairset
     @inbounds for i in 1:(pairset.load-npairs)

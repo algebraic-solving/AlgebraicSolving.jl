@@ -1,6 +1,5 @@
 # updating the pairset and basis
 
-using LoopVectorization: getloopsym
 # add new reduced rows to basis/syzygies
 # TODO: make a new symbol ht everytime?
 function update_basis!(basis::Basis,
@@ -131,23 +130,23 @@ function update_pairset!(pairset::Pairset{N},
     # at new_basis_idx
     bmask = basis.sigmasks[new_basis_idx]
     # TODO: do we need to check sigratios here
-    @inbounds for i in 1:pairset.load
-        p = pairset.elems[i]
-        cond = !iszero(p.top_index) && index(p.top_sig) == new_sig_idx 
-        if cond && divch(new_sig_mon, monomial(p.top_sig), mask(bmask), p.top_sig_mask)
-            if comp_sigratio(basis, new_basis_idx, p.top_index)
-                pairset.elems[i].top_index = 0
-                continue
-            end
-        end
-        cond = new_sig_idx == index(p.bot_sig)
-        if cond && divch(new_sig_mon, monomial(p.bot_sig), mask(bmask), p.bot_sig_mask)
-            if comp_sigratio(basis, new_basis_idx, p.bot_index)
-                pairset.elems[i].top_index = 0
-                continue
-            end
-        end
-    end
+    # @inbounds for i in 1:pairset.load
+    #     p = pairset.elems[i]
+    #     cond = !iszero(p.top_index) && index(p.top_sig) == new_sig_idx 
+    #     if cond && divch(new_sig_mon, monomial(p.top_sig), mask(bmask), p.top_sig_mask)
+    #         if comp_sigratio(basis, new_basis_idx, p.top_index)
+    #             pairset.elems[i].top_index = 0
+    #             continue
+    #         end
+    #     end
+    #     cond = new_sig_idx == index(p.bot_sig)
+    #     if cond && divch(new_sig_mon, monomial(p.bot_sig), mask(bmask), p.bot_sig_mask)
+    #         if comp_sigratio(basis, new_basis_idx, p.bot_index)
+    #             pairset.elems[i].top_index = 0
+    #             continue
+    #         end
+    #     end
+    # end
 
     # kill pairs that became rewriteable in the previous round
     remove_red_pairs!(pairset)
@@ -217,6 +216,9 @@ function update_pairset!(pairset::Pairset{N},
         
         pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
         mult = divide(monomial(top_sig), monomial(basis.sigs[top_index]))
+        if all(iszero, mult.exps)
+            println("WARNING: sig re-reduces")
+        end
         # println("new critical signature $(mult.exps), $((index(basis.sigs[top_index]), monomial(basis.sigs[top_index]).exps))")
         new_pair =  SPair(top_sig, bot_sig,
                           top_sig_mask, bot_sig_mask,
