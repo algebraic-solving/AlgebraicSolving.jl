@@ -23,6 +23,7 @@ function select_normal!(pairset::Pairset{N},
         end
     end
 
+    @info "selected $(npairs) pairs, degree $(deg)"
     added_to_matrix = 0
 
     # allocate matrix
@@ -64,7 +65,12 @@ function select_normal!(pairset::Pairset{N},
                 mult = divide(monomial(curr_top_sig),
                               monomial(basis.sigs[rewr_ind]))
                 lm = mul(mult, leading_monomial(basis, ht, rewr_ind))
-                add_cond = !iszero(find_in_hash_table(symbol_ht, lm))
+                l_idx = find_in_hash_table(symbol_ht, lm)
+                if !iszero(l_idx)
+                    if !iszero(matrix.pivots[l_idx])
+                        add_cond = matrix.sigs[matrix.pivots[l_idx]] != curr_top_sig
+                    end
+                end
             end
                 
             # check if there is a non-rewriteable reducer
@@ -81,8 +87,9 @@ function select_normal!(pairset::Pairset{N},
                 
                 @inbounds for j in 1:npairs
                     pair2 = pairset.elems[j]
-                    if iszero(reducer_ind) || lt_pot(pair2.bot_sig,
-                                                     reducer_sig)
+                    pair2.bot_sig == curr_top_sig && continue
+                    if iszero(reducer_ind) || lt_pot(pair2.bot_sig, reducer_sig)
+                        !lt_pot(pair2.bot_sig, curr_top_sig) && continue
                         new_red = false
                         if !iszero(pair2.bot_index)
                             rewriteable_basis(basis, pair2.bot_index,
@@ -110,7 +117,6 @@ function select_normal!(pairset::Pairset{N},
                                                     reducer_ind,
                                                     symbol_ht, ht, mult,
                                                     reducer_sig)
-
                     # set pivot
                     matrix.pivots[lead_idx] = matrix.nrows
                 end
@@ -133,7 +139,6 @@ function select_normal!(pairset::Pairset{N},
     end
                 
     if !iszero(added_to_matrix)
-        @info "selected $(npairs) pairs, degree $(deg)"
         @info "$(added_to_matrix) non-rewriteable critical signatures added to matrix"
     end
 

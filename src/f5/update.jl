@@ -209,10 +209,6 @@ function update_pairset!(pairset::Pairset{N},
             end 
         end
         
-        # check bottom pair sig against basis sigs
-        # rewriteable_basis(basis, bot_index, bot_sig,
-        #                   bot_sig_mask) && continue
-
         pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
         new_pair =  SPair(top_sig, bot_sig,
                           top_sig_mask, bot_sig_mask,
