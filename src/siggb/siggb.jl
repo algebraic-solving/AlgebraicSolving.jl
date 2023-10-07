@@ -12,7 +12,53 @@ include("update.jl")
 include("symbolic_pp.jl")
 include("linear_algebra.jl")
 
-function sig_groebner_basis(sys::Vector{T}; infolevel = 0, degbound = 0) where {T <: MPolyElem}
+@doc Markdown.doc"""
+    sig_groebner_basis(sys::Vector{T}; info_level = 0, degbound = 0) where {T <: MPolyElem}
+
+Compute a Signature Gröbner basis of the sequence `sys` w.r.t. to the
+degree reverse lexicographical monomial ordering and the degree
+position-over-term ordering induced by `sys`. The output is a vector
+of `Tuple{Tuple{Int64, T}, T}` where the first element indicates the
+signature and the second the underlying polynomial.
+
+**Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` are supported.
+**Note**: The input generators must be homogeneous.
+**Note**: The algorithms behaviour may depend heavily on how the elements in `sys` are sorted.
+
+# Arguments
+- `sys::Vector{T} where T <: MpolyElem`: input generators.
+- `info_level::Int=0`: info level printout: off (`0`, default), computational details (`1`)
+- `degbound::Int=0`: degree bound for Gröbner basis computation, compute a full Gröbner basis if `0` (default) or only up to degree `d`.
+
+# Example
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, vars = PolynomialRing(GF(17), ["x$i" for i in 1:4])
+(Multivariate polynomial ring in 4 variables over GF(17), Nemo.fpMPolyRingElem[x1, x2, x3, x4])
+
+julia> F = AlgebraicSolving.cyclic(R)
+Nemo.fpMPolyRingElem[x1 + x2 + x3 + x4, x1*x2 + x1*x4 + x2*x3 + x3*x4, x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4, x1*x2*x3*x4 + 16]
+
+julia> Fhom = AlgebraicSolving._homogenize(F.gens)
+4-element Vector{Nemo.fpMPolyRingElem}:
+ x1 + x2 + x3 + x4
+ x1*x2 + x2*x3 + x1*x4 + x3*x4
+ x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4
+ x1*x2*x3*x4 + 16*x5^4
+
+julia> sig_groebner_basis(Fhom)
+7-element Vector{Tuple{Tuple{Int64, Nemo.fpMPolyRingElem}, Nemo.fpMPolyRingElem}}:
+ ((1, 1), x1 + x2 + x3 + x4)
+ ((2, 1), x2^2 + 2*x2*x4 + x4^2)
+ ((3, 1), x2*x3^2 + x3^2*x4 + 16*x2*x4^2 + 16*x4^3)
+ ((4, 1), x2*x3*x4^2 + x3^2*x4^2 + 16*x2*x4^3 + x3*x4^3 + 16*x4^4 + 16*x5^4)
+ ((4, x3), x3^3*x4^2 + x3^2*x4^3 + 16*x3*x5^4 + 16*x4*x5^4)
+ ((4, x2), x2*x4^4 + x4^5 + 16*x2*x5^4 + 16*x4*x5^4)
+ ((4, x2*x3), x3^2*x4^4 + x2*x3*x5^4 + 16*x2*x4*x5^4 + x3*x4*x5^4 + 15*x4^2*x5^4)
+```
+"""
+function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) where {T <: MPolyElem}
     R = first(sys).parent
     Rchar = characteristic(R)
 
@@ -123,7 +169,7 @@ function sig_groebner_basis(sys::Vector{T}; infolevel = 0, degbound = 0) where {
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
-    logger = ConsoleLogger(stdout, infolevel == 0 ? Warn : Info)
+    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
         siggb!(basis, pairset, basis_ht, char, shift, degbound = degbound)
     end
