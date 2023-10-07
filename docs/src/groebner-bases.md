@@ -21,7 +21,8 @@ AlgebraicSolving allows to compute Gröbner bases for input generators over fini
 fields of characteristic smaller $2^{31}$ w.r.t. the degree reverse
 lexicographical monomial order.
 
-At the moment different variants of Faugère's F4 Algorithm are implemented.
+At the moment different variants of Faugère's F4 Algorithm are implemented as
+well as a signature based algorithm to compute Gröbner bases.
 
 ## Functionality
 
@@ -55,4 +56,14 @@ variables of the first block via the `eliminate` parameter in the
         complete_reduction::Bool=true,
         info_level::Int=0
         )
+```
+
+To compute signature Gröbner bases use
+
+```@docs
+   sig_groebner_basis(
+       sys::Vector{T} where T <: MPolyElem,
+	   info_level::Int=0,
+	   degbound::Int=0
+       )
 ```
