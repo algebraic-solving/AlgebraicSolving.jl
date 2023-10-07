@@ -298,10 +298,11 @@ end
 
     @inbounds for i in basis.basis_offset:basis.basis_load
         if index(basis.sigs[i]) < index(sig)
-            is_rewr = divch(leading_monomial(basis, basis_ht, i),
-                            monomial(sig),
-                            basis.lm_masks[i], sigmask)
-            is_rewr && return true
+            if divch(basis.lm_masks[i], sigmask)
+                if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
+                    return true
+                end
+            end
         end
     end
     return false
