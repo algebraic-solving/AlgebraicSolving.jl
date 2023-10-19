@@ -34,7 +34,7 @@ signature and the second the underlying polynomial.
 ```jldoctest
 julia> using AlgebraicSolving
 
-julia> R, vars = PolynomialRing(GF(17), ["x$i" for i in 1:4])
+julia> R, vars = polynomial_ring(GF(17), ["x$i" for i in 1:4])
 (Multivariate polynomial ring in 4 variables over GF(17), fpMPolyRingElem[x1, x2, x3, x4])
 
 julia> F = AlgebraicSolving.cyclic(R)
@@ -228,7 +228,7 @@ end
 # homogenize w.r.t. the last variable
 function _homogenize(F::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
-    S, vars = PolynomialRing(base_ring(R), ["x$i" for i in 1:nvars(R)+1],
+    S, vars = polynomial_ring(base_ring(R), ["x$i" for i in 1:nvars(R)+1],
                              ordering = :degrevlex)
     res = typeof(first(F))[]
     for f in F

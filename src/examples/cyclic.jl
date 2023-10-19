@@ -7,7 +7,7 @@ Return the Cyclic ideal in the variables of `R`.
 ```jldoctest
 julia> using AlgebraicSolving
 
-julia> R, vars = PolynomialRing(QQ, ["x$i" for i in 1:4])
+julia> R, vars = polynomial_ring(QQ, ["x$i" for i in 1:4])
 (Multivariate polynomial ring in 4 variables over QQ, QQMPolyRingElem[x1, x2, x3, x4])
 
 julia> cyclic(R)
