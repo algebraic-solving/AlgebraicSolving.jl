@@ -216,13 +216,13 @@ is greater then zero an empty array is returned.
 julia> using AlgebraicSolving
 
 julia> R,(x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
-(Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
+(Multivariate polynomial ring in 3 variables over QQ, QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
-Nemo.QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
+QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
 
 julia> rational_parametrization(I)
-AlgebraicSolving.RationalParametrization([:x1, :x2, :x3], Nemo.ZZRingElem[], 84*x^4 - 40*x^3 + x^2 + x, 336*x^3 - 120*x^2 + 2*x + 1, AbstractAlgebra.PolyRingElem[184*x^3 - 80*x^2 + 4*x + 1, 36*x^3 - 18*x^2 + 2*x])
+AlgebraicSolving.RationalParametrization([:x1, :x2, :x3], ZZRingElem[], 84*x^4 - 40*x^3 + x^2 + x, 336*x^3 - 120*x^2 + 2*x + 1, AbstractAlgebra.PolyRingElem[184*x^3 - 80*x^2 + 4*x + 1, 36*x^3 - 18*x^2 + 2*x])
 ```
 """
 function rational_parametrization(
@@ -269,18 +269,18 @@ the rational roots of the ideal.
 julia> using AlgebraicSolving
 
 julia> R,(x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
-(Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
+(Multivariate polynomial ring in 3 variables over QQ, QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
-Nemo.QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
+QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
 
 julia> rat_sols = rational_solutions(I)
-2-element Vector{Vector{Nemo.QQFieldElem}}:
+2-element Vector{Vector{QQFieldElem}}:
  [1, 0, 0]
  [1//3, 0, 1//3]
 
 julia> map(r->map(p->evaluate(p, r), I.gens), rat_sols)
-2-element Vector{Vector{Nemo.QQFieldElem}}:
+2-element Vector{Vector{QQFieldElem}}:
  [0, 0, 0]
  [0, 0, 0]
 ```
@@ -365,13 +365,13 @@ is greater than zero an empty array is returned.
 julia> using AlgebraicSolving
 
 julia> R,(x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
-(Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
+(Multivariate polynomial ring in 3 variables over QQ, QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
-Nemo.QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
+QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
 
 julia> real_solutions(I)
-4-element Vector{Vector{Nemo.QQFieldElem}}:
+4-element Vector{Vector{QQFieldElem}}:
  [5416829397//8589934592, 2708414699//8589934592, -2844258330290649520990905062759917788583//21778071482940061661655974875633165533184]
  [1, 0, 0]
  [1945971683//8589934592, 972985841//8589934592, 744426424910260862653434112767010536665//2722258935367507707706996859454145691648]
