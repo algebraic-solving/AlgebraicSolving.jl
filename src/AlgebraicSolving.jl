@@ -11,7 +11,10 @@ include("types.jl")
 include("interfaces/nemo.jl")
 include("algorithms/groebner-bases.jl")
 include("algorithms/solvers.jl")
+#= siggb =#
+include("siggb/siggb.jl")
 #= examples =#
 include("examples/katsura.jl")
+include("examples/cyclic.jl")
 
 end # module AlgebraicSolving
