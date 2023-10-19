@@ -171,7 +171,7 @@ function _core_msolve(
     k = 1
     while i <= len
         j = 1
-        tmp = Vector{Nemo.QQFieldElem}(undef, nr_vars)
+        tmp = Vector{QQFieldElem}(undef, nr_vars)
         while j <= nr_vars
             tmp[j]  = QQFieldElem(unsafe_load(jl_sols_num, i)) >> Int64(unsafe_load(jl_sols_den, i))
             tmp[j] += QQFieldElem(unsafe_load(jl_sols_num, i+1)) >> Int64(unsafe_load(jl_sols_den, i+1))

@@ -13,7 +13,7 @@ include("symbolic_pp.jl")
 include("linear_algebra.jl")
 
 @doc Markdown.doc"""
-    sig_groebner_basis(sys::Vector{T}; info_level = 0, degbound = 0) where {T <: MPolyElem}
+    sig_groebner_basis(sys::Vector{T}; info_level = 0, degbound = 0) where {T <: MPolyRingElem}
 
 Compute a Signature Gröbner basis of the sequence `sys` w.r.t. to the
 degree reverse lexicographical monomial ordering and the degree
@@ -35,20 +35,20 @@ signature and the second the underlying polynomial.
 julia> using AlgebraicSolving
 
 julia> R, vars = PolynomialRing(GF(17), ["x$i" for i in 1:4])
-(Multivariate polynomial ring in 4 variables over GF(17), Nemo.fpMPolyRingElem[x1, x2, x3, x4])
+(Multivariate polynomial ring in 4 variables over GF(17), fpMPolyRingElem[x1, x2, x3, x4])
 
 julia> F = AlgebraicSolving.cyclic(R)
-Nemo.fpMPolyRingElem[x1 + x2 + x3 + x4, x1*x2 + x1*x4 + x2*x3 + x3*x4, x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4, x1*x2*x3*x4 + 16]
+fpMPolyRingElem[x1 + x2 + x3 + x4, x1*x2 + x1*x4 + x2*x3 + x3*x4, x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4, x1*x2*x3*x4 + 16]
 
 julia> Fhom = AlgebraicSolving._homogenize(F.gens)
-4-element Vector{Nemo.fpMPolyRingElem}:
+4-element Vector{fpMPolyRingElem}:
  x1 + x2 + x3 + x4
  x1*x2 + x2*x3 + x1*x4 + x3*x4
  x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4
  x1*x2*x3*x4 + 16*x5^4
 
 julia> sig_groebner_basis(Fhom)
-7-element Vector{Tuple{Tuple{Int64, Nemo.fpMPolyRingElem}, Nemo.fpMPolyRingElem}}:
+7-element Vector{Tuple{Tuple{Int64, fpMPolyRingElem}, fpMPolyRingElem}}:
  ((1, 1), x1 + x2 + x3 + x4)
  ((2, 1), x2^2 + 2*x2*x4 + x4^2)
  ((3, 1), x2*x3^2 + x3^2*x4 + 16*x2*x4^2 + 16*x4^3)
@@ -58,7 +58,7 @@ julia> sig_groebner_basis(Fhom)
  ((4, x2*x3), x3^2*x4^4 + x2*x3*x5^4 + 16*x2*x4*x5^4 + x3*x4*x5^4 + 15*x4^2*x5^4)
 ```
 """
-function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) where {T <: MPolyElem}
+function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) where {T <: MPolyRingElem}
     R = first(sys).parent
     Rchar = characteristic(R)
 
