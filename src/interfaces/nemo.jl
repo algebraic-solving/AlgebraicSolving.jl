@@ -1,14 +1,14 @@
 
 @doc Markdown.doc"""
     _convert_to_msolve(
-            F::Vector{T}) where T <: MPolyElem
+            F::Vector{T}) where T <: MPolyRingElem
 
 Convert a vector of polynomials to input data for msolve.
 
 **Note**: This is an internal function.
 """
 function _convert_to_msolve(
-        F::Vector{T}) where T <: MPolyElem
+        F::Vector{T}) where T <: MPolyRingElem
 
     R = first(F).parent
     
@@ -86,7 +86,7 @@ function _convert_finite_field_gb_to_abstract_algebra(
     CR      = coefficient_ring(R)
 
     basis = []
-    #= basis = Vector{MPolyElem}(undef, bld) =#
+    #= basis = Vector{MPolyRingElem}(undef, bld) =#
 
     len   = 0
 

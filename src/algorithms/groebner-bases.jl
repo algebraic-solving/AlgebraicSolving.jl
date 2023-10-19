@@ -3,7 +3,7 @@ import msolve_jll: libneogb
 export groebner_basis, eliminate
 
 @doc Markdown.doc"""
-    eliminate(I::Ideal{T} where T <: MPolyElem, eliminate::Int,  <keyword arguments>)
+    eliminate(I::Ideal{T} where T <: MPolyRingElem, eliminate::Int,  <keyword arguments>)
 
 Compute a Groebner basis of the ideal `I` w.r.t. to the product monomial ordering defined by two blocks
 w.r.t. the degree reverse lexicographical monomial ordering using Faugère's F4 algorithm. Hereby the first block includes
@@ -14,7 +14,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 **Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` are supported.
 
 # Arguments
-- `I::Ideal{T} where T <: MPolyElem`: input generators.
+- `I::Ideal{T} where T <: MPolyRingElem`: input generators.
 - `initial_hts::Int=17`: initial hash table size `log_2`.
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
@@ -26,7 +26,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 ```jldoctest
 julia> using AlgebraicSolving
 
-julia> R, (x,y,z) = PolynomialRing(GF(101),["x","y","z"], ordering=:degrevlex)
+julia> R, (x,y,z) = polynomial_ring(GF(101),["x","y","z"], ordering=:degrevlex)
 (Multivariate polynomial ring in 3 variables over GF(101), Nemo.fpMPolyRingElem[x, y, z])
 
 julia> I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
@@ -38,7 +38,7 @@ julia> eliminate(I, 2)
 ```
 """
 function eliminate(
-        I::Ideal{T} where T <: MPolyElem,
+        I::Ideal{T} where T <: MPolyRingElem,
         eliminate::Int;
         initial_hts::Int=17,
         nr_thrds::Int=1,
@@ -59,7 +59,7 @@ function eliminate(
 end
 
 @doc Markdown.doc"""
-    groebner_basis(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
+    groebner_basis(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
 Compute a Groebner basis of the ideal `I` w.r.t. to the degree reverse lexicographical monomial ordering using Faugère's F4 algorithm.
 At the moment the underlying algorithm is based on variants of Faugère's F4 Algorithm.
@@ -67,7 +67,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 **Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` are supported.
 
 # Arguments
-- `I::Ideal{T} where T <: MPolyElem`: input generators.
+- `I::Ideal{T} where T <: MPolyRingElem`: input generators.
 - `initial_hts::Int=17`: initial hash table size `log_2`.
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
@@ -80,7 +80,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 ```jldoctest
 julia> using AlgebraicSolving
 
-julia> R, (x,y,z) = PolynomialRing(GF(101),["x","y","z"], ordering=:degrevlex)
+julia> R, (x,y,z) = polynomial_ring(GF(101),["x","y","z"], ordering=:degrevlex)
 (Multivariate polynomial ring in 3 variables over GF(101), Nemo.fpMPolyRingElem[x, y, z])
 
 julia> I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
@@ -99,7 +99,7 @@ julia> groebner_basis(I, eliminate=2)
 ```
 """
 function groebner_basis(
-        I::Ideal{T} where T <: MPolyElem;
+        I::Ideal{T} where T <: MPolyRingElem;
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,
@@ -119,7 +119,7 @@ function groebner_basis(
 end
 
 function _core_groebner_basis(
-        I::Ideal{T} where T <: MPolyElem;
+        I::Ideal{T} where T <: MPolyRingElem;
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,

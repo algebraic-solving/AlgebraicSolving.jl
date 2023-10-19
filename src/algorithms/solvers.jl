@@ -17,11 +17,11 @@ function _get_rational_parametrization(
         nr_vars::Int32
     )
     if cfs_lf != Ptr{BigInt}(0)
-        lf = [fmpz(unsafe_load(cfs_lf, i)) for i in 1:nr_vars]
+        lf = [ZZRingElem(unsafe_load(cfs_lf, i)) for i in 1:nr_vars]
     else
-        lf = fmpz[]
+        lf = ZZRingElem[]
     end
-    C, x  = PolynomialRing(QQ,"x")
+    C, x  = polynomial_ring(QQ,"x")
     ctr   = 0
 
     elim  = C([unsafe_load(cfs, i) for i in 1:lens[1]])
@@ -31,13 +31,13 @@ function _get_rational_parametrization(
     ctr +=  lens[2]
 
     size  = nr-2
-    p = Vector{PolyElem}(undef, size)
+    p = Vector{PolyRingElem}(undef, size)
     k = 1
     for i in 3:nr
         p[k]  = C([unsafe_load(cfs, j+ctr) for j in 1:lens[i]-1])
         # multiply parametrization polynomial directly with
         # corresponding coefficients
-        p[k]  *=   (-1) * fmpz(unsafe_load(cfs, lens[i]+ctr))
+        p[k]  *=   (-1) * ZZRingElem(unsafe_load(cfs, lens[i]+ctr))
         ctr   +=  lens[i]
         k     +=  1
     end
@@ -46,14 +46,14 @@ function _get_rational_parametrization(
 end
 
 @doc Markdown.doc"""
-    _core_msolve(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
+    _core_msolve(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
 Compute a rational parametrization and the real solutions of the ideal `I` via msolve.
 
 **Note**: This is an internal function.
 """
 function _core_msolve(
-        I::Ideal{T} where T <: MPolyElem;     # input generators
+        I::Ideal{T} where T <: MPolyRingElem;     # input generators
         initial_hts::Int=17,                  # hash table size, default 2^17
         nr_thrds::Int=1,                      # number of threads
         max_nr_pairs::Int=0,                  # number of pairs maximally chosen
@@ -131,9 +131,9 @@ function _core_msolve(
     nterms  = 0
 
     if jl_dquot == 0
-        C,x = PolynomialRing(QQ,"x")
-        I.rat_param = RationalParametrization(Symbol[], fmpz[], C(-1), C(-1), PolyElem[])
-        I.real_sols = fmpq[]
+        C,x = polynomial_ring(QQ,"x")
+        I.rat_param = RationalParametrization(Symbol[], ZZRingElem[], C(-1), C(-1), PolyRingElem[])
+        I.real_sols = QQFieldElem[]
         return I.rat_param, I.real_sols
     end
     [nterms += jl_len[i] for i=1:jl_ld]
@@ -150,8 +150,8 @@ function _core_msolve(
     I.rat_param = RationalParametrization(vsymbols, rat_param[1],rat_param[2],
                                           rat_param[3], rat_param[4])
     if jl_nb_sols == 0
-        I.real_sols = fmpq[]
-        return rat_param, Vector{fmpq}[]
+        I.real_sols = QQFieldElem[]
+        return rat_param, Vector{QQFieldElem}[]
     end
 
     # get solutions
@@ -164,17 +164,17 @@ function _core_msolve(
 
     #= solutions are returned as intervals, i.e. a minimum and a maximum entry for
      = the numerator and denominator; thus we sum up and divide by  =#
-    solutions = Vector{Vector{fmpq}}(undef, jl_nb_sols)
+    solutions = Vector{Vector{QQFieldElem}}(undef, jl_nb_sols)
 
     len = 2*jl_nb_sols*nr_vars
     i = 1
     k = 1
     while i <= len
         j = 1
-        tmp = Vector{Nemo.fmpq}(undef, nr_vars)
+        tmp = Vector{Nemo.QQFieldElem}(undef, nr_vars)
         while j <= nr_vars
-            tmp[j]  = fmpq(unsafe_load(jl_sols_num, i)) >> Int64(unsafe_load(jl_sols_den, i))
-            tmp[j] += fmpq(unsafe_load(jl_sols_num, i+1)) >> Int64(unsafe_load(jl_sols_den, i+1))
+            tmp[j]  = QQFieldElem(unsafe_load(jl_sols_num, i)) >> Int64(unsafe_load(jl_sols_den, i))
+            tmp[j] += QQFieldElem(unsafe_load(jl_sols_num, i+1)) >> Int64(unsafe_load(jl_sols_den, i+1))
             tmp[j] = tmp[j] >> 1
             i += 2
             j += 1
@@ -194,7 +194,7 @@ function _core_msolve(
 end
 
 @doc Markdown.doc"""
-    rational_parametrization(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
+    rational_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
 Given an ideal `I` with a finite solution set over the complex numbers, return
 the rational parametrization of the ideal with a given precision (default 32 bits).
@@ -203,7 +203,7 @@ the rational parametrization of the ideal with a given precision (default 32 bit
 is greater then zero an empty array is returned.
 
 # Arguments
-- `I::Ideal{T} where T <: MPolyElem`: input generators.
+- `I::Ideal{T} where T <: MPolyRingElem`: input generators.
 - `initial_hts::Int=17`: initial hash table size `log_2`.
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
@@ -215,7 +215,7 @@ is greater then zero an empty array is returned.
 ```jldoctest
 julia> using AlgebraicSolving
 
-julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
+julia> R,(x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
 (Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
@@ -226,7 +226,7 @@ AlgebraicSolving.RationalParametrization([:x1, :x2, :x3], Nemo.ZZRingElem[], 84*
 ```
 """
 function rational_parametrization(
-        I::Ideal{T} where T <: MPolyElem;     # input generators
+        I::Ideal{T} where T <: MPolyRingElem;     # input generators
         initial_hts::Int=17,                  # hash table size, default 2^17
         nr_thrds::Int=1,                      # number of threads
         max_nr_pairs::Int=0,                  # number of pairs maximally chosen
@@ -250,13 +250,13 @@ end
 
 
 @doc Markdown.doc"""
-    rational_solutions(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
+    rational_solutions(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
 Given an ideal `I` with a finite solution set over the complex numbers, return
 the rational roots of the ideal. 
 
 # Arguments
-- `I::Ideal{T} where T <: MPolyElem`: input generators.
+- `I::Ideal{T} where T <: MPolyRingElem`: input generators.
 - `initial_hts::Int=17`: initial hash table size `log_2`.
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
@@ -268,7 +268,7 @@ the rational roots of the ideal.
 ```jldoctest
 julia> using AlgebraicSolving
 
-julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
+julia> R,(x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
 (Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
@@ -286,7 +286,7 @@ julia> map(r->map(p->evaluate(p, r), I.gens), rat_sols)
 ```
 """
 function rational_solutions(
-        I::Ideal{T} where T <: MPolyElem;     # input generators
+        I::Ideal{T} where T <: MPolyRingElem;     # input generators
         initial_hts::Int=17,                  # hash table size, default 2^17
         nr_thrds::Int=1,                      # number of threads
         max_nr_pairs::Int=0,                  # number of pairs maximally chosen
@@ -313,12 +313,12 @@ function rational_solutions(
     rat_den = map(l->evaluate(param_t.denom, l), rat_elim)
     rat_num = map(r->map(l->evaluate(l, r), param_t.param), rat_elim)
 
-    rat_sols = Vector{Vector{fmpq}}(undef, nb)
+    rat_sols = Vector{Vector{QQFieldElem}}(undef, nb)
 
     if length(param_t.vars) == parent(I).nvars
 
       for i in 1:nb
-        rat_sols[i] = Vector{fmpq}(undef, nvars)
+        rat_sols[i] = Vector{QQFieldElem}(undef, nvars)
         for j in 1:(nvars-1)
            rat_sols[i][j] = rat_num[i][j] // rat_den[i]
         end
@@ -328,7 +328,7 @@ function rational_solutions(
     else
 
       for i in 1:nb
-        rat_sols[i] = Vector{fmpq}(undef, nvars - 1)
+        rat_sols[i] = Vector{QQFieldElem}(undef, nvars - 1)
         for j in 1:(nvars-1)
            rat_sols[i][j] = rat_num[i][j] // rat_den[i]
         end
@@ -343,7 +343,7 @@ end
 
 
 @doc Markdown.doc"""
-    real_solutions(I::Ideal{T} where T <: MPolyElem, <keyword arguments>)
+    real_solutions(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
 Given an ideal `I` with a finite solution set over the complex numbers, return
 the real roots of the ideal with a given precision (default 32 bits).
@@ -352,7 +352,7 @@ the real roots of the ideal with a given precision (default 32 bits).
 is greater than zero an empty array is returned.
 
 # Arguments
-- `I::Ideal{T} where T <: MPolyElem`: input generators.
+- `I::Ideal{T} where T <: MPolyRingElem`: input generators.
 - `initial_hts::Int=17`: initial hash table size `log_2`.
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
@@ -364,7 +364,7 @@ is greater than zero an empty array is returned.
 ```jldoctest
 julia> using AlgebraicSolving
 
-julia> R,(x1,x2,x3) = PolynomialRing(QQ, ["x1","x2","x3"])
+julia> R,(x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
 (Multivariate polynomial ring in 3 variables over QQ, Nemo.QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
@@ -379,7 +379,7 @@ julia> real_solutions(I)
 ```
 """
 function real_solutions(
-        I::Ideal{T} where T <: MPolyElem;     # input generators
+        I::Ideal{T} where T <: MPolyRingElem;     # input generators
         initial_hts::Int=17,                  # hash table size, default 2^17
         nr_thrds::Int=1,                      # number of threads
         max_nr_pairs::Int=0,                  # number of pairs maximally chosen
