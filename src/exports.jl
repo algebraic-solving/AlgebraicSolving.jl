@@ -1,3 +1,3 @@
-export PolynomialRing, MPolyRing, GFElem, MPoly, MPolyElem, FiniteField, GF,
-       characteristic, degree, ZZ, QQ, vars, nvars, ngens, fmpz, fmpq, fmpq_poly,
+export polynomial_ring, MPolyRing, GFElem, MPolyRingElem, finite_field, GF, fpMPolyRingElem,
+       characteristic, degree, ZZ, QQ, vars, nvars, ngens, ZZRingElem, QQFieldElem, QQMPolyRingElem,
        base_ring, coefficient_ring, evaluate, prime_field

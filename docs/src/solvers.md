@@ -26,7 +26,7 @@ The underlying engine is provided by msolve.
 
 ```@docs
     rational_parametrization(
-        I::Ideal{T} where T <: MPolyElem;
+        I::Ideal{T} where T <: MPolyRingElem;
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,
@@ -36,7 +36,7 @@ The underlying engine is provided by msolve.
         )
 
     real_solutions(
-        I::Ideal{T} where T <: MPolyElem;
+        I::Ideal{T} where T <: MPolyRingElem;
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,
@@ -45,7 +45,7 @@ The underlying engine is provided by msolve.
         precision::Int=32
         )
     rational_solutions(
-        I::Ideal{T} where T <: MPolyElem;
+        I::Ideal{T} where T <: MPolyRingElem;
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,

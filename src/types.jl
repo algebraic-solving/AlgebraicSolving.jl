@@ -2,17 +2,17 @@ export Ideal
 
 mutable struct RationalParametrization
     vars::Vector{Symbol}
-    lf_cfs::Vector{fmpz}
-    elim::fmpq_poly
-    denom::fmpq_poly
-    param::Vector{PolyElem}
+    lf_cfs::Vector{ZZRingElem}
+    elim::QQPolyRingElem
+    denom::QQPolyRingElem
+    param::Vector{PolyRingElem}
 
     function RationalParametrization(
             vars::Vector{Symbol},
-            lf_cfs::Vector{fmpz},
-            elim::fmpq_poly,
-            denom::fmpq_poly,
-            param::Vector{PolyElem}
+            lf_cfs::Vector{ZZRingElem},
+            elim::QQPolyRingElem,
+            denom::QQPolyRingElem,
+            param::Vector{PolyRingElem}
         )
         rp = new()
         rp.vars   = vars
@@ -25,15 +25,15 @@ mutable struct RationalParametrization
     end
 end
 
-mutable struct Ideal{T <: MPolyElem}
+mutable struct Ideal{T <: MPolyRingElem}
     gens::Vector{T}
     dim::Int
     gb::Dict{Int, Vector{T}}
-    real_sols::Vector{Vector{fmpq}}
-    rat_sols::Vector{Vector{fmpq}}
+    real_sols::Vector{Vector{QQFieldElem}}
+    rat_sols::Vector{Vector{QQFieldElem}}
     rat_param::RationalParametrization
 
-    function Ideal(F::Vector{T}) where {T <: MPolyElem}
+    function Ideal(F::Vector{T}) where {T <: MPolyRingElem}
         I = new{T}()
         I.gens = F
         I.dim  = -1

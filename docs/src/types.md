@@ -26,7 +26,7 @@ We use [Nemo](https://www.nemocas.org/index.html)'s multivariate polynomial
 ring structures:
 
 ```@repl
-R, (x,y,z) = PolynomialRing(QQ, ["x", "y", "z"], ordering=:degrevlex)
+R, (x,y,z) = polynomial_ring(QQ, ["x", "y", "z"], ordering=:degrevlex)
 ```
 The above example defines a multivariate polynomial ring in three variables `x`, 
 `y`, and `z` over the rationals using the dgree reverse lexicographical ordering 
@@ -34,7 +34,7 @@ for printing polynomials in the following. One can also define polynomial rings
 over finite fields:
 
 ```@repl
-R, (x,y,z) = PolynomialRing(GF(101), ["x", "y", "z"], ordering=:degrevlex)
+R, (x,y,z) = polynomial_ring(GF(101), ["x", "y", "z"], ordering=:degrevlex)
 ```
 
 ## Ideals
@@ -44,7 +44,7 @@ data structures connected to ideals in order to make computational algebra more
 effective:
 
 ```@repl
-R, (x,y,z) = PolynomialRing(QQ, ["x", "y", "z"], ordering=:degrevlex)
+R, (x,y,z) = polynomial_ring(QQ, ["x", "y", "z"], ordering=:degrevlex)
 I = Ideal([x+y+1, y*z^2-13*y^2])
 ```
 
