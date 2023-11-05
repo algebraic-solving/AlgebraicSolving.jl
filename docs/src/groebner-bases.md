@@ -61,9 +61,5 @@ variables of the first block via the `eliminate` parameter in the
 To compute signature Gröbner bases use
 
 ```@docs
-   sig_groebner_basis(
-       sys::Vector{T} where T <: MPolyElem,
-	   info_level::Int=0,
-	   degbound::Int=0
-       )
+    sig_groebner_basis(sys::Vector{T}; info_level::Int = 0, degbound::Int = 0) where {T <: MPolyRingElem}
 ```
