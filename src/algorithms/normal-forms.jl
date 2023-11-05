@@ -33,10 +33,10 @@ julia> I = Ideal([y*x^3+12-y, x+y])
 fpMPolyRingElem[x^3*y + 100*y + 12, x + y]
 
 julia> f = 2*x^2+7*x*y
- 2*x^2 + 7*x*y
+2*x^2 + 7*x*y
 
-julia> normal_form(F,I)
- 96*y^2
+julia> normal_form(f, I)
+96*y^2
 ```
 """
 function normal_form(
