@@ -10,6 +10,7 @@ include("types.jl")
 #= functionality =#
 include("interfaces/nemo.jl")
 include("algorithms/groebner-bases.jl")
+include("algorithms/normal-forms.jl")
 include("algorithms/solvers.jl")
 #= siggb =#
 include("siggb/siggb.jl")

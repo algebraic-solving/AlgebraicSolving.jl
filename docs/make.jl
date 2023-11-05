@@ -20,6 +20,7 @@ makedocs(
         "index.md",
         "types.md",
         "Algorithms" => ["groebner-bases.md",
+                         "normal-forms.md",
                          "solvers.md"],
         "Examples" => "katsura.md"
         ]
