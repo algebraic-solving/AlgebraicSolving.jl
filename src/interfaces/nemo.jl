@@ -68,7 +68,7 @@ to a vector of polynomials.
 
 **Note**: This is an internal function.
 """
-function _convert_finite_field_gb_to_abstract_algebra(
+function _convert_finite_field_array_to_abstract_algebra(
         bld::Int32,
         blen::Vector{Int32},
         bcf::Vector{Int32},
@@ -85,7 +85,7 @@ function _convert_finite_field_gb_to_abstract_algebra(
     nr_vars = nvars(R)
     CR      = coefficient_ring(R)
 
-    basis = []
+    basis = (typeof(R(0)))[]
     #= basis = Vector{MPolyRingElem}(undef, bld) =#
 
     len   = 0
@@ -102,9 +102,13 @@ function _convert_finite_field_gb_to_abstract_algebra(
             end
         end
         g  = MPolyBuildCtx(R)
-        for j in 1:blen[i]
-            push_term!(g, CR(bcf[len+j]),
-                       convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+        if bcf[len+1] == 0
+            g.poly = R(0)
+        else
+            for j in 1:blen[i]
+                push_term!(g, CR(bcf[len+j]),
+                           convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+            end
         end
         len +=  blen[i]
         push!(basis, g.poly)
