@@ -13,7 +13,7 @@ using AlgebraicSolving
 Pages = ["normal-forms.md"]
 ```
 
-# Gröbner bases
+# Normal forms
 
 ## Introduction
 
