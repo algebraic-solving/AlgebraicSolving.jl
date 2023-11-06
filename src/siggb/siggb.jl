@@ -63,7 +63,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     Rchar = characteristic(R)
 
     # check if input is ok
-    if Rchar > 2^31
+    if Rchar > 2^31 || iszero(Rchar)
         error("At the moment we only support finite fields up to prime characteristic < 2^31.")
     end
     sysl = length(sys)
@@ -241,4 +241,16 @@ function _homogenize(F::Vector{P}) where {P <: MPolyRingElem}
         push!(res, finish(ctx))
     end
     return res
+end
+
+# test against msolve
+function _is_gb(gb::Vector{Tuple{Tuple{Int, P}, P}}) where {P <: MPolyRingElem}
+    gb_pols = [p[2] for p in gb]
+    gb_msolve = groebner_basis(Ideal(gb_pols), complete_reduction = true)
+    
+    lms_gb = (Nemo.leading_monomial).(gb_pols)
+    lms_msolve = (Nemo.leading_monomial).(gb_msolve)
+    res1 = all(u -> any(v -> divides(u, v)[1], lms_gb), lms_msolve)
+    res2 = all(u -> any(v -> divides(u, v)[1], lms_msolve), lms_gb)
+    return res1 && res2
 end

@@ -100,7 +100,6 @@ function echelonize!(matrix::MacaulayMatrix,
     if !iszero(arit_ops)
         @info "$(arit_ops) submul's"
     end
-    @assert is_triangular(matrix)
 end
 
 # subtract mult
