@@ -4,11 +4,11 @@ export normal_form
 
 @doc Markdown.doc"""
     normal_form(
-        F::Vector{T} where T <: MPolyRingElem,
-        I::Ideal{T} where T <: MPolyRingElem;
+        f::T,
+        I::Ideal{T};
         nr_thrds::Int=1,
         info_level::Int=0
-        )
+        ) where T <: MPolyRingElem
 
 Compute the normal forms of the elements of `F` w.r.t. a degree reverse
 lexicographical Gröbner basis of `I`.
