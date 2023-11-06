@@ -34,6 +34,7 @@ import Nemo:
     is_unit,
     isqrtrem,
     jacobi_symbol,
+    leading_coefficient,
     matrix_space,
     moebius_mu,
     MPolyRing,

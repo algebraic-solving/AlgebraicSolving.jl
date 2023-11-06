@@ -13,7 +13,7 @@ include("symbolic_pp.jl")
 include("linear_algebra.jl")
 
 @doc Markdown.doc"""
-    sig_groebner_basis(sys::Vector{T}; info_level = 0, degbound = 0) where {T <: MPolyRingElem}
+    sig_groebner_basis(sys::Vector{T}; info_level::Int = 0, degbound::Int = 0) where {T <: MPolyRingElem}
 
 Compute a Signature Gröbner basis of the sequence `sys` w.r.t. to the
 degree reverse lexicographical monomial ordering and the degree

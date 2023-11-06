@@ -151,7 +151,7 @@ function _core_groebner_basis(
     gb_exp = Ref(Ptr{Cint}(0))
     gb_cf  = Ref(Ptr{Cvoid}(0))
 
-    nr_terms  = ccall((:f4_julia, libneogb), Int,
+    nr_terms  = ccall((:export_f4, libneogb), Int,
         (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
         Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
         Cint, Cint, Cint, Cint, Cint, Cint, Cint),
@@ -166,7 +166,7 @@ function _core_groebner_basis(
     ptr     = reinterpret(Ptr{Int32}, gb_cf[])
     jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
 
-    basis = _convert_finite_field_gb_to_abstract_algebra(
+    basis = _convert_finite_field_array_to_abstract_algebra(
                 jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
 
 

@@ -10,5 +10,5 @@
     R, (x,y,z) = polynomial_ring(GF(101),["x","y","z"], ordering=:degrevlex)
     F = [x^2+1-3, x*y-z, x*z^2-3*y^2]
     res = AlgebraicSolving._convert_to_msolve(F)
-    @test AlgebraicSolving._convert_finite_field_gb_to_abstract_algebra(Int32(3), res..., R) == F
+    @test AlgebraicSolving._convert_finite_field_array_to_abstract_algebra(Int32(3), res..., R) == F
 end
