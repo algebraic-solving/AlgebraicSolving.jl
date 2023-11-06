@@ -63,7 +63,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     Rchar = characteristic(R)
 
     # check if input is ok
-    if Rchar > 2^31
+    if Rchar > 2^31 || iszero(Rchar)
         error("At the moment we only support finite fields up to prime characteristic < 2^31.")
     end
     sysl = length(sys)

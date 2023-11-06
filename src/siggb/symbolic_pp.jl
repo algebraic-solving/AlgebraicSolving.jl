@@ -110,7 +110,6 @@ function select_normal!(pairset::Pairset{N},
 
                 add_cond = !iszero(reducer_ind)
                 if add_cond
-                    resize_pivots!(matrix, symbol_ht)
                     mult = divide(monomial(reducer_sig),
                                   monomial(basis.sigs[reducer_ind]))
                     lead_idx = write_to_matrix_row!(matrix, basis,
@@ -118,6 +117,7 @@ function select_normal!(pairset::Pairset{N},
                                                     symbol_ht, ht, mult,
                                                     reducer_sig)
                     # set pivot
+                    resize_pivots!(matrix, symbol_ht)
                     matrix.pivots[lead_idx] = matrix.nrows
                 end
             end
