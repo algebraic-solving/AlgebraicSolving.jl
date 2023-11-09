@@ -19,7 +19,7 @@ function echelonize!(matrix::MacaulayMatrix,
         hash2col[col2hash[i]] = MonIdx(i)
     end
 
-    @inbounds for i in 2:matrix.nrows
+    @inbounds for i in 1:matrix.nrows
         row_ind = matrix.sig_order[i]
 
         row_cols = matrix.rows[row_ind]
@@ -34,7 +34,10 @@ function echelonize!(matrix::MacaulayMatrix,
             does_red = !iszero(pividx) && rev_sigorder[pividx] < i
             does_red && break
         end
-        !does_red && continue
+        if !does_red
+            pivots[l_col_idx] = row_ind
+            continue
+        end
 
         # buffer the row
         row_coeffs = matrix.coeffs[row_ind]

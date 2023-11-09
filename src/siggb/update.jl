@@ -76,7 +76,6 @@ function update_basis!(basis::Basis,
             insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
             lm = basis_ht.exponents[first(row)]
             s = new_sig
-            # println("new $s, $(lm.exps)")
 
             # add everything to basis
             l = basis.basis_load + 1
