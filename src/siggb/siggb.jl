@@ -202,7 +202,7 @@ function siggb!(basis::Basis{N},
                 shift::Val{Shift};
                 degbound = 0) where {N, Char, Shift}
 
-    tr = new_tracer()
+    tr = new_tracer(Val(N))
 
     while !iszero(pairset.load)
         if !iszero(degbound) && first(pairset.elems).deg > degbound

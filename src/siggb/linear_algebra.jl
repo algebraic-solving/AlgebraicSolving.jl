@@ -134,6 +134,7 @@ function echelonize!(matrix::MacaulayMatrix,
         mat_basis_inds[i] = matrix.parent_inds[i]
     end
     push!(tr.basis_indices, mat_basis_inds)
+    @inbounds push!(tr.sigs, matrix.sigs[1:matrix.nrows])
     push!(tr.matrices, tr_mat)
 
     return
@@ -184,11 +185,12 @@ end
 
 # for tracer
 
-function new_tracer()
+function new_tracer(::Val{N}) where N
     st_deg = 1
     basis_indices = Vector{Int}[]
+    sigs = Vector{Sig{N}}[]
     mats = TracerMatrix[]
-    return Tracer(st_deg, basis_indices, mats)
+    return Tracer(st_deg, basis_indices, sigs, mats)
 end
 
 # for debug helping

@@ -115,10 +115,11 @@ mutable struct TracerMatrix
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
 end
 
-mutable struct Tracer
+mutable struct Tracer{N}
     start_degree::Int
-    # basis_indices[i + start_degree - 1] gives row indices of matrix
+    # basis_indices[i + start_degree - 1] gives indices of matrix
     # in degree i + start_degree - 1
     basis_indices::Vector{Vector{Int}}
+    sigs::Vector{Vector{Sig{N}}}
     matrices::Vector{TracerMatrix}
 end
