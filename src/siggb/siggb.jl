@@ -202,6 +202,8 @@ function siggb!(basis::Basis{N},
                 shift::Val{Shift};
                 degbound = 0) where {N, Char, Shift}
 
+    tr = new_tracer()
+
     while !iszero(pairset.load)
         if !iszero(degbound) && first(pairset.elems).deg > degbound
             break
@@ -212,7 +214,7 @@ function siggb!(basis::Basis{N},
         select_normal!(pairset, basis, matrix, basis_ht, symbol_ht)
         symbolic_pp!(basis, matrix, basis_ht, symbol_ht)
         finalize_matrix!(matrix, symbol_ht)
-        echelonize!(matrix, char, shift)
+        echelonize!(matrix, tr, char, shift)
 
         update_basis!(basis, matrix, pairset, symbol_ht, basis_ht)
     end

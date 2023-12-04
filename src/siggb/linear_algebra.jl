@@ -1,4 +1,5 @@
 function echelonize!(matrix::MacaulayMatrix,
+                     tr::Tracer,
                      char::Val{Char},
                      shift::Val{Shift}) where {Char, Shift}
 
@@ -10,6 +11,9 @@ function echelonize!(matrix::MacaulayMatrix,
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
     pivots = matrix.pivots
 
+    tr_mat = TracerMatrix(Dict{Int, Int}(),
+                          Vector{Tuple{Int, Coeff}}[])
+
     @inbounds for i in 1:matrix.nrows
         rev_sigorder[matrix.sig_order[i]] = i
         row_ind = matrix.sig_order[i]
@@ -19,6 +23,7 @@ function echelonize!(matrix::MacaulayMatrix,
         hash2col[col2hash[i]] = MonIdx(i)
     end
 
+    n_trmat_rows = 0 
     @inbounds for i in 1:matrix.nrows
         row_ind = matrix.sig_order[i]
 
@@ -39,6 +44,10 @@ function echelonize!(matrix::MacaulayMatrix,
             continue
         end
 
+        # indicate that we are tracing for row i
+        n_trmat_rows += 1
+        tr_mat.row_inds[row_ind] = n_trmat_rows
+
         # buffer the row
         row_coeffs = matrix.coeffs[row_ind]
         @inbounds for (k, j) in enumerate(row_cols)
@@ -46,7 +55,12 @@ function echelonize!(matrix::MacaulayMatrix,
             buffer[col_idx] = row_coeffs[k]
         end
 
+        # allocate a row for the tracer matrix
+        # at most we subtract (i-1) other rows
+        row_ops = Vector{Tuple{Int, Coeff}}(undef, i - 1)
+        
         # do the reduction
+        n_row_subs = 0
         @inbounds for j in 1:matrix.ncols
             a = buffer[j] % Char
             iszero(a) && continue
@@ -55,7 +69,10 @@ function echelonize!(matrix::MacaulayMatrix,
                 continue
             end
 
-            # subtract m*rows[pivots[j]] from buffer
+            n_row_subs += 1
+            row_ops[n_row_subs] = (pividx, a)
+
+            # subtract a*rows[pivots[j]] from buffer
             pivmons = matrix.rows[pividx]
             pivcoeffs = matrix.coeffs[pividx]
 
@@ -63,6 +80,10 @@ function echelonize!(matrix::MacaulayMatrix,
                                           pivcoeffs, shift)
             arit_ops += arit_ops_new
         end
+
+        # finalize tracer row, add it to tracer matrix
+        resize!(row_ops, n_row_subs)
+        push!(tr_mat.col_inds_and_coeffs, row_ops)
 
         new_row_length = 0
         @inbounds for j in 1:matrix.ncols
@@ -103,6 +124,16 @@ function echelonize!(matrix::MacaulayMatrix,
     if !iszero(arit_ops)
         @info "$(arit_ops) submul's"
     end
+
+    # extend the tracer
+    mat_basis_inds = Vector{Int}(undef, matrix.nrows)
+    @inbounds for i in 1:matrix.nrows
+        mat_basis_inds[i] = matrix.parent_inds[i]
+    end
+    push!(tr.basis_indices, mat_basis_inds)
+    push!(tr.matrices, tr_mat)
+
+    return
 end
 
 # subtract mult
@@ -146,6 +177,15 @@ end
 
 @inline function mul(a, b, ::Val{Char}) where Char 
     return Coeff((Cbuf(a) * Cbuf(b)) % Char)
+end
+
+# for tracer
+
+function new_tracer()
+    st_deg = 1
+    basis_indices = Vector{Int}[]
+    mats = TracerMatrix[]
+    return Tracer(st_deg, basis_indices, mats)
 end
 
 # for debug helping

@@ -107,3 +107,17 @@ mutable struct MacaulayMatrix{N}
     toadd::Vector{Int}
     toadd_length::Int
 end
+
+# struct to remember the row reductions we did
+mutable struct TracerMatrix
+    row_inds::Dict{Int, Int}
+    col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
+end
+
+mutable struct Tracer
+    start_degree::Int
+    # basis_indices[i + start_degree - 1] gives row indices of matrix
+    # in degree i + start_degree - 1
+    basis_indices::Vector{Vector{Int}}
+    matrices::Vector{TracerMatrix}
+end
