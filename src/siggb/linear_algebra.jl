@@ -183,6 +183,12 @@ end
     return Coeff((Cbuf(a) * Cbuf(b)) % Char)
 end
 
+@inline function add(a, b, ::Val{Char}) where Char
+    c0 = a + b
+    c1 = c0 - Coeff(Char)
+    return max(c0, c1)
+end
+
 # for tracer
 
 function new_tracer(::Val{N}) where N
