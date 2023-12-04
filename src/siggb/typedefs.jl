@@ -111,6 +111,7 @@ end
 # struct to remember the row reductions we did
 mutable struct TracerMatrix
     row_inds::Dict{Int, Int}
+    diagonal::Vector{Coeff}
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
 end
 

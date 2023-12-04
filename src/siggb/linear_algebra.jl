@@ -12,6 +12,7 @@ function echelonize!(matrix::MacaulayMatrix,
     pivots = matrix.pivots
 
     tr_mat = TracerMatrix(Dict{Int, Int}(),
+                          Coeff[],
                           Vector{Tuple{Int, Coeff}}[])
 
     @inbounds for i in 1:matrix.nrows
@@ -109,6 +110,8 @@ function echelonize!(matrix::MacaulayMatrix,
             buffer[k] = zero(Cbuf)
             j += 1
         end
+        # store that we normalized the row
+        push!(tr_mat.diagonal, inver)
 
         # check if row lead reduced, TODO: dont know if this is reliable
         s = matrix.sigs[row_ind]
