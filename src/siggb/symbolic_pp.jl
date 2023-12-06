@@ -148,6 +148,7 @@ function select_normal!(pairset::Pairset{N},
     end
     pairset.load -= npairs
     resize_pivots!(matrix, symbol_ht)
+    return deg
 end
 
 function symbolic_pp!(basis::Basis{N},

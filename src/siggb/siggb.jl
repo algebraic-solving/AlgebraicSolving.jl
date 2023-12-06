@@ -203,7 +203,7 @@ function siggb!(basis::Basis{N},
                 shift::Val{Shift};
                 degbound = 0) where {N, Char, Shift}
 
-    tr = new_tracer(Val(N))
+    tr = new_tracer()
 
     while !iszero(pairset.load)
         if !iszero(degbound) && first(pairset.elems).deg > degbound
@@ -212,13 +212,19 @@ function siggb!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        select_normal!(pairset, basis, matrix, basis_ht, symbol_ht)
+        deg = select_normal!(pairset, basis, matrix, basis_ht, symbol_ht)
         symbolic_pp!(basis, matrix, basis_ht, symbol_ht)
         finalize_matrix!(matrix, symbol_ht)
-        echelonize!(matrix, tr, char, shift)
+        iszero(matrix.nrows) && continue
+        tr_mat = echelonize!(matrix, tr, char, shift)
+
+        tr[deg] = tr_mat
 
         update_basis!(basis, matrix, pairset, symbol_ht, basis_ht)
     end
+
+    l_sig = basis.sigs[basis.basis_load]
+    mod = construct_module(l_sig, basis, tr, char)
 end
 
 

@@ -110,16 +110,12 @@ end
 
 # struct to remember the row reductions we did
 mutable struct TracerMatrix
-    row_inds::Dict{Int, Int}
+    # TODO: could make this Dict{Sig, Tuple{Int, Int}}
+    # first index row index, second one rewr ind
+    rows::Dict{Sig, Tuple{Int, Int}}
+    row_ind_to_sig::Dict{Int, Sig}
     diagonal::Vector{Coeff}
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
 end
 
-mutable struct Tracer{N}
-    start_degree::Int
-    # basis_indices[i + start_degree - 1] gives indices of matrix
-    # in degree i + start_degree - 1
-    basis_indices::Vector{Vector{Int}}
-    sigs::Vector{Vector{Sig{N}}}
-    matrices::Vector{TracerMatrix}
-end
+const Tracer = Dict{Int, TracerMatrix}

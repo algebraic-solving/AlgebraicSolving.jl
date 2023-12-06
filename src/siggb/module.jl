@@ -1,62 +1,53 @@
 # construct a module representation out of a given sig
 function construct_module(sig::Sig{N},
-                          degs::Vector{Exp},
                           basis::Basis{N},
-                          tr::Tracer) where N
+                          tr::Tracer,
+                          vchar::Val{Char}) where {N, Char}
 
+    degs = basis.degs
     mod_dim = length(degs)
 
-    res = [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
+    @inbounds deg = monomial(sig).deg + degs[index(sig)]
+    tr_mat = tr[deg]
 
-    deg, row_ind = find_deg_and_row_ind(sig, tr, degs)
+    row_ind, rewr_basis_ind = tr_mat.rows[sig]
+    diag_coeff = tr_mat.diagonal[row_ind]
+    if rewr_basis_ind >= basis.basis_offset
+        @inbounds rewr_sig = basis.sigs[rewr_basis_ind]
 
-    # construct module representation of canonical rewriter
-    # TODO: check that bas_ind[row_ind] is not zero
-    @inbounds rewr_sig = basis.sigs[bas_ind[row_ind]]
-    mod_rep_rewr = construct_module(rewr_sig, degs, basis, tr)
+        # construct module representation of canonical rewriter
+        res = construct_module(rewr_sig, basis, tr, vchar)
 
-    # TODO: multiply by monomial and coefficient
-    @inbounds for i in 1:mod_dim
-        res[i] = mod_rep_rewr[i]
+        # multiply by monomial/coefficient
+        mult = divide(monomial(sig), monomial(rewr_sig))
+        @inbounds for i in 1:mod_dim
+            res_i_coeffs = res[i][1]
+            mul_by_coeff!(res_i_coeffs, diag_coeff, vchar)
+            res_i_mons = res[i][2]
+            mul_by_mon!(res_i_mons, mult)
+        end
+    else
+        # if it was an input element we just take the signature
+        res = [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
+        res[index(sig)] = ([diag_coeff], [monomial(sig)])
     end
 
-    # check what row reductions we did
-    tr_mat = tr.matrices[deg]
-    tr_mat_ind = get(tr_mat.row_inds, row_ind, 0)
-
-    if iszero(tr_mat_ind)
-        return res
-    end
-
-    @inbounds col_inds_coeffs = tr_mat.col_inds_and_coeffs[tr_mat_ind]
-    @inbounds for (j, coeff)  in col_inds_coeffs
-        j_sig = tr.sigs[deg][j]
-        j_sig_mod = construct_module(sig, degs, basis, tr)
-        # TODO: add coeff*j_sig_mod to res
-        # TODO: are we sure that everything is sorted
-    end
-
-    return res
-end
-
-function find_deg_and_row_ind(sig::Sig,
-                              tr::Tracer,
-                              degs::Vector{Exp})
-
-    @inbounds deg = degree(monomial(sig)) + degs[index(sig)]
-    tr_ind = deg
-
-    row_ind = 0
-    @inbounds for (i, s) in enumerate(tr.sigs[deg])
-        if s == sig
-            row_ind = i
-            break
+    @inbounds row_ops = tr_mat.col_inds_and_coeffs[row_ind]
+    @inbounds for (j, coeff)  in row_ops
+        j_sig = tr_mat.row_ind_to_sig[j]
+        j_sig_mod = construct_module(j_sig, basis, tr, vchar)
+        for i in 1:mod_dim
+            res_i_coeffs = res[i][1]
+            res_i_mons = res[i][2]
+            j_mod_coeffs = j_sig_mod[i][1]
+            j_mod_mons = j_sig_mod[i][2]
+            res[i] = add_pols(res_i_mons, j_mod_mons,
+                              res_i_coeffs, j_mod_coeffs,
+                              vchar)
         end
     end
 
-    iszero(row_ind) && error("sig not found in matrix")
-
-    return deg, row_ind
+    return res
 end
 
 # functions for polynomials
@@ -70,10 +61,10 @@ end
 
 function mul_by_coeff!(coeffs::Vector{Coeff},
                        c::Coeff,
-                       vchar::Val{Char}) 
+                       vchar::Val{Char}) where Char 
 
     @inbounds for i in 1:length(coeffs)
-        coeffs[i] = mul(c, coeffs[i], varch)
+        coeffs[i] = mul(c, coeffs[i], vchar)
     end
 end
 
@@ -128,5 +119,5 @@ function add_pols(mons1::Vector{M},
     resize!(mons_res, new_l)
     resize!(coeffs_res, new_l)
 
-    return mons_res, coeffs_res
+    return coeffs_res, mons_res
 end
