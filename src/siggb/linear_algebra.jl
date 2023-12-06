@@ -175,6 +175,10 @@ end
     return invmod(Cbuf(a), Cbuf(Char)) % Coeff
 end
 
+@inline function addinv(a::Coeff, ::Val{Char}) where Char
+    return Char - a
+end
+
 @inline function mul(a, b, ::Val{Char}) where Char 
     isone(a) && return b
     isone(b) && return a
@@ -183,8 +187,9 @@ end
 
 @inline function add(a, b, ::Val{Char}) where Char
     c0 = a + b
-    c1 = c0 - Coeff(Char)
-    return max(c0, c1)
+    return Coeff(c0 % Char)
+    # c1 = c0 - Coeff(Char)
+    # return max(c0, c1)
 end
 
 # for tracer

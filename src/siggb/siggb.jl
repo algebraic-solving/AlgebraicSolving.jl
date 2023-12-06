@@ -171,7 +171,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     end
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
-    with_logger(logger) do
+    tr = with_logger(logger) do
         siggb!(basis, pairset, basis_ht, char, shift, degbound = degbound)
     end
 
@@ -179,12 +179,9 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     eltp = typeof(first(sys))
     outp = Tuple{Tuple{Int, eltp}, eltp}[]
     @inbounds for i in basis.basis_offset:basis.basis_load
-        exps = [basis_ht.exponents[m].exps for m in basis.monomials[i]]
-        ctx = MPolyBuildCtx(R)
-        for (e, c) in zip(exps, basis.coefficients[i])
-            push_term!(ctx, c, Vector{Int}(e))
-        end
-        pol = finish(ctx)
+        pol = convert_to_pol(R,
+                             [basis_ht.exponents[m] for m in basis.monomials[i]],
+                             basis.coefficients[i])
 
         s = basis.sigs[i]
         ctx = MPolyBuildCtx(R)
@@ -193,6 +190,13 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
 
         push!(outp, (sig, pol))
     end
+
+    l_sig = basis.sigs[basis.basis_load]
+    mod = construct_module(l_sig, basis, tr, char, R)
+
+    mod_R = [convert_to_pol(R, ent[2], ent[1]) for ent in mod]
+    mod_image = sum([ent*f*leading_coefficient(f)^(-1) for (ent, f) in zip(mod_R, sys)])
+    println(mod_image)
     return outp
 end
 
@@ -223,12 +227,23 @@ function siggb!(basis::Basis{N},
         update_basis!(basis, matrix, pairset, symbol_ht, basis_ht)
     end
 
-    l_sig = basis.sigs[basis.basis_load]
-    mod = construct_module(l_sig, basis, tr, char)
+    return tr
 end
 
 
 # miscallaneous helper functions
+
+function convert_to_pol(R::MPolyRing,
+                        exps::Vector{<:Monomial},
+                        coeffs::Vector{Coeff})
+
+    ctx = MPolyBuildCtx(R)
+    for (e, c) in zip(exps, coeffs)
+        push_term!(ctx, c, Vector{Int}(e.exps))
+    end
+    return finish(ctx)
+end
+
 function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
     ordr = Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
