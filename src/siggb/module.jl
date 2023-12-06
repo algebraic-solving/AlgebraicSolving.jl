@@ -3,8 +3,12 @@ function construct_module(sig::Sig{N},
                           basis::Basis{N},
                           tr::Tracer,
                           vchar::Val{Char},
-                          R::MPolyRing) where {N, Char}
+                          mod_cache) where {N, Char}
 
+    if haskey(mod_cache, sig)
+        return mod_cache[sig]
+    end
+    @info "sig $(Int(index(sig))), $(Vector{Int}(monomial(sig).exps))"
     degs = basis.degs
     mod_dim = length(degs)
 
@@ -16,13 +20,13 @@ function construct_module(sig::Sig{N},
         @inbounds rewr_sig = basis.sigs[rewr_basis_ind]
 
         # construct module representation of canonical rewriter
-        res = construct_module(rewr_sig, basis, tr, vchar, R)
+        rewr_mod = construct_module(rewr_sig, basis, tr, vchar, mod_cache)
 
         # multiply by monomial
         mult = divide(monomial(sig), monomial(rewr_sig))
+        res = Vector{Polynomial{N}}(undef, mod_dim)
         @inbounds for i in 1:mod_dim
-            res_i_mons = res[i][2]
-            mul_by_mon!(res_i_mons, mult)
+            res[i] = (copy(rewr_mod[i][1]), mul_by_mon(rewr_mod[i][2], mult))
         end
     else
         # if it was an input element we just take the signature
@@ -33,16 +37,16 @@ function construct_module(sig::Sig{N},
     @inbounds row_ops = tr_mat.col_inds_and_coeffs[row_ind]
     @inbounds for (j, coeff)  in row_ops
         j_sig = tr_mat.row_ind_to_sig[j]
-        j_sig_mod = construct_module(j_sig, basis, tr, vchar, R)
+        j_sig_mod = construct_module(j_sig, basis, tr, vchar, mod_cache)
         for i in 1:mod_dim
             res_i_coeffs = res[i][1]
             res_i_mons = res[i][2]
             j_mod_coeffs = j_sig_mod[i][1]
-            mul_by_coeff!(j_mod_coeffs, addinv(coeff, vchar), vchar)
+            mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar), vchar)
             j_mod_mons = j_sig_mod[i][2]
             res[i] = add_pols(res_i_mons, j_mod_mons,
-                              res_i_coeffs, j_mod_coeffs,
-                              vchar, R)
+                              res_i_coeffs, mul_j_mod_coeffs,
+                              vchar)
         end
     end
 
@@ -52,16 +56,33 @@ function construct_module(sig::Sig{N},
         mul_by_coeff!(res_i_coeffs, diag_coeff, vchar)
     end
 
+    if haskey(mod_cache, sig)
+        @assert mod_cache[sig] == res
+    end
+    mod_cache[sig] = res
     return res
 end
 
 # functions for polynomials
-function mul_by_mon!(mons::Vector{M},
-                     mon::M) where {M <: Monomial}
+function mul_by_mon(mons::Vector{M},
+                    mon::M) where {M <: Monomial}
 
+    mons_res = Vector{M}(undef, length(mons))
     @inbounds for i in 1:length(mons)
-        mons[i] = mul(mon, mons[i])
+        mons_res[i] = mul(mon, mons[i])
     end
+    return mons_res
+end
+
+function mul_by_coeff(coeffs::Vector{Coeff},
+                      c::Coeff,
+                      vchar::Val{Char}) where Char 
+
+    coeffs_res = Vector{Coeff}(undef, length(coeffs))
+    @inbounds for i in 1:length(coeffs)
+        coeffs_res[i] = mul(c, coeffs[i], vchar)
+    end
+    return coeffs_res
 end
 
 function mul_by_coeff!(coeffs::Vector{Coeff},
@@ -77,8 +98,7 @@ function add_pols(mons1::Vector{M},
                   mons2::Vector{M},
                   coeffs1::Vector{Coeff},
                   coeffs2::Vector{Coeff},
-                  vch::Val{Char},
-                  R::MPolyRing) where {M <: Monomial, Char}
+                  vch::Val{Char}) where {M <: Monomial, Char}
 
     l1 = length(mons1)
     l2 = length(mons2)

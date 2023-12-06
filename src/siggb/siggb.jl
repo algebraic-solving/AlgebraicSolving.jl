@@ -1,3 +1,4 @@
+using Memoization
 # sizes for initialization
 const init_ht_size = 2^17
 const init_basis_size = 10000
@@ -192,11 +193,14 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     end
 
     l_sig = basis.sigs[basis.basis_load]
-    mod = construct_module(l_sig, basis, tr, char, R)
+    println("constructing mod rep")
+    mod_cache = Dict{Sig, Vector{Polynomial{nv}}}()
+    mod = construct_module(l_sig, basis, tr, char, mod_cache)
+    println("done")
 
     mod_R = [convert_to_pol(R, ent[2], ent[1]) for ent in mod]
     mod_image = sum([ent*f*leading_coefficient(f)^(-1) for (ent, f) in zip(mod_R, sys)])
-    println(mod_image)
+    println("module ok: $(mod_image == last(outp)[2])")
     return outp
 end
 
