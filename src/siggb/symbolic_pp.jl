@@ -2,7 +2,8 @@ function select_normal!(pairset::Pairset{N},
                         basis::Basis{N},
                         matrix::MacaulayMatrix,
                         ht::MonomialHashtable,
-                        symbol_ht::MonomialHashtable) where N
+                        symbol_ht::MonomialHashtable,
+                        ind_order::Vector{Int}) where N
 
     # number of selected pairs
     npairs = 0
@@ -85,8 +86,9 @@ function select_normal!(pairset::Pairset{N},
                 @inbounds for j in 1:npairs
                     pair2 = pairset.elems[j]
                     pair2.bot_sig == curr_top_sig && continue
-                    if iszero(reducer_ind) || lt_pot(pair2.bot_sig, reducer_sig)
-                        !lt_pot(pair2.bot_sig, curr_top_sig) && continue
+                    if iszero(reducer_ind) || lt_pot(pair2.bot_sig, reducer_sig, ind_order)
+                        iszero(pair2.bot_index) && continue
+                        !lt_pot(pair2.bot_sig, curr_top_sig, ind_order) && continue
                         new_red = false
                         if !iszero(pair2.bot_index)
                             rewriteable_basis(basis, pair2.bot_index,
@@ -151,7 +153,8 @@ end
 function symbolic_pp!(basis::Basis{N},
                       matrix::MacaulayMatrix,
                       ht::MonomialHashtable,
-                      symbol_ht::MonomialHashtable) where N
+                      symbol_ht::MonomialHashtable,
+                      ind_order::Vector{Int}) where N
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
@@ -207,7 +210,7 @@ function symbolic_pp!(basis::Basis{N},
             # found_reducer = true
 
             # check if new reducer sig is smaller than possible previous
-            if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig)
+            if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig, ind_order)
                 j += 1
                 @goto target
             end
@@ -218,7 +221,8 @@ function symbolic_pp!(basis::Basis{N},
                             mul(monomial(mult2), monomial(cand_sig)))
             cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
                                     ht.ndivbits)
-            if rewriteable(basis, ht, j, mul_cand_sig, cand_sig_mask)
+            if rewriteable(basis, ht, j, mul_cand_sig, cand_sig_mask,
+                           ind_order)
                 j += 1
                 @goto target
             end
@@ -248,7 +252,8 @@ function symbolic_pp!(basis::Basis{N},
 end
 
 function finalize_matrix!(matrix::MacaulayMatrix,
-                          symbol_ht::MonomialHashtable)
+                          symbol_ht::MonomialHashtable,
+                          ind_order::Vector{Int})
     
     # store indices into hashtable in a sorted way
     ncols = symbol_ht.load
@@ -275,7 +280,7 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     matrix.sig_order = Vector{Int}(undef, matrix.nrows)
     # sort signatures
     sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
-              lt = (sig1, sig2) -> lt_pot(sig1, sig2))
+              lt = (sig1, sig2) -> lt_pot(sig1, sig2, ind_order))
 end
 
 # TODO: later to optimize: mem allocations for matrix

@@ -6,7 +6,8 @@ function update_basis!(basis::Basis,
                        matrix::MacaulayMatrix,
                        pairset::Pairset{N},
                        symbol_ht::MonomialHashtable,
-                       basis_ht::MonomialHashtable) where N
+                       basis_ht::MonomialHashtable,
+                       ind_order::Vector{Int}) where N
 
     new_basis_c = 0
     new_syz_c = 0
@@ -106,7 +107,7 @@ function update_basis!(basis::Basis,
             basis.basis_load = l
 
             # build new pairs
-            update_pairset!(pairset, basis, basis_ht, l)
+            update_pairset!(pairset, basis, basis_ht, l, ind_order)
         end
     end
     if new_basis_c != 0 || new_syz_c != 0
@@ -121,7 +122,8 @@ end
 function update_pairset!(pairset::Pairset{N},
                          basis::Basis,
                          basis_ht::MonomialHashtable,
-                         new_basis_idx::Int) where N
+                         new_basis_idx::Int,
+                         ind_order::Vector{Int}) where N
 
 
     new_sig_mon = monomial(basis.sigs[new_basis_idx])
@@ -193,13 +195,13 @@ function update_pairset!(pairset::Pairset{N},
 
         # check both pair signatures against koszul syzygies
         rewriteable_koszul(basis, basis_ht, new_pair_sig,
-                           new_pair_sig_mask) && continue
+                           new_pair_sig_mask, ind_order) && continue
         rewriteable_koszul(basis, basis_ht, basis_pair_sig,
-                           basis_pair_sig_mask) && continue
+                           basis_pair_sig_mask, ind_order) && continue
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin
-	    if lt_pot(basis_pair_sig, new_pair_sig)
+	    if lt_pot(basis_pair_sig, new_pair_sig, ind_order)
                 new_pair_sig, new_pair_sig_mask, new_basis_idx,
                 basis_pair_sig, basis_pair_sig_mask, i
             else
@@ -293,10 +295,13 @@ end
 @inline function rewriteable_koszul(basis::Basis,
                                     basis_ht::MonomialHashtable,
                                     sig::Sig,
-                                    sigmask::DivMask)
+                                    sigmask::DivMask,
+                                    ind_order::Vector{Int})
 
     @inbounds for i in basis.basis_offset:basis.basis_load
-        if index(basis.sigs[i]) < index(sig)
+        b_ind = index(basis.sigs[i])
+        s_ind = index(sig)
+        if ind_order[b_ind] < ind_order[s_ind]
             if divch(basis.lm_masks[i], sigmask)
                 if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
                     return true
@@ -311,11 +316,12 @@ function rewriteable(basis::Basis,
                      basis_ht::MonomialHashtable,
                      idx::Int,
                      sig::Sig,
-                     sigmask::DivMask)
+                     sigmask::DivMask,
+                     ind_order::Vector{Int})
 
     rewriteable_syz(basis, sig, sigmask) && return true
     rewriteable_basis(basis, idx, sig, sigmask) && return true
-    rewriteable_koszul(basis, basis_ht, sig, sigmask) && return true
+    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order) && return true
     return false
 end
 

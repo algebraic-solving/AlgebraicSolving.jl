@@ -171,9 +171,13 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
+    # index order
+    ind_order = collect(1:sysl)
+
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     tr = with_logger(logger) do
-        siggb!(basis, pairset, basis_ht, char, shift, degbound = degbound)
+        siggb!(basis, pairset, basis_ht, char, shift, ind_order,
+               degbound = degbound)
     end
 
     # output
@@ -199,7 +203,8 @@ function siggb!(basis::Basis{N},
                 pairset::Pairset,
                 basis_ht::MonomialHashtable,
                 char::Val{Char},
-                shift::Val{Shift};
+                shift::Val{Shift},
+                ind_order::Vector{Int};
                 degbound = 0) where {N, Char, Shift}
 
     tr = new_tracer()
@@ -212,15 +217,15 @@ function siggb!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        select_normal!(pairset, basis, matrix, basis_ht, symbol_ht)
-        symbolic_pp!(basis, matrix, basis_ht, symbol_ht)
-        finalize_matrix!(matrix, symbol_ht)
+        deg = select_normal!(pairset, basis, matrix, basis_ht, symbol_ht, ind_order)
+        symbolic_pp!(basis, matrix, basis_ht, symbol_ht, ind_order)
+        finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
         tr_mat = echelonize!(matrix, tr, char, shift)
 
         tr[deg] = tr_mat
 
-        update_basis!(basis, matrix, pairset, symbol_ht, basis_ht)
+        update_basis!(basis, matrix, pairset, symbol_ht, basis_ht, ind_order)
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
 

@@ -74,11 +74,14 @@ end
     end
 end
 
-function lt_pot(a::Sig, b::Sig)
+function lt_pot(a::Sig, b::Sig,
+                ind_order::Vector{Int})
     if index(a) == index(b)
         return lt_drl(a[2], b[2])
     else
-        return index(a) < index(b)
+        ord_ind_a = ind_order[index(a)]
+        ord_ind_b = ind_order[index(b)]
+        return ord_ind_a < ord_ind_b
     end
 end
 
