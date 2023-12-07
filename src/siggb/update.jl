@@ -59,55 +59,12 @@ function update_basis!(basis::Basis,
             remove_red_pairs!(pairset)
         else
             new_basis_c += 1
-
-            # make sure we have enough space
-            if basis.basis_load == basis.basis_size
-                basis.basis_size *= 2
-                resize!(basis.sigs, basis.basis_size)
-                resize!(basis.sigmasks, basis.basis_size)
-                resize!(basis.sigratios, basis.basis_size)
-                resize!(basis.rewrite_nodes, basis.basis_size)
-                resize!(basis.lm_masks, basis.basis_size)
-                resize!(basis.monomials, basis.basis_size)
-                resize!(basis.coefficients, basis.basis_size)
-                resize!(basis.is_red, basis.basis_size)
-            end
-            
-            # add to basis hashtable
-            insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
-            lm = basis_ht.exponents[first(row)]
-            s = new_sig
-
-            # add everything to basis
-            l = basis.basis_load + 1
-            basis.sigs[l] = new_sig
-            basis.sigmasks[l] = new_sig_mask
-            new_sig_ratio = divide(lm, new_sig_mon)
-            basis.sigratios[l] = new_sig_ratio
-
+            coeffs = matrix.coeffs[i]
             parent_ind = matrix.parent_inds[i]
-            tree_data = basis.rewrite_nodes[parent_ind+1]
-            insind = 3 
-            @inbounds for j in insind:insind+tree_data[1]
-                child_ind = tree_data[j]
-                rat = basis.sigratios[child_ind-1]
-                if lt_drl(new_sig_ratio, rat)
-                    break
-                end
-                insind += 1
-            end
-            insert!(tree_data, insind, l+1)
-            tree_data[1] += 1
-            basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
-            
-            basis.lm_masks[l] = divmask(lm, basis_ht.divmap,
-                                        basis_ht.ndivbits)
-            basis.monomials[l] = row
-            basis.coefficients[l] = matrix.coeffs[i]
-            basis.basis_load = l
-
-            # build new pairs
-            update_pairset!(pairset, basis, basis_ht, l, ind_order)
+            add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
+                            row, coeffs,
+                            new_sig, new_sig_mask, parent_ind,
+                            ind_order)
         end
     end
     if new_basis_c != 0 || new_syz_c != 0
@@ -115,6 +72,66 @@ function update_basis!(basis::Basis,
     end
 end
 
+function add_basis_elem!(basis::Basis,
+                         pairset::Pairset,
+                         basis_ht::MonomialHashtable,
+                         symbol_ht::MonomialHashtable,
+                         row::Vector{MonIdx},
+                         coeffs::Vector{Coeff},
+                         new_sig::Sig,
+                         new_sig_mask::MaskSig,
+                         parent_ind::Int,
+                         ind_order::Vector{Int})
+
+    # make sure we have enough space
+    if basis.basis_load == basis.basis_size
+        basis.basis_size *= 2
+        resize!(basis.sigs, basis.basis_size)
+        resize!(basis.sigmasks, basis.basis_size)
+        resize!(basis.sigratios, basis.basis_size)
+        resize!(basis.rewrite_nodes, basis.basis_size)
+        resize!(basis.lm_masks, basis.basis_size)
+        resize!(basis.monomials, basis.basis_size)
+        resize!(basis.coefficients, basis.basis_size)
+        resize!(basis.is_red, basis.basis_size)
+    end
+    
+    # add to basis hashtable
+    insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
+    lm = basis_ht.exponents[first(row)]
+    s = new_sig
+
+    # add everything to basis
+    l = basis.basis_load + 1
+    basis.sigs[l] = new_sig
+    basis.sigmasks[l] = new_sig_mask
+    new_sig_ratio = divide(lm, monomial(new_sig))
+    basis.sigratios[l] = new_sig_ratio
+
+    basis.lm_masks[l] = divmask(lm, basis_ht.divmap,
+                                basis_ht.ndivbits)
+    basis.monomials[l] = row
+    basis.coefficients[l] = coeffs
+
+    tree_data = basis.rewrite_nodes[parent_ind+1]
+    insind = 3 
+    @inbounds for j in insind:insind+tree_data[1]
+        child_ind = tree_data[j]
+        rat = basis.sigratios[child_ind-1]
+        if lt_drl(new_sig_ratio, rat)
+            break
+        end
+        insind += 1
+    end
+    insert!(tree_data, insind, l+1)
+    tree_data[1] += 1
+    basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
+
+    basis.basis_load = l
+
+    # build new pairs
+    update_pairset!(pairset, basis, basis_ht, l, ind_order)
+end
 
 # construct all pairs with basis element at new_basis_idx
 # and perform corresponding rewrite checks
