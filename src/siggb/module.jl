@@ -3,14 +3,18 @@ function construct_module(sig::Sig{N},
                           basis::Basis{N},
                           tr::Tracer,
                           vchar::Val{Char},
-                          mod_cache) where {N, Char}
+                          mod_cache,
+                          just_index::SigIndex=SigIndex(0)) where {N, Char}
 
     if haskey(mod_cache, sig)
         return mod_cache[sig]
     end
-    @info "sig $(Int(index(sig))), $(Vector{Int}(monomial(sig).exps))"
     degs = basis.degs
     mod_dim = length(degs)
+
+    if index(sig) < just_index
+        return [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
+    end
 
     @inbounds deg = monomial(sig).deg + degs[index(sig)]
     tr_mat = tr[deg]
@@ -20,7 +24,8 @@ function construct_module(sig::Sig{N},
         @inbounds rewr_sig = basis.sigs[rewr_basis_ind]
 
         # construct module representation of canonical rewriter
-        rewr_mod = construct_module(rewr_sig, basis, tr, vchar, mod_cache)
+        rewr_mod = construct_module(rewr_sig, basis, tr, vchar, mod_cache,
+                                    just_index)
 
         # multiply by monomial
         mult = divide(monomial(sig), monomial(rewr_sig))
@@ -37,8 +42,10 @@ function construct_module(sig::Sig{N},
     @inbounds row_ops = tr_mat.col_inds_and_coeffs[row_ind]
     @inbounds for (j, coeff)  in row_ops
         j_sig = tr_mat.row_ind_to_sig[j]
-        j_sig_mod = construct_module(j_sig, basis, tr, vchar, mod_cache)
+        j_sig_mod = construct_module(j_sig, basis, tr, vchar, mod_cache,
+                                     just_index)
         for i in 1:mod_dim
+            !iszero(just_index) && i != just_index
             res_i_coeffs = res[i][1]
             res_i_mons = res[i][2]
             j_mod_coeffs = j_sig_mod[i][1]
