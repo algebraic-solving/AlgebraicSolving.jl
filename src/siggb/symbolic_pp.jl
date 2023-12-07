@@ -4,9 +4,6 @@ function select_normal!(pairset::Pairset{N},
                         ht::MonomialHashtable,
                         symbol_ht::MonomialHashtable) where N
 
-    # sort pairset
-    sort_pairset_by_degree!(pairset, 1, pairset.load-1)
-
     # number of selected pairs
     npairs = 0
     deg = zero(Exp) 

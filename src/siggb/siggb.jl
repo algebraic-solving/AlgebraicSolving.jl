@@ -203,6 +203,7 @@ function siggb!(basis::Basis{N},
                 degbound = 0) where {N, Char, Shift}
 
     tr = new_tracer()
+    sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
     while !iszero(pairset.load)
         if !iszero(degbound) && first(pairset.elems).deg > degbound
@@ -211,7 +212,7 @@ function siggb!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        deg = select_normal!(pairset, basis, matrix, basis_ht, symbol_ht)
+        select_normal!(pairset, basis, matrix, basis_ht, symbol_ht)
         symbolic_pp!(basis, matrix, basis_ht, symbol_ht)
         finalize_matrix!(matrix, symbol_ht)
         iszero(matrix.nrows) && continue
@@ -220,6 +221,59 @@ function siggb!(basis::Basis{N},
         tr[deg] = tr_mat
 
         update_basis!(basis, matrix, pairset, symbol_ht, basis_ht)
+        sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+    end
+
+    return tr
+end
+
+function sigsat!(basis::Basis{N},
+                 pairset::Pairset,
+                 sat_pairset::Pairset,
+                 sat_index::SigIndex,
+                 basis_ht::MonomialHashtable,
+                 char::Val{Char},
+                 shift::Val{Shift}) where {N, Char, Shift}
+
+    sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+    tr = new_tracer()
+
+    while !iszero(pairset.load) || !iszero(sat_pairset.load)
+        if !iszero(pairset.load)
+            matrix = initialize_matrix(Val(N))
+            symbol_ht = initialize_secondary_hash_table(basis_ht)
+
+            deg = select_normal!(pairset, basis, matrix, basis_ht, symbol_ht)
+            symbolic_pp!(basis, matrix, basis_ht, symbol_ht)
+            finalize_matrix!(matrix, symbol_ht)
+            if !iszero(matrix.nrows)
+                tr_mat = echelonize!(matrix, tr, char, shift)
+
+                tr[deg] = tr_mat
+
+                update_basis!(basis, matrix, pairset, symbol_ht, basis_ht)
+                sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+            end
+        end
+
+        if !iszero(sat_pairset.load)
+	    matrix = initialize_matrix(Val(N))
+            symbol_ht = initialize_secondary_hash_table(basis_ht)
+
+            deg = select_normal!(sat_pairset, basis, matrix, basis_ht, symbol_ht)
+            symbolic_pp!(basis, matrix, basis_ht, symbol_ht)
+            finalize_matrix!(matrix, symbol_ht)
+            if !iszero(matrix.nrows)
+                tr_mat = echelonize!(matrix, tr, char, shift)
+
+                tr[deg] = tr_mat
+
+                update_basis!(basis, matrix, pairset, symbol_ht, basis_ht)
+                sort_pairset_by_degree!(sat_pairset, 1, pairset.load-1)
+            end
+
+            gb_deg = iszero(pairset.load) ? first(pairset.elems).deg - 1 : zero(Exp)
+        end
     end
 
     return tr
