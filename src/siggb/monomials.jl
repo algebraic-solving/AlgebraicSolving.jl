@@ -75,20 +75,20 @@ end
 end
 
 function cmp_ind(ind1::SigIndex, ind2::SigIndex,
-                 ind_order::Vector{Int})
+                 ind_order::IndOrder)
 
-    ord_ind1 = ind_order[ind1]
-    ord_ind2 = ind_order[ind2]
+    ord_ind1 = ind_order.ord[ind1]
+    ord_ind2 = ind_order.ord[ind2]
     return ord_ind1 <= ord_ind2
 end
 
 function lt_pot(a::Sig, b::Sig,
-                ind_order::Vector{Int})
+                ind_order::IndOrder)
     if index(a) == index(b)
         return lt_drl(a[2], b[2])
     else
-        ord_ind_a = ind_order[index(a)]
-        ord_ind_b = ind_order[index(b)]
+        ord_ind_a = ind_order.ord[index(a)]
+        ord_ind_b = ind_order.ord[index(b)]
         return ord_ind_a < ord_ind_b
     end
 end

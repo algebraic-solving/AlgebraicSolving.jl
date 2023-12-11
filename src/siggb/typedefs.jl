@@ -122,5 +122,11 @@ end
 
 const Tracer = Dict{Int, TracerMatrix}
 
+# For Index ordering
+mutable struct IndOrder
+    ord::Vector{SigIndex}
+    max_ind::SigIndex
+end
+
 # This is to store where certain elements come from
 const Tags = Dict{SigIndex, Symbol}

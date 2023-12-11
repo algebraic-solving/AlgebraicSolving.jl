@@ -7,7 +7,7 @@ function update_basis!(basis::Basis,
                        pairset::Pairset{N},
                        symbol_ht::MonomialHashtable,
                        basis_ht::MonomialHashtable,
-                       ind_order::Vector{Int},
+                       ind_order::IndOrder,
                        tags::Tags) where N
 
     new_basis_c = 0
@@ -53,7 +53,7 @@ function add_basis_elem!(basis::Basis,
                          new_sig::Sig,
                          new_sig_mask::MaskSig,
                          parent_ind::Int,
-                         ind_order::Vector{Int},
+                         ind_order::IndOrder,
                          tags::Tags)
 
     # make sure we have enough space
@@ -160,7 +160,7 @@ function update_pairset!(pairset::Pairset{N},
                          basis::Basis,
                          basis_ht::MonomialHashtable,
                          new_basis_idx::Int,
-                         ind_order::Vector{Int},
+                         ind_order::IndOrder,
                          tags::Tags) where N
 
 
@@ -340,7 +340,7 @@ end
                                     basis_ht::MonomialHashtable,
                                     sig::Sig,
                                     sigmask::DivMask,
-                                    ind_order::Vector{Int},
+                                    ind_order::IndOrder,
                                     tags::Tags)
 
     s_ind = index(sig)
@@ -350,7 +350,7 @@ end
 
     @inbounds for i in basis.basis_offset:basis.basis_load
         b_ind = index(basis.sigs[i])
-        if ind_order[b_ind] < ind_order[s_ind]
+        if ind_order.ord[b_ind] < ind_order.ord[s_ind]
             if divch(basis.lm_masks[i], sigmask)
                 if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
                     return true
@@ -366,7 +366,7 @@ function rewriteable(basis::Basis,
                      idx::Int,
                      sig::Sig,
                      sigmask::DivMask,
-                     ind_order::Vector{Int},
+                     ind_order::IndOrder,
                      tags::Tags)
 
     s_ind = index(sig)
@@ -403,11 +403,11 @@ function gettag(tags::Tags, i::SigIndex)
 end
 
 function dont_build_pair(ind1::SigIndex, ind2::SigIndex,
-                         tags::Tags, sig_order::Vector{Int})
+                         tags::Tags, ind_order::IndOrder)
 
     if gettag(tags, ind1) == :colins
         ind1 == ind2 && return true
-        if cmp_ind(ind2, ind1, sig_order)
+        if cmp_ind(ind2, ind1, ind_order)
             return true
         end
     end

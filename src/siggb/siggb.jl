@@ -204,7 +204,8 @@ function siggb!(basis::Basis{N},
                 degbound = 0) where {N, Char, Shift}
 
     # index order
-    ind_order = collect(1:basis.basis_offset-1)
+    ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
+                         SigIndex(basis.basis_offset-1))
 
     # tracer
     tr = new_tracer()

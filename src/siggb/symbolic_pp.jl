@@ -3,7 +3,7 @@ function select_normal!(pairset::Pairset{N},
                         matrix::MacaulayMatrix,
                         ht::MonomialHashtable,
                         symbol_ht::MonomialHashtable,
-                        ind_order::Vector{Int},
+                        ind_order::IndOrder,
                         tags::Tags) where N
 
     # number of selected pairs
@@ -156,7 +156,7 @@ function symbolic_pp!(basis::Basis{N},
                       matrix::MacaulayMatrix,
                       ht::MonomialHashtable,
                       symbol_ht::MonomialHashtable,
-                      ind_order::Vector{Int},
+                      ind_order::IndOrder,
                       tags::Tags) where N
 
     i = one(MonIdx)
@@ -253,7 +253,7 @@ end
 
 function finalize_matrix!(matrix::MacaulayMatrix,
                           symbol_ht::MonomialHashtable,
-                          ind_order::Vector{Int})
+                          ind_order::IndOrder)
     
     # store indices into hashtable in a sorted way
     ncols = symbol_ht.load
