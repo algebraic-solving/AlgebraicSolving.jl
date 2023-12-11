@@ -86,6 +86,8 @@ function add_basis_elem!(basis::Basis,
     basis.monomials[l] = row
     basis.coefficients[l] = coeffs
 
+    basis.is_red[l] = false
+
     tree_data = basis.rewrite_nodes[parent_ind+1]
     insind = 3 
     @inbounds for j in insind:insind+tree_data[1]
@@ -99,6 +101,11 @@ function add_basis_elem!(basis::Basis,
     insert!(tree_data, insind, l+1)
     tree_data[1] += 1
     basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
+
+    # if an existing sig further reduced we dont need the old element
+    if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
+        basis.is_red[parent_ind] = true
+    end 
 
     basis.basis_load = l
 
@@ -196,8 +203,11 @@ function update_pairset!(pairset::Pairset{N},
     new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
     # pair construction loop
     @inbounds for i in basis.basis_offset:(new_basis_idx - 1)
-        basis_sig_idx = index(basis.sigs[i])
 
+        # ignore if redundant
+        basis.is_red[i] && continue
+
+        basis_sig_idx = index(basis.sigs[i])
         # dont build some pairs if one of the elements is inserted
         # during colon ideal computation
         dont_build_pair(new_sig_idx, basis_sig_idx, tags, ind_order) && continue

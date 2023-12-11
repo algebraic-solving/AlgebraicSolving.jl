@@ -169,9 +169,6 @@ function symbolic_pp!(basis::Basis{N},
         found_reducer = false
         # skip if reducer already exists
         if !iszero(matrix.pivots[i])
-            # exp = symbol_ht.exponents[i]
-            # println("mon: $(exp.exps)")
-            # println("reducer exists")
             i += one(MonIdx)
             continue
         end
@@ -198,7 +195,7 @@ function symbolic_pp!(basis::Basis{N},
         j = basis.basis_offset 
         @label target
         # find element in basis which divmask divides divmask of monomial
-        @inbounds while j <= basis.basis_load && !divch(basis.lm_masks[j], divm)
+        @inbounds while j <= basis.basis_load && !basis.is_red[j] && !divch(basis.lm_masks[j], divm)
             j += 1 
         end
 
