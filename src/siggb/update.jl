@@ -289,27 +289,6 @@ end
     return k != idx
 end
 
-# @inline function rewriteable_basis(basis::Basis,
-#                                    idx::Int,
-#                                    sig::Sig,
-#                                    sigmask::DivMask)
-
-#     ind = index(sig)
-    
-#     @inbounds for i in basis.basis_load:-1:basis.basis_offset
-#         i == idx && continue
-#         i_sig_idx = index(basis.sigmasks[i])
-#         i_sig_idx != ind && continue
-#         i_sig_mask = mask(basis.sigmasks[i])
-#         if divch(monomial(basis.sigs[i]), monomial(sig),
-#                  i_sig_mask, sigmask)
-#             is_rewr = comp_sigratio(basis, i, idx)
-#             is_rewr && return true
-#         end
-#     end
-#     return false
-# end
-
 function find_canonical_rewriter(basis::Basis,
                                  sig::Sig,
                                  sigmask::DivMask)
