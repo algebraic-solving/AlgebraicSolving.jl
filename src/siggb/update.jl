@@ -8,7 +8,9 @@ function update_basis!(basis::Basis,
                        symbol_ht::MonomialHashtable,
                        basis_ht::MonomialHashtable,
                        ind_order::IndOrder,
-                       tags::Tags) where N
+                       tags::Tags,
+                       tr::Tracer,
+                       vchar::Val{Char}) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
@@ -28,7 +30,8 @@ function update_basis!(basis::Basis,
         if isempty(row)
             new_syz_c += 1
 
-            process_syzygy!(basis, pairset, new_sig, new_sig_mask)
+            process_syzygy!(basis, basis_ht, pairset, new_sig, new_sig_mask,
+                            tags, ind_order, tr, vchar)
         else
             new_basis_c += 1
             coeffs = matrix.coeffs[i]
@@ -113,44 +116,84 @@ function add_basis_elem!(basis::Basis,
     update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
 end
 
-function process_syzygy!(basis::Basis,
+function process_syzygy!(basis::Basis{N},
+                         basis_ht::MonomialHashtable,
                          pairset::Pairset,
                          new_sig::Sig,
-                         new_sig_mask::MaskSig)
+                         new_sig_mask::MaskSig,
+                         tags::Tags,
+                         ind_order::IndOrder,
+                         tr::Tracer,
+                         vchar::Val{Char}) where {N, Char}
 
     new_idx = index(new_sig_mask)
-    new_sig_mon = monomial(new_sig)
-
-    # make sure we have enough space
-    if basis.syz_load == basis.syz_size
-        basis.syz_size *= 2
-        resize!(basis.syz_sigs, basis.syz_size)
-        resize!(basis.syz_masks, basis.syz_size)
-    end
+    tag = gettag(tags, new_idx)
     
-    # add new syz sig
-    l = basis.syz_load + 1
-    basis.syz_sigs[l] = monomial(new_sig)
-    basis.syz_masks[l] = new_sig_mask
-    basis.syz_load += 1
+    if tag != :col
+        new_sig_mon = monomial(new_sig)
 
-    # kill pairs with known syz signature
-    @inbounds for j in 1:pairset.load
-        p = pairset.elems[j]
-        cond = index(p.top_sig) == new_idx
-        if cond && divch(new_sig_mon, monomial(p.top_sig),
-                         new_sig_mask[2], p.top_sig_mask)
-            pairset.elems[j].top_index = 0
+        # make sure we have enough space
+        if basis.syz_load == basis.syz_size
+            basis.syz_size *= 2
+            resize!(basis.syz_sigs, basis.syz_size)
+            resize!(basis.syz_masks, basis.syz_size)
         end
-        cond = index(p.bot_sig) == new_idx
-        if cond && divch(new_sig_mon, monomial(p.bot_sig),
-                         new_sig_mask[2], p.bot_sig_mask)
-            pairset.elems[j].top_index = 0
+        
+        # add new syz sig
+        l = basis.syz_load + 1
+        basis.syz_sigs[l] = monomial(new_sig)
+        basis.syz_masks[l] = new_sig_mask
+        basis.syz_load += 1
+
+        # kill pairs with known syz signature
+        @inbounds for j in 1:pairset.load
+            p = pairset.elems[j]
+            cond = index(p.top_sig) == new_idx
+            if cond && divch(new_sig_mon, monomial(p.top_sig),
+                             new_sig_mask[2], p.top_sig_mask)
+                pairset.elems[j].top_index = 0
+            end
+            cond = index(p.bot_sig) == new_idx
+            if cond && divch(new_sig_mon, monomial(p.bot_sig),
+                             new_sig_mask[2], p.bot_sig_mask)
+                pairset.elems[j].top_index = 0
+            end
         end
+
+        # remove pairs that became rewriteable in previous loop
+        remove_red_pairs!(pairset)
+    else
+        # construct cofactor of zero reduction and ins in hashtable
+        cofac_coeffs, cofac_mons = construct_module(new_sig, basis, tr, vchar,
+                                                    Dict{Sig, Vector{Polynomial{N}}()},
+                                                    new_idx)[new_idx]
+        cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in syz_mons]
+
+        # normalize coefficients
+        inver = invmod(first(cofac_coeffs), vchar)
+        @inbounds for i in eachindex(cofac_coeffs)
+            if isone(i)
+                cofac_coeffs[i] = one(Coeff)
+                continue
+            end
+            cofac_coeffs[i] = mul(inver, cofac_coeffs[i], vchar)
+        end
+
+        # construct a signature for cofactor
+        ind = ind_order.max_ind + one(SigIndex)
+        ind_order.max_ind = ind
+        cofac_sig = (ind, monomial(SVector{N, Exp}(zeros(Exp, N))))
+        cofac_sig_mask = (ind, zero(DivMask))
+
+        # update index order
+        push!(ind_order.ord, ind)
+
+        # add cofactor to basis
+        add_basis_elem!(basis, pairset, basis_ht, basis_ht,
+                        cofac_mons_hashed, cofac_coeffs,
+                        cofac_sig, cofac_sig_mask, 0,
+                        ind_order, tags)
     end
-
-    # remove pairs that became rewriteable in previous loop
-    remove_red_pairs!(pairset)
 end
 
 # construct all pairs with basis element at new_basis_idx

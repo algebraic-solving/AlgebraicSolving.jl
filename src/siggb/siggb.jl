@@ -230,7 +230,9 @@ function siggb!(basis::Basis{N},
 
         tr[deg] = tr_mat
 
-        update_basis!(basis, matrix, pairset, symbol_ht, basis_ht, ind_order, tags)
+        update_basis!(basis, matrix, pairset, symbol_ht,
+                      basis_ht, ind_order, tags,
+                      tr, char)
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
 
