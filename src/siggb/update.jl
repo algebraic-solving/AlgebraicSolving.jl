@@ -187,7 +187,20 @@ function process_syzygy!(basis::Basis{N},
         cofac_sig_mask = (ind, zero(DivMask))
 
         # update index order
-        push!(ind_order.ord, ind)
+        col_inds = findall(tag -> tag == :col, tags)
+        filter!(col_ind -> ind_order.ord[col_ind] > ind_order.ord[new_idx], col_inds)
+        if !isempty(col_inds)
+            _, min_larger_ind = findmin(col_ind -> ind_order[col_ind], col_inds)
+            @inbounds for i in eachindex(ind_order.ord)
+                ord_i = ind_order.ord[i]
+                if ord_i >= min_larger_ind
+                    ind_order.ord[i] += one(SigIndex)
+                end
+            end
+            push!(ind_order.ord, min_larger_ind)
+        else
+            push!(ind_order.ord, ind)
+        end
 
         # update tags
         tags[ind] = :colins
