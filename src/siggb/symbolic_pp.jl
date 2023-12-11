@@ -3,7 +3,8 @@ function select_normal!(pairset::Pairset{N},
                         matrix::MacaulayMatrix,
                         ht::MonomialHashtable,
                         symbol_ht::MonomialHashtable,
-                        ind_order::Vector{Int}) where N
+                        ind_order::Vector{Int},
+                        tags::Tags) where N
 
     # number of selected pairs
     npairs = 0
@@ -93,7 +94,8 @@ function select_normal!(pairset::Pairset{N},
                         if !iszero(pair2.bot_index)
                             rewriteable_basis(basis, pair2.bot_index,
                                               pair2.bot_sig,
-                                              pair2.bot_sig_mask) && continue
+                                              pair2.bot_sig_mask,
+                                              tags) && continue
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
                                           monomial(basis.sigs[ind]))
@@ -154,7 +156,8 @@ function symbolic_pp!(basis::Basis{N},
                       matrix::MacaulayMatrix,
                       ht::MonomialHashtable,
                       symbol_ht::MonomialHashtable,
-                      ind_order::Vector{Int}) where N
+                      ind_order::Vector{Int},
+                      tags::Tags) where N
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
@@ -222,7 +225,7 @@ function symbolic_pp!(basis::Basis{N},
             cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
                                     ht.ndivbits)
             if rewriteable(basis, ht, j, mul_cand_sig, cand_sig_mask,
-                           ind_order)
+                           ind_order, tags)
                 j += 1
                 @goto target
             end

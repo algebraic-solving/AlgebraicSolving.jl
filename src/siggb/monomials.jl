@@ -74,6 +74,14 @@ end
     end
 end
 
+function cmp_ind(ind1::SigIndex, ind2::SigIndex,
+                 ind_order::Vector{Int})
+
+    ord_ind1 = ind_order[ind1]
+    ord_ind2 = ind_order[ind2]
+    return ord_ind1 <= ord_ind2
+end
+
 function lt_pot(a::Sig, b::Sig,
                 ind_order::Vector{Int})
     if index(a) == index(b)
@@ -124,7 +132,7 @@ Base.hash(a::Monomial{N}) where N = makehash(Val(N), a.exps)
 #-------------------------#
 
 # for readibility
-index(a::Sig) = a[1]
-monomial(a::Sig) = a[2]
-index(a::MaskSig) = a[1]
-mask(a::MaskSig) = a[2]
+index(a::Sig) = @inbounds a[1]
+monomial(a::Sig) = @inbounds a[2]
+index(a::MaskSig) = @inbounds a[1]
+mask(a::MaskSig) = @inbounds a[2]

@@ -7,7 +7,8 @@ function update_basis!(basis::Basis,
                        pairset::Pairset{N},
                        symbol_ht::MonomialHashtable,
                        basis_ht::MonomialHashtable,
-                       ind_order::Vector{Int}) where N
+                       ind_order::Vector{Int},
+                       tags::Tags) where N
 
     new_basis_c = 0
     new_syz_c = 0
@@ -64,7 +65,7 @@ function update_basis!(basis::Basis,
             add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
                             row, coeffs,
                             new_sig, new_sig_mask, parent_ind,
-                            ind_order)
+                            ind_order, tags)
         end
     end
     if new_basis_c != 0 || new_syz_c != 0
@@ -81,7 +82,8 @@ function add_basis_elem!(basis::Basis,
                          new_sig::Sig,
                          new_sig_mask::MaskSig,
                          parent_ind::Int,
-                         ind_order::Vector{Int})
+                         ind_order::Vector{Int},
+                         tags::Tags)
 
     # make sure we have enough space
     if basis.basis_load == basis.basis_size
@@ -130,7 +132,7 @@ function add_basis_elem!(basis::Basis,
     basis.basis_load = l
 
     # build new pairs
-    update_pairset!(pairset, basis, basis_ht, l, ind_order)
+    update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
 end
 
 # construct all pairs with basis element at new_basis_idx
@@ -140,7 +142,8 @@ function update_pairset!(pairset::Pairset{N},
                          basis::Basis,
                          basis_ht::MonomialHashtable,
                          new_basis_idx::Int,
-                         ind_order::Vector{Int}) where N
+                         ind_order::Vector{Int},
+                         tags::Tags) where N
 
 
     new_sig_mon = monomial(basis.sigs[new_basis_idx])
@@ -182,9 +185,23 @@ function update_pairset!(pairset::Pairset{N},
     new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
     # pair construction loop
     @inbounds for i in basis.basis_offset:(new_basis_idx - 1)
-        basis_lm = leading_monomial(basis, basis_ht, i)
         basis_sig_idx = index(basis.sigs[i])
 
+        # dont build some pairs if one of the elements is inserted
+        # during colon ideal computation
+        dont_build_pair(new_sig_idx, basis_sig_idx, tags, ind_order) && continue
+        dont_build_pair(basis_sig_idx, new_sig_idx, tags, ind_order) && continue
+
+        if gettag(tags, basis_sig_idx) == :col
+            if gettag(tags, new_sig_idx) == :col
+                continue
+            end
+            if cmp_ind(new_sig_idx, basis_sig_idx)
+                continue
+            end
+        end
+
+        basis_lm = leading_monomial(basis, basis_ht, i)
         mult_new_elem = lcm_div(new_lm, basis_lm)
         new_pair_sig_mon = mul(mult_new_elem, new_sig_mon)
         
@@ -206,15 +223,15 @@ function update_pairset!(pairset::Pairset{N},
 
         # check both pair sigs against non-trivial syzygies
         rewriteable_syz(basis, new_pair_sig,
-                        new_pair_sig_mask) && continue
+                        new_pair_sig_mask, tags) && continue
         rewriteable_syz(basis, basis_pair_sig,
-                        basis_pair_sig_mask) && continue
+                        basis_pair_sig_mask, tags) && continue
 
         # check both pair signatures against koszul syzygies
         rewriteable_koszul(basis, basis_ht, new_pair_sig,
-                           new_pair_sig_mask, ind_order) && continue
+                           new_pair_sig_mask, ind_order, tags) && continue
         rewriteable_koszul(basis, basis_ht, basis_pair_sig,
-                           basis_pair_sig_mask, ind_order) && continue
+                           basis_pair_sig_mask, ind_order, tags) && continue
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin
@@ -239,9 +256,13 @@ end
 
 @inline function rewriteable_syz(basis::Basis,
                                  sig::Sig,
-                                 sigmask::DivMask)
+                                 sigmask::DivMask,
+                                 tags::Tags)
 
     ind = index(sig)
+    if gettag(tags, ind) == :colins
+        return false
+    end
 
     @inbounds for i in 1:basis.syz_load
         if index(basis.syz_masks[i]) == ind
@@ -256,7 +277,13 @@ end
 @inline function rewriteable_basis(basis::Basis,
                                    idx::Int,
                                    sig::Sig,
-                                   sigmask::DivMask)
+                                   sigmask::DivMask,
+                                   tags::Tags)
+
+    ind = index(sig)
+    if gettag(tags, ind) == :colins
+        return false
+    end
 
     k = find_canonical_rewriter(basis, sig, sigmask)
     return k != idx
@@ -313,11 +340,16 @@ end
                                     basis_ht::MonomialHashtable,
                                     sig::Sig,
                                     sigmask::DivMask,
-                                    ind_order::Vector{Int})
+                                    ind_order::Vector{Int},
+                                    tags::Tags)
+
+    s_ind = index(sig)
+    if gettag(tags, s_ind) == :colins
+        return false
+    end
 
     @inbounds for i in basis.basis_offset:basis.basis_load
         b_ind = index(basis.sigs[i])
-        s_ind = index(sig)
         if ind_order[b_ind] < ind_order[s_ind]
             if divch(basis.lm_masks[i], sigmask)
                 if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
@@ -334,15 +366,21 @@ function rewriteable(basis::Basis,
                      idx::Int,
                      sig::Sig,
                      sigmask::DivMask,
-                     ind_order::Vector{Int})
+                     ind_order::Vector{Int},
+                     tags::Tags)
 
-    rewriteable_syz(basis, sig, sigmask) && return true
-    rewriteable_basis(basis, idx, sig, sigmask) && return true
-    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order) && return true
+    s_ind = index(sig)
+    if gettag(tags, s_ind) == :colins
+        return false
+    end
+
+    rewriteable_syz(basis, sig, sigmask, tags) && return true
+    rewriteable_basis(basis, idx, sig, sigmask, tags) && return true
+    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags) && return true
     return false
 end
 
-# helper functions for readability
+# helper functions
 function leading_monomial(basis::Basis,
                           basis_ht::MonomialHashtable,
                           i)
@@ -358,6 +396,22 @@ end
         return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
     end
     return lt_drl(rat1, rat2)
+end
+
+function gettag(tags::Tags, i::SigIndex)
+    return get(tags, i, :default)
+end
+
+function dont_build_pair(ind1::SigIndex, ind2::SigIndex,
+                         tags::Tags, sig_order::Vector{Int})
+
+    if gettag(tags, ind1) == :colins
+        ind1 == ind2 && return true
+        if cmp_ind(ind2, ind1, sig_order)
+            return true
+        end
+    end
+    return false
 end
 
 # remove pairs that are rewriteable

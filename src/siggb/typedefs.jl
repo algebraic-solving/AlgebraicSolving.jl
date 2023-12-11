@@ -121,3 +121,6 @@ mutable struct TracerMatrix
 end
 
 const Tracer = Dict{Int, TracerMatrix}
+
+# This is to store where certain elements come from
+const Tags = Dict{SigIndex, Symbol}
