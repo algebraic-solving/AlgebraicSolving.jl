@@ -28,36 +28,7 @@ function update_basis!(basis::Basis,
         if isempty(row)
             new_syz_c += 1
 
-            # make sure we have enough space
-            if basis.syz_load == basis.syz_size
-                basis.syz_size *= 2
-                resize!(basis.syz_sigs, basis.syz_size)
-                resize!(basis.syz_masks, basis.syz_size)
-            end
-            
-            # add new syz sig
-            l = basis.syz_load + 1
-            basis.syz_sigs[l] = monomial(new_sig)
-            basis.syz_masks[l] = new_sig_mask
-            basis.syz_load += 1
-
-            # kill pairs with known syz signature
-            @inbounds for j in 1:pairset.load
-                p = pairset.elems[j]
-                cond = index(p.top_sig) == new_idx
-                if cond && divch(new_sig_mon, monomial(p.top_sig),
-                                 new_sig_mask[2], p.top_sig_mask)
-                    pairset.elems[j].top_index = 0
-                end
-                cond = index(p.bot_sig) == new_idx
-                if cond && divch(new_sig_mon, monomial(p.bot_sig),
-                                 new_sig_mask[2], p.bot_sig_mask)
-                    pairset.elems[j].top_index = 0
-                end
-            end
-
-            # remove pairs that became rewriteable in previous loop
-            remove_red_pairs!(pairset)
+            process_syzygy!(basis, pairset, new_sig, new_sig_mask)
         else
             new_basis_c += 1
             coeffs = matrix.coeffs[i]
@@ -133,6 +104,46 @@ function add_basis_elem!(basis::Basis,
 
     # build new pairs
     update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
+end
+
+function process_syzygy!(basis::Basis,
+                         pairset::Pairset,
+                         new_sig::Sig,
+                         new_sig_mask::MaskSig)
+
+    new_idx = index(new_sig_mask)
+    new_sig_mon = monomial(new_sig)
+
+    # make sure we have enough space
+    if basis.syz_load == basis.syz_size
+        basis.syz_size *= 2
+        resize!(basis.syz_sigs, basis.syz_size)
+        resize!(basis.syz_masks, basis.syz_size)
+    end
+    
+    # add new syz sig
+    l = basis.syz_load + 1
+    basis.syz_sigs[l] = monomial(new_sig)
+    basis.syz_masks[l] = new_sig_mask
+    basis.syz_load += 1
+
+    # kill pairs with known syz signature
+    @inbounds for j in 1:pairset.load
+        p = pairset.elems[j]
+        cond = index(p.top_sig) == new_idx
+        if cond && divch(new_sig_mon, monomial(p.top_sig),
+                         new_sig_mask[2], p.top_sig_mask)
+            pairset.elems[j].top_index = 0
+        end
+        cond = index(p.bot_sig) == new_idx
+        if cond && divch(new_sig_mon, monomial(p.bot_sig),
+                         new_sig_mask[2], p.bot_sig_mask)
+            pairset.elems[j].top_index = 0
+        end
+    end
+
+    # remove pairs that became rewriteable in previous loop
+    remove_red_pairs!(pairset)
 end
 
 # construct all pairs with basis element at new_basis_idx
