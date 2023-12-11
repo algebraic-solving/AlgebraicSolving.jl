@@ -212,6 +212,7 @@ function siggb!(basis::Basis{N},
 
     # tags
     tags = Tags()
+    tags[basis.basis_offset-1] = :col
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 

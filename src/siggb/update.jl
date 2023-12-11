@@ -91,25 +91,27 @@ function add_basis_elem!(basis::Basis,
 
     basis.is_red[l] = false
 
-    tree_data = basis.rewrite_nodes[parent_ind+1]
-    insind = 3 
-    @inbounds for j in insind:insind+tree_data[1]
-        child_ind = tree_data[j]
-        rat = basis.sigratios[child_ind-1]
-        if lt_drl(new_sig_ratio, rat)
-            break
+    if gettag(tags, index(new_sig)) != :colins
+        tree_data = basis.rewrite_nodes[parent_ind+1]
+        insind = 3 
+        @inbounds for j in insind:insind+tree_data[1]
+            child_ind = tree_data[j]
+            rat = basis.sigratios[child_ind-1]
+            if lt_drl(new_sig_ratio, rat)
+                break
+            end
+            insind += 1
         end
-        insind += 1
+        insert!(tree_data, insind, l+1)
+        tree_data[1] += 1
+
+        # if an existing sig further reduced we dont need the old element
+        if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
+            basis.is_red[parent_ind] = true
+        end 
     end
-    insert!(tree_data, insind, l+1)
-    tree_data[1] += 1
+
     basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
-
-    # if an existing sig further reduced we dont need the old element
-    if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
-        basis.is_red[parent_ind] = true
-    end 
-
     basis.basis_load = l
 
     # build new pairs
@@ -129,48 +131,47 @@ function process_syzygy!(basis::Basis{N},
     new_idx = index(new_sig_mask)
     tag = gettag(tags, new_idx)
     
-    if tag != :col
-        new_sig_mon = monomial(new_sig)
+    new_sig_mon = monomial(new_sig)
 
-        # make sure we have enough space
-        if basis.syz_load == basis.syz_size
-            basis.syz_size *= 2
-            resize!(basis.syz_sigs, basis.syz_size)
-            resize!(basis.syz_masks, basis.syz_size)
+    # make sure we have enough space
+    if basis.syz_load == basis.syz_size
+        basis.syz_size *= 2
+        resize!(basis.syz_sigs, basis.syz_size)
+        resize!(basis.syz_masks, basis.syz_size)
+    end
+    
+    # add new syz sig
+    l = basis.syz_load + 1
+    basis.syz_sigs[l] = monomial(new_sig)
+    basis.syz_masks[l] = new_sig_mask
+    basis.syz_load += 1
+
+    # kill pairs with known syz signature
+    @inbounds for j in 1:pairset.load
+        p = pairset.elems[j]
+        cond = index(p.top_sig) == new_idx
+        if cond && divch(new_sig_mon, monomial(p.top_sig),
+                         new_sig_mask[2], p.top_sig_mask)
+            pairset.elems[j].top_index = 0
         end
-        
-        # add new syz sig
-        l = basis.syz_load + 1
-        basis.syz_sigs[l] = monomial(new_sig)
-        basis.syz_masks[l] = new_sig_mask
-        basis.syz_load += 1
-
-        # kill pairs with known syz signature
-        @inbounds for j in 1:pairset.load
-            p = pairset.elems[j]
-            cond = index(p.top_sig) == new_idx
-            if cond && divch(new_sig_mon, monomial(p.top_sig),
-                             new_sig_mask[2], p.top_sig_mask)
-                pairset.elems[j].top_index = 0
-            end
-            cond = index(p.bot_sig) == new_idx
-            if cond && divch(new_sig_mon, monomial(p.bot_sig),
-                             new_sig_mask[2], p.bot_sig_mask)
-                pairset.elems[j].top_index = 0
-            end
+        cond = index(p.bot_sig) == new_idx
+        if cond && divch(new_sig_mon, monomial(p.bot_sig),
+                         new_sig_mask[2], p.bot_sig_mask)
+            pairset.elems[j].top_index = 0
         end
+    end
 
-        # remove pairs that became rewriteable in previous loop
-        remove_red_pairs!(pairset)
-    else
+    # remove pairs that became rewriteable in previous loop
+    remove_red_pairs!(pairset)
+    if tag == :col
         # construct cofactor of zero reduction and ins in hashtable
         cofac_coeffs, cofac_mons = construct_module(new_sig, basis, tr, vchar,
-                                                    Dict{Sig, Vector{Polynomial{N}}()},
+                                                    Dict{Sig, Vector{Polynomial{N}}}(),
                                                     new_idx)[new_idx]
-        cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in syz_mons]
+        cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
 
         # normalize coefficients
-        inver = invmod(first(cofac_coeffs), vchar)
+        inver = inv(first(cofac_coeffs), vchar)
         @inbounds for i in eachindex(cofac_coeffs)
             if isone(i)
                 cofac_coeffs[i] = one(Coeff)
@@ -188,10 +189,13 @@ function process_syzygy!(basis::Basis{N},
         # update index order
         push!(ind_order.ord, ind)
 
+        # update tags
+        tags[ind] = :colins
+
         # add cofactor to basis
         add_basis_elem!(basis, pairset, basis_ht, basis_ht,
                         cofac_mons_hashed, cofac_coeffs,
-                        cofac_sig, cofac_sig_mask, 0,
+                        cofac_sig, cofac_sig_mask, -1,
                         ind_order, tags)
     end
 end
@@ -256,15 +260,6 @@ function update_pairset!(pairset::Pairset{N},
         dont_build_pair(new_sig_idx, basis_sig_idx, tags, ind_order) && continue
         dont_build_pair(basis_sig_idx, new_sig_idx, tags, ind_order) && continue
 
-        if gettag(tags, basis_sig_idx) == :col
-            if gettag(tags, new_sig_idx) == :col
-                continue
-            end
-            if cmp_ind(new_sig_idx, basis_sig_idx)
-                continue
-            end
-        end
-
         basis_lm = leading_monomial(basis, basis_ht, i)
         mult_new_elem = lcm_div(new_lm, basis_lm)
         new_pair_sig_mon = mul(mult_new_elem, new_sig_mon)
@@ -309,10 +304,10 @@ function update_pairset!(pairset::Pairset{N},
         end
         
         pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
-        new_pair =  SPair(top_sig, bot_sig,
-                          top_sig_mask, bot_sig_mask,
-                          top_index, bot_index,
-                          pair_deg)
+        new_pair = SPair(top_sig, bot_sig,
+                         top_sig_mask, bot_sig_mask,
+                         top_index, bot_index,
+                         pair_deg)
         pairset.elems[pairset.load + 1] = new_pair
         pairset.load += 1
     end
