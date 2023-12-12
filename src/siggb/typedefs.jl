@@ -54,8 +54,8 @@ mutable struct Basis{N}
     basis_load::Int
     basis_size::Int
     # for storing the initial polynomials
-    sys_load::Int
-    sys_size::Int
+    input_load::Int
+    input_size::Int
     basis_offset::Int
     syz_load::Int
     syz_size::Int

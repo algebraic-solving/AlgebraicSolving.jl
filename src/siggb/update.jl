@@ -62,15 +62,7 @@ function add_basis_elem!(basis::Basis,
 
     # make sure we have enough space
     if basis.basis_load == basis.basis_size
-        basis.basis_size *= 2
-        resize!(basis.sigs, basis.basis_size)
-        resize!(basis.sigmasks, basis.basis_size)
-        resize!(basis.sigratios, basis.basis_size)
-        resize!(basis.rewrite_nodes, basis.basis_size)
-        resize!(basis.lm_masks, basis.basis_size)
-        resize!(basis.monomials, basis.basis_size)
-        resize!(basis.coefficients, basis.basis_size)
-        resize!(basis.is_red, basis.basis_size)
+        resize_basis!(basis)
     end
     
     # add to basis hashtable
@@ -486,4 +478,59 @@ function remove_red_pairs!(pairset::Pairset)
         pairset.elems[j] = pairset.elems[i]
     end
     pairset.load = j 
+end
+
+function resize_basis!(basis::Basis)
+    basis.basis_size *= 2
+    resize!(basis.sigs, basis.basis_size)
+    resize!(basis.sigmasks, basis.basis_size)
+    resize!(basis.sigratios, basis.basis_size)
+    resize!(basis.rewrite_nodes, basis.basis_size)
+    resize!(basis.lm_masks, basis.basis_size)
+    resize!(basis.monomials, basis.basis_size)
+    resize!(basis.coefficients, basis.basis_size)
+    resize!(basis.is_red, basis.basis_size)
+end
+
+function make_room_new_input_el!(basis::Basis)
+
+    # this whole block just shifts the basis to the right
+    # to make room for new input elements
+    @inbounds if basis.input_load >= basis.input_size
+        shift = basis.input_size
+        basis.input_size *= 2
+        
+        shift = new_offset - basis.basis_offset
+        old_offset = basis.basis_offset
+        basis.basis_offset += shift
+        basis.basis_load += shift
+        if basis.basis_load >= basis.basis_size
+            resize_basis!(basis)
+        end
+
+        # adjusts rewrite nodes at the start
+        for i in 1:basis.input_load
+            basis.rewrite_nodes[i][3] += shift
+        end
+
+        for i in basis.basis_load:-1:basis.basis_offset
+            basis.sigs[i] = basis.sigs[i-shift]
+            basis.sigmasks[i] = basis.sigmasks[i-shift]
+            basis.sigratios[i] = basis.sigratios[i-shift]
+            basis.lm_masks[i] = basis.lm_masks[i-shift]
+            basis.monomials[i] = basis.monomials[i-shift]
+            basis.coefficients[i] = basis.coefficients[i-shift]
+            basis.is_red[i] = basis.is_red[i-shift]
+            
+            # adjust rewrite tree
+            rnodes = basis.rewrite_nodes[i-shift]
+            if rnodes[2] >= old_offset
+                rnodes[2] += shift
+            end
+            for j in 3:rnodes[1]
+                rnodes[j] += shift
+            end
+            basis.rewrite_nodes[i] = rnodes
+        end
+    end
 end

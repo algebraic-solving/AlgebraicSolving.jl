@@ -157,7 +157,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         basis.monomials[i] = mons
         basis.coefficients[i] = coeffs
         basis.is_red[i] = false
-        basis.sys_load += 1
+        basis.input_load += 1
 
         # add unitvector as pair
         pairset.elems[i] = SPair{nv}(sig, zero_sig, zero(DivMask),
