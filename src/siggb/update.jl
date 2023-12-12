@@ -39,7 +39,7 @@ function update_basis!(basis::Basis,
             add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
                             row, coeffs,
                             new_sig, new_sig_mask, parent_ind,
-                            ind_order, tags)
+                            tr, ind_order, tags)
         end
     end
     if new_basis_c != 0 || new_syz_c != 0
@@ -56,6 +56,7 @@ function add_basis_elem!(basis::Basis,
                          new_sig::Sig,
                          new_sig_mask::MaskSig,
                          parent_ind::Int,
+                         tr::Tracer,
                          ind_order::IndOrder,
                          tags::Tags)
 
@@ -114,6 +115,14 @@ function add_basis_elem!(basis::Basis,
     basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
     basis.basis_load = l
 
+    # update tracer info
+    if tr.load >= tr.size
+        tr.size *= 2
+        resize!(tr.mats, tr.size)
+    end
+    @inbounds tr.basis_ind_to_mat[l] = length(tr.mats)
+    tr.load += 1
+
     # build new pairs
     update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
 end
@@ -164,10 +173,11 @@ function process_syzygy!(basis::Basis{N},
     # remove pairs that became rewriteable in previous loop
     remove_red_pairs!(pairset)
     if tag == :col
+        @info "inserting cofactor from colon ideal computation"
         # construct cofactor of zero reduction and ins in hashtable
         cofac_coeffs, cofac_mons = construct_module(new_sig, basis, tr, vchar,
                                                     Dict{Sig, Vector{Polynomial{N}}}(),
-                                                    new_idx)[new_idx]
+                                                    ind_order.max_ind, new_idx)[new_idx]
         cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
 
         # normalize coefficients
@@ -190,7 +200,7 @@ function process_syzygy!(basis::Basis{N},
         col_inds = findall(tag -> tag == :col, tags)
         filter!(col_ind -> ind_order.ord[col_ind] > ind_order.ord[new_idx], col_inds)
         if !isempty(col_inds)
-            _, min_larger_ind = findmin(col_ind -> ind_order[col_ind], col_inds)
+            _, min_larger_ind = findmin(col_ind -> ind_order.ord[col_ind], col_inds)
             @inbounds for i in eachindex(ind_order.ord)
                 ord_i = ind_order.ord[i]
                 if ord_i >= min_larger_ind
@@ -206,6 +216,7 @@ function process_syzygy!(basis::Basis{N},
         tags[ind] = :colins
 
         # add cofactor to basis
+        @inbounds push!(basis.degs, first(cofac_mons).deg)
         add_basis_elem!(basis, pairset, basis_ht, basis_ht,
                         cofac_mons_hashed, cofac_coeffs,
                         cofac_sig, cofac_sig_mask, -1,

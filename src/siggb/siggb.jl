@@ -212,6 +212,8 @@ function siggb!(basis::Basis{N},
 
     # tags
     tags = Tags()
+    # tags[basis.basis_offset-1] = :col
+    # tags[basis.basis_offset-2] = :col
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -228,7 +230,7 @@ function siggb!(basis::Basis{N},
         iszero(matrix.nrows) && continue
         tr_mat = echelonize!(matrix, tr, char, shift)
 
-        tr[deg] = tr_mat
+        push!(tr.mats, tr_mat)
 
         update_basis!(basis, matrix, pairset, symbol_ht,
                       basis_ht, ind_order, tags,

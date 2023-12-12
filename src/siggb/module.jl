@@ -1,49 +1,67 @@
+function construct_module(basis::Basis{N},
+                          basis_index::Int,
+                          tr::Tracer,
+                          vchar::Val{Char},
+                          mod_cache::Dict{Sig, Vector{Polynomial{N}}},
+                          mod_dim::SigIndex,
+                          just_index::SigIndex=SigIndex(0)) where {N, Char}
+
+    @inbounds sig = basis.sigs[basis_index]
+
+    if basis_index >= basis.basis_offset
+        @inbounds mat_ind = tr.basis_ind_to_mat[basis_index]
+        return construct_module(sig, basis, mat_index, tr,
+                                vchar, mod_cache,
+                                mod_dim, just_index)
+    else
+        # if it was an input element we just take the signature
+        res = [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
+        res[index(sig)] = ([one(Coeff)], [monomial(sig)])
+        return res
+    end
+        
+end
 # construct a module representation out of a given sig
 function construct_module(sig::Sig{N},
                           basis::Basis{N},
+                          mat_index::Int,
                           tr::Tracer,
                           vchar::Val{Char},
-                          mod_cache,
+                          mod_cache::Dict{Sig, Vector{Polynomial{N}}},
+                          mod_dim::SigIndex,
                           just_index::SigIndex=SigIndex(0)) where {N, Char}
 
     if haskey(mod_cache, sig)
         return mod_cache[sig]
     end
-    degs = basis.degs
-    mod_dim = length(degs)
 
     if index(sig) < just_index
         return [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
     end
 
-    @inbounds deg = monomial(sig).deg + degs[index(sig)]
-    tr_mat = tr[deg]
+    tr_mat = tr.mats[mat_index]
 
     row_ind, rewr_basis_ind = tr_mat.rows[sig]
-    if rewr_basis_ind >= basis.basis_offset
-        @inbounds rewr_sig = basis.sigs[rewr_basis_ind]
 
-        # construct module representation of canonical rewriter
-        rewr_mod = construct_module(rewr_sig, basis, tr, vchar, mod_cache,
-                                    just_index)
+    # construct module representation of canonical rewriter
+    rewr_mod = construct_module(basis, basis_index, tr, vchar,
+                                mod_cache,
+                                mod_dim, just_index)
 
-        # multiply by monomial
-        mult = divide(monomial(sig), monomial(rewr_sig))
-        res = Vector{Polynomial{N}}(undef, mod_dim)
-        @inbounds for i in 1:mod_dim
-            res[i] = (copy(rewr_mod[i][1]), mul_by_mon(rewr_mod[i][2], mult))
-        end
-    else
-        # if it was an input element we just take the signature
-        res = [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
-        res[index(sig)] = ([one(Coeff)], [monomial(sig)])
+    # multiply by monomial
+    mult = divide(monomial(sig), monomial(rewr_sig))
+    isone = all(iszero, mult.exps)
+    res = Vector{Polynomial{N}}(undef, mod_dim)
+    @inbounds for i in 1:mod_dim
+        res[i] = (copy(rewr_mod[i][1]), isone ? copy(rewr_mod[i][2]) : mul_by_mon(rewr_mod[i][2], mult))
     end
 
     @inbounds row_ops = tr_mat.col_inds_and_coeffs[row_ind]
     @inbounds for (j, coeff)  in row_ops
         j_sig = tr_mat.row_ind_to_sig[j]
-        j_sig_mod = construct_module(j_sig, basis, tr, vchar, mod_cache,
-                                     just_index)
+        j_sig_mod = construct_module(j_sig, basis, mat_index,
+                                     tr, vchar, mod_cache,
+                                     mod_dim, just_index)
         for i in 1:mod_dim
             !iszero(just_index) && i != just_index
             res_i_coeffs = res[i][1]

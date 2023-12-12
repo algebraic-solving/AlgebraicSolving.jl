@@ -120,7 +120,12 @@ mutable struct TracerMatrix
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
 end
 
-const Tracer = Dict{Int, TracerMatrix}
+mutable struct Tracer
+    mats::Vector{TracerMatrix}
+    basis_ind_to_mat::Vector{Int}
+    load::Int
+    size::Int
+end
 
 # For Index ordering
 mutable struct IndOrder
