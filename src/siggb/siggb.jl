@@ -105,7 +105,8 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
                   lm_masks, monomials, coeffs, is_red,
                   syz_sigs, syz_masks, degs, sysl,
-                  init_basis_size, sysl + 1, 0, init_syz_size)
+                  init_basis_size, 0, sysl, sysl + 1, 0,
+                  init_syz_size)
 
     # root node
     basis.rewrite_nodes[1] = vcat([length(sys)-1, -1],
@@ -156,6 +157,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         basis.monomials[i] = mons
         basis.coefficients[i] = coeffs
         basis.is_red[i] = false
+        basis.sys_load += 1
 
         # add unitvector as pair
         pairset.elems[i] = SPair{nv}(sig, zero_sig, zero(DivMask),
