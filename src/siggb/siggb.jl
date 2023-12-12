@@ -104,7 +104,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     syz_masks = Vector{MaskSig}(undef, init_syz_size)
     basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
                   lm_masks, monomials, coeffs, is_red,
-                  syz_sigs, syz_masks, degs, sysl,
+                  syz_sigs, syz_masks, Exp[], sysl,
                   init_basis_size, 0, sysl, sysl + 1, 0,
                   init_syz_size)
 
@@ -114,11 +114,9 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
 
     # initialize pairset
     pairset = Pairset{nv}(Vector{SPair{nv}}(undef, init_pair_size),
-                          sysl,
+                          0,
                           init_pair_size)
 
-    one_mon = monomial(SVector{nv}(zeros(Exp, nv)))
-    zero_sig = (zero(SigIndex), one_mon)
     # store initial pols in basis and pairset
     @inbounds for i in 1:sysl
         f = sys[i]
@@ -145,31 +143,14 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         @inbounds mons = mons[s]
         @inbounds coeffs = coeffs[s]
 
-        # signatures
-        sig = (SigIndex(i), one_mon)
-        lm_exps = SVector{nv}((Exp).(exps[1]))
-        sigr = monomial(lm_exps)
-
-        # store stuff in basis
-        basis.sigs[i] = sig
-        basis.sigratios[i] = sigr
-        basis.rewrite_nodes[i+1] = [-1, 1]
-        basis.monomials[i] = mons
-        basis.coefficients[i] = coeffs
-        basis.is_red[i] = false
-        basis.input_load += 1
-
-        # add unitvector as pair
-        pairset.elems[i] = SPair{nv}(sig, zero_sig, zero(DivMask),
-                                     zero(DivMask), i, 0, degs[i])
+        add_input_element!(basis, pairset, SigIndex(i),
+                           mons, coeffs, zero(DivMask),
+                           basis_ht.exponents[first(mons)])
     end
 
     # compute divmasks
     fill_divmask!(basis_ht)
-    dm_one_mon = divmask(one_mon, basis_ht.divmap, basis_ht.ndivbits)
     @inbounds for i in 1:sysl
-        basis.sigmasks[i] = (SigIndex(i), dm_one_mon)
-        pairset.elems[i].top_sig_mask = basis.sigmasks[i][2]
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
@@ -260,6 +241,39 @@ end
 function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
     ordr = Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
+end
+
+function add_input_element!(basis::Basis{N},
+                            pairset::Pairset,
+                            ind::SigIndex,
+                            mons::Vector{MonIdx},
+                            coeffs::Vector{Coeff},
+                            lm_divm::DivMask,
+                            lm::Monomial) where N
+
+    one_mon = monomial(SVector{N}(zeros(Exp, N)))
+    zero_sig = (zero(SigIndex), one_mon)
+
+    # signatures
+    sig = (ind, one_mon)
+
+    # store stuff in basis
+    basis.sigs[ind] = sig
+    basis.sigmasks[ind] = (ind, zero(DivMask))
+    basis.sigratios[ind] = lm
+    basis.rewrite_nodes[ind+1] = [-1, 1]
+    basis.monomials[ind] = mons
+    basis.coefficients[ind] = coeffs
+    basis.is_red[ind] = false
+    push!(basis.degs, lm.deg)
+    basis.lm_masks[ind] = lm_divm
+    basis.input_load += 1
+
+    # add unitvector as pair
+    pairset.elems[pairset.load+1] = SPair{N}(sig, zero_sig, zero(DivMask),
+                                             zero(DivMask), Int(ind),
+                                             0, lm.deg)
+    pairset.load += 1
 end
 
 # homogenize w.r.t. the last variable
