@@ -109,8 +109,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
                   init_syz_size)
 
     # root node
-    basis.rewrite_nodes[1] = vcat([length(sys)-1, -1],
-                                  collect(2:length(sys)+1))
+    basis.rewrite_nodes[1] = [-1, -1]
 
     # initialize pairset
     pairset = Pairset{nv}(Vector{SPair{nv}}(undef, init_pair_size),
@@ -195,7 +194,7 @@ function siggb!(basis::Basis{N},
 
     # tags
     tags = Tags()
-    # tags[basis.basis_offset-1] = :col
+    tags[basis.basis_offset-1] = :col
     # tags[basis.basis_offset-2] = :col
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
@@ -251,29 +250,35 @@ function add_input_element!(basis::Basis{N},
                             lm_divm::DivMask,
                             lm::Monomial) where N
 
-    one_mon = monomial(SVector{N}(zeros(Exp, N)))
-    zero_sig = (zero(SigIndex), one_mon)
+    @inbounds begin
+        one_mon = monomial(SVector{N}(zeros(Exp, N)))
+        zero_sig = (zero(SigIndex), one_mon)
 
-    # signatures
-    sig = (ind, one_mon)
+        # signatures
+        sig = (ind, one_mon)
 
-    # store stuff in basis
-    basis.sigs[ind] = sig
-    basis.sigmasks[ind] = (ind, zero(DivMask))
-    basis.sigratios[ind] = lm
-    basis.rewrite_nodes[ind+1] = [-1, 1]
-    basis.monomials[ind] = mons
-    basis.coefficients[ind] = coeffs
-    basis.is_red[ind] = false
-    push!(basis.degs, lm.deg)
-    basis.lm_masks[ind] = lm_divm
-    basis.input_load += 1
+        # store stuff in basis
+        basis.sigs[ind] = sig
+        basis.sigmasks[ind] = (ind, zero(DivMask))
+        basis.sigratios[ind] = lm
+        basis.rewrite_nodes[ind+1] = [-1, 1]
+        basis.monomials[ind] = mons
+        basis.coefficients[ind] = coeffs
+        basis.is_red[ind] = false
+        push!(basis.degs, lm.deg)
+        basis.lm_masks[ind] = lm_divm
+        basis.input_load += 1
 
-    # add unitvector as pair
-    pairset.elems[pairset.load+1] = SPair{N}(sig, zero_sig, zero(DivMask),
-                                             zero(DivMask), Int(ind),
-                                             0, lm.deg)
-    pairset.load += 1
+        # add child to rewrite root
+        push!(basis.rewrite_nodes[1], ind+1)
+        basis.rewrite_nodes[1][1] += 1
+
+        # add unitvector as pair
+        pairset.elems[pairset.load+1] = SPair{N}(sig, zero_sig, zero(DivMask),
+                                                 zero(DivMask), Int(ind),
+                                                 0, lm.deg)
+        pairset.load += 1
+    end
 end
 
 # homogenize w.r.t. the last variable

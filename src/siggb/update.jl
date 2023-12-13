@@ -111,6 +111,7 @@ function add_basis_elem!(basis::Basis,
     if tr.load >= tr.size
         tr.size *= 2
         resize!(tr.mats, tr.size)
+        resize!(tr.basis_ind_to_mat, tr.size)
     end
     @inbounds tr.basis_ind_to_mat[l] = length(tr.mats)
     tr.load += 1
@@ -167,9 +168,10 @@ function process_syzygy!(basis::Basis{N},
     if tag == :col
         @info "inserting cofactor from colon ideal computation"
         # construct cofactor of zero reduction and ins in hashtable
-        cofac_coeffs, cofac_mons = construct_module(new_sig, basis, tr, vchar,
+        mat_ind = length(tr.mats)
+        cofac_coeffs, cofac_mons = construct_module(new_sig, basis, mat_ind, tr, vchar,
                                                     Dict{Sig, Vector{Polynomial{N}}}(),
-                                                    ind_order.max_ind, new_idx)[new_idx]
+                                                    ind_order.max_ind, ind_order, new_idx)[new_idx]
         cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
 
         # normalize coefficients
@@ -182,11 +184,9 @@ function process_syzygy!(basis::Basis{N},
             cofac_coeffs[i] = mul(inver, cofac_coeffs[i], vchar)
         end
 
-        # construct a signature for cofactor
+        # sig index for cofactor
         ind = ind_order.max_ind + one(SigIndex)
         ind_order.max_ind = ind
-        cofac_sig = (ind, monomial(SVector{N, Exp}(zeros(Exp, N))))
-        cofac_sig_mask = (ind, zero(DivMask))
 
         # update index order
         col_inds = findall(tag -> tag == :col, tags)
@@ -207,12 +207,14 @@ function process_syzygy!(basis::Basis{N},
         # update tags
         tags[ind] = :colins
 
-        # add cofactor to basis
-        @inbounds push!(basis.degs, first(cofac_mons).deg)
-        add_basis_elem!(basis, pairset, basis_ht, basis_ht,
-                        cofac_mons_hashed, cofac_coeffs,
-                        cofac_sig, cofac_sig_mask, -1,
-                        ind_order, tags)
+        # add cofactor to input sequence
+        if basis.input_load == basis.input_size
+            make_room_new_input_el!(basis, tr)
+        end
+        lm = first(cofac_mons)
+        lm_divm = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
+        add_input_element!(basis, pairset, ind, cofac_mons_hashed,
+                           cofac_coeffs, lm_divm, lm)
     end
 end
 
@@ -492,15 +494,15 @@ function resize_basis!(basis::Basis)
     resize!(basis.is_red, basis.basis_size)
 end
 
-function make_room_new_input_el!(basis::Basis)
+function make_room_new_input_el!(basis::Basis,
+                                 tr::Tracer)
 
     # this whole block just shifts the basis to the right
     # to make room for new input elements
-    @inbounds if basis.input_load >= basis.input_size
-        shift = basis.input_size
+    @inbounds begin
         basis.input_size *= 2
         
-        shift = new_offset - basis.basis_offset
+        shift = basis.input_size
         old_offset = basis.basis_offset
         basis.basis_offset += shift
         basis.basis_load += shift
@@ -508,9 +510,15 @@ function make_room_new_input_el!(basis::Basis)
             resize_basis!(basis)
         end
 
+        if tr.load + shift >= tr.size
+            tr.size *= 2
+            resize!(tr.mats, tr.size)
+            resize!(tr.basis_ind_to_mat, tr.size)
+        end
+
         # adjusts rewrite nodes at the start
         for i in 1:basis.input_load
-            basis.rewrite_nodes[i][3] += shift
+            basis.rewrite_nodes[i+1][3] += shift
         end
 
         for i in basis.basis_load:-1:basis.basis_offset
@@ -521,16 +529,29 @@ function make_room_new_input_el!(basis::Basis)
             basis.monomials[i] = basis.monomials[i-shift]
             basis.coefficients[i] = basis.coefficients[i-shift]
             basis.is_red[i] = basis.is_red[i-shift]
+
+            # adjust tracer
+            tr.basis_ind_to_mat[i] = tr.basis_ind_to_mat[i-shift]
             
             # adjust rewrite tree
-            rnodes = basis.rewrite_nodes[i-shift]
-            if rnodes[2] >= old_offset
+            rnodes = basis.rewrite_nodes[i-shift+1]
+            if rnodes[2] >= old_offset + 1
                 rnodes[2] += shift
             end
             for j in 3:rnodes[1]
                 rnodes[j] += shift
             end
-            basis.rewrite_nodes[i] = rnodes
+            basis.rewrite_nodes[i+1] = rnodes
+        end
+
+        # adjust tracer
+        for mat in tr.mats
+            for i in keys(mat.rows)
+                v = mat.rows[i]
+                if v[2] >= old_offset
+                    mat.rows[i] = (v[1], v[2] + shift)
+                end
+            end
         end
     end
 end

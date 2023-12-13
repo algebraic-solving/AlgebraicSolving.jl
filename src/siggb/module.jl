@@ -4,23 +4,28 @@ function construct_module(basis::Basis{N},
                           vchar::Val{Char},
                           mod_cache::Dict{Sig, Vector{Polynomial{N}}},
                           mod_dim::SigIndex,
+                          ind_order::IndOrder,
                           just_index::SigIndex=SigIndex(0)) where {N, Char}
 
     @inbounds sig = basis.sigs[basis_index]
 
     if basis_index >= basis.basis_offset
         @inbounds mat_ind = tr.basis_ind_to_mat[basis_index]
-        return construct_module(sig, basis, mat_index, tr,
-                                vchar, mod_cache,
-                                mod_dim, just_index)
+        return construct_module(sig, basis, mat_ind, tr,
+                                vchar, mod_cache, 
+                                mod_dim, ind_order,
+                                just_index)
     else
         # if it was an input element we just take the signature
         res = [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
-        res[index(sig)] = ([one(Coeff)], [monomial(sig)])
+        if iszero(just_index) || index(sig) == just_index
+            res[index(sig)] = ([one(Coeff)], [monomial(sig)])
+        end
         return res
     end
         
 end
+
 # construct a module representation out of a given sig
 function construct_module(sig::Sig{N},
                           basis::Basis{N},
@@ -29,13 +34,14 @@ function construct_module(sig::Sig{N},
                           vchar::Val{Char},
                           mod_cache::Dict{Sig, Vector{Polynomial{N}}},
                           mod_dim::SigIndex,
+                          ind_ord::IndOrder,
                           just_index::SigIndex=SigIndex(0)) where {N, Char}
 
     if haskey(mod_cache, sig)
         return mod_cache[sig]
     end
 
-    if index(sig) < just_index
+    if ind_ord.ord[index(sig)] < ind_ord.ord[just_index]
         return [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
     end
 
@@ -44,11 +50,12 @@ function construct_module(sig::Sig{N},
     row_ind, rewr_basis_ind = tr_mat.rows[sig]
 
     # construct module representation of canonical rewriter
-    rewr_mod = construct_module(basis, basis_index, tr, vchar,
+    rewr_mod = construct_module(basis, rewr_basis_ind, tr, vchar,
                                 mod_cache,
-                                mod_dim, just_index)
+                                mod_dim, ind_ord, just_index)
 
     # multiply by monomial
+    rewr_sig = basis.sigs[rewr_basis_ind]
     mult = divide(monomial(sig), monomial(rewr_sig))
     isone = all(iszero, mult.exps)
     res = Vector{Polynomial{N}}(undef, mod_dim)
@@ -61,7 +68,7 @@ function construct_module(sig::Sig{N},
         j_sig = tr_mat.row_ind_to_sig[j]
         j_sig_mod = construct_module(j_sig, basis, mat_index,
                                      tr, vchar, mod_cache,
-                                     mod_dim, just_index)
+                                     mod_dim, ind_ord, just_index)
         for i in 1:mod_dim
             !iszero(just_index) && i != just_index
             res_i_coeffs = res[i][1]
