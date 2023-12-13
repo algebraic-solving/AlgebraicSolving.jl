@@ -1,5 +1,6 @@
 function echelonize!(matrix::MacaulayMatrix,
                      tr::Tracer,
+                     tags::Tags,
                      char::Val{Char},
                      shift::Val{Shift}) where {Char, Shift}
 
@@ -10,6 +11,12 @@ function echelonize!(matrix::MacaulayMatrix,
     hash2col = Vector{MonIdx}(undef, matrix.ncols)
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
     pivots = matrix.pivots
+
+    println("sigs")
+    for i in 1:matrix.nrows
+        row_ind = matrix.sig_order[i]
+        println(matrix.sigs[row_ind])
+    end
 
     tr_mat = TracerMatrix(Dict{Sig, Tuple{Int, Int}}(),
                           Dict{Int, Sig}(),
@@ -51,8 +58,20 @@ function echelonize!(matrix::MacaulayMatrix,
         for (j, m_idx) in enumerate(row_cols)
             colidx = hash2col[m_idx]
             pividx = pivots[colidx]
-            does_red = !iszero(pividx) && rev_sigorder[pividx] < i
-            does_red && break
+            if !iszero(pividx) && rev_sigorder[pividx] < i
+                row_sig_ind = index(row_sig)
+                piv_sig_ind = index(matrix.sigs[pividx])
+                row_tag = gettag(tags, row_sig_ind)
+                piv_tag = gettag(tags, piv_sig_ind)
+                if row_tag == :colins
+                    does_red = piv_tag == :colins
+                    does_red && break
+                end
+                if row_tag == :col
+                    does_red = piv_tag != :col
+                    does_red && break
+                end
+            end
         end
         if !does_red
             pivots[l_col_idx] = row_ind

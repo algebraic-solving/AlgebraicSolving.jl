@@ -195,7 +195,7 @@ function siggb!(basis::Basis{N},
     # tags
     tags = Tags()
     tags[basis.basis_offset-1] = :col
-    # tags[basis.basis_offset-2] = :col
+    tags[basis.basis_offset-2] = :col
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -206,11 +206,13 @@ function siggb!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        deg = select_normal!(pairset, basis, matrix, basis_ht, symbol_ht, ind_order, tags)
-        symbolic_pp!(basis, matrix, basis_ht, symbol_ht, ind_order, tags)
+        deg = select_normal!(pairset, basis, matrix,
+                             basis_ht, symbol_ht, ind_order, tags)
+        symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+                     ind_order, tags)
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tr_mat = echelonize!(matrix, tr, char, shift)
+        tr_mat = echelonize!(matrix, tr, tags, char, shift)
 
         push!(tr.mats, tr_mat)
 

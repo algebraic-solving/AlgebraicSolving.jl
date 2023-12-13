@@ -192,7 +192,7 @@ function process_syzygy!(basis::Basis{N},
         col_inds = findall(tag -> tag == :col, tags)
         filter!(col_ind -> ind_order.ord[col_ind] > ind_order.ord[new_idx], col_inds)
         if !isempty(col_inds)
-            _, min_larger_ind = findmin(col_ind -> ind_order.ord[col_ind], col_inds)
+            min_larger_ind, _ = findmin(col_ind -> ind_order.ord[col_ind], col_inds)
             @inbounds for i in eachindex(ind_order.ord)
                 ord_i = ind_order.ord[i]
                 if ord_i >= min_larger_ind
@@ -461,7 +461,12 @@ end
 function dont_build_pair(ind1::SigIndex, ind2::SigIndex,
                          tags::Tags, ind_order::IndOrder)
 
-    if gettag(tags, ind1) == :colins
+    tag1 = gettag(tags, ind1)
+    tag2 = gettag(tags, ind2)
+
+    tag1 == tag2 == :col && return true
+
+    if tag1 == :colins
         ind1 == ind2 && return true
         if cmp_ind(ind2, ind1, ind_order)
             return true
