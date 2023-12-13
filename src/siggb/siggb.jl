@@ -1,4 +1,3 @@
-using Memoization
 # sizes for initialization
 const init_ht_size = 2^17
 const init_basis_size = 10000
@@ -194,8 +193,6 @@ function siggb!(basis::Basis{N},
 
     # tags
     tags = Tags()
-    tags[basis.basis_offset-1] = :col
-    tags[basis.basis_offset-2] = :col
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
