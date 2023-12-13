@@ -8,6 +8,7 @@ const def_sort_alg = Base.Sort.DEFAULT_UNSTABLE
 include("typedefs.jl")
 include("monomials.jl")
 include("hashtable.jl")
+include("rewriting.jl")
 include("update.jl")
 include("symbolic_pp.jl")
 include("linear_algebra.jl")
@@ -91,24 +92,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     basis_ht = initialize_basis_hash_table(Val(nv))
 
     # initialize basis
-    sigs = Vector{Sig{nv}}(undef, init_basis_size)
-    sigmasks = Vector{MaskSig}(undef, init_basis_size)
-    sigratios = Vector{Monomial{nv}}(undef, init_basis_size)
-    rewrite_nodes = Vector{Vector{Int}}(undef, init_basis_size+1)
-    lm_masks = Vector{DivMask}(undef, init_basis_size)
-    monomials = Vector{Vector{MonIdx}}(undef, init_basis_size)
-    coeffs = Vector{Vector{Coeff}}(undef, init_basis_size)
-    is_red = Vector{Bool}(undef, init_basis_size)
-    syz_sigs = Vector{Monomial{nv}}(undef, init_syz_size)
-    syz_masks = Vector{MaskSig}(undef, init_syz_size)
-    basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
-                  lm_masks, monomials, coeffs, is_red,
-                  syz_sigs, syz_masks, Exp[], sysl,
-                  init_basis_size, 0, sysl, sysl + 1, 0,
-                  init_syz_size)
-
-    # root node
-    basis.rewrite_nodes[1] = [-1, -1]
+    basis = new_basis(init_basis_size, init_syz_size, sysl)
 
     # initialize pairset
     pairset = Pairset{nv}(Vector{SPair{nv}}(undef, init_pair_size),
@@ -153,7 +137,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     end
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
-    tr = with_logger(logger) do
+    with_logger(logger) do
         siggb!(basis, pairset, basis_ht, char, shift,
                degbound = degbound)
     end
@@ -213,15 +197,61 @@ function siggb!(basis::Basis{N},
 
         push!(tr.mats, tr_mat)
 
-        update_basis!(basis, matrix, pairset, symbol_ht,
+        update_siggb!(basis, matrix, pairset, symbol_ht,
                       basis_ht, ind_order, tags,
                       tr, char)
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
-
-    return tr
 end
 
+function sigdecomp!(basis::Basis{N},
+                    pairset::Pairset,
+                    basis_ht::MonomialHashtable,
+                    char::Val{Char},
+                    shift::Val{Shift};
+                    degbound = 0) where {N, Char, Shift}
+
+    # index order
+    ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
+                         SigIndex(basis.basis_offset-1))
+
+    # tracer
+    tr = new_tracer()
+
+    # tags
+    tags = Tags()
+
+    # component queue
+    queue = [(basis, pairset)]
+
+    
+    sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+    while !isempty(queue)
+        basis, pairset = first(queue)
+        while !iszero(pairset.load)
+            if !iszero(degbound) && first(pairset.elems).deg > degbound
+                break
+            end
+            matrix = initialize_matrix(Val(N))
+            symbol_ht = initialize_secondary_hash_table(basis_ht)
+
+            deg = select_normal!(pairset, basis, matrix,
+                                 basis_ht, symbol_ht, ind_order, tags)
+            symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+                         ind_order, tags)
+            finalize_matrix!(matrix, symbol_ht, ind_order)
+            iszero(matrix.nrows) && continue
+            tr_mat = echelonize!(matrix, tr, tags, char, shift)
+
+            push!(tr.mats, tr_mat)
+
+            update_siggb!(basis, matrix, pairset, symbol_ht,
+                          basis_ht, ind_order, tags,
+                          tr, char)
+            sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+        end
+    end
+end
 
 # miscallaneous helper functions
 
@@ -241,6 +271,54 @@ function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
 end
 
+function new_basis(basis_size, syz_size,
+                   input_length)
+
+    sigs = Vector{Sig{nv}}(undef, basis_size)
+    sigmasks = Vector{MaskSig}(undef, basis_size)
+    sigratios = Vector{Monomial{nv}}(undef, basis_size)
+    rewrite_nodes = Vector{Vector{Int}}(undef, basis_size+1)
+    lm_masks = Vector{DivMask}(undef, basis_size)
+    monomials = Vector{Vector{MonIdx}}(undef, basis_size)
+    coeffs = Vector{Vector{Coeff}}(undef, basis_size)
+    is_red = Vector{Bool}(undef, basis_size)
+    syz_sigs = Vector{Monomial{nv}}(undef, syz_size)
+    syz_masks = Vector{MaskSig}(undef, syz_size)
+    basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
+                  lm_masks, monomials, coeffs, is_red,
+                  syz_sigs, syz_masks, Exp[],
+                  input_length,
+                  init_basis_size, 0, input_length,
+                  input_length + 1, 0,
+                  init_syz_size)
+
+    # root node
+    basis.rewrite_nodes[1] = [-1, -1]
+
+    return basis
+end
+
+# write stuff from index i in basis1 to index j in basis2
+# WARNING: rewrite nodes need to be set outside this function 
+function overwrite!(basis1::Basis,
+                    basis2::Basis,
+                    i::Int, j::Int)
+
+    @inbounds begin
+        basis2.sigs[j]          = basis1.sigs[i]
+        basis2.sigmasks[j]      = basis1.sigmasks[i]
+        basis2.sigratios[j]     = basis1.sigratios[i]
+        rnodes = basis1.rewrite_nodes[i+1]
+        basis2.rewrite_nodes[j+1] = copy(rnodes)
+        basis2.lm_masks[j]      = basis1.lm_masks[i]
+
+        # TODO: this does not copy, is that safe?
+        basis2.monomials[j]     = basis1.monomials[i]
+        basis2.coefficients[j]  = basis1.coefficients[i]
+        basis2.is_red[j]        = basis1.is_red[i]
+    end
+end
+
 function add_input_element!(basis::Basis{N},
                             pairset::Pairset,
                             ind::SigIndex,
@@ -253,23 +331,25 @@ function add_input_element!(basis::Basis{N},
         one_mon = monomial(SVector{N}(zeros(Exp, N)))
         zero_sig = (zero(SigIndex), one_mon)
 
-        # signatures
+        # signature
         sig = (ind, one_mon)
 
+        l = basis.input_load + 1
+
         # store stuff in basis
-        basis.sigs[ind] = sig
-        basis.sigmasks[ind] = (ind, zero(DivMask))
-        basis.sigratios[ind] = lm
-        basis.rewrite_nodes[ind+1] = [-1, 1]
-        basis.monomials[ind] = mons
-        basis.coefficients[ind] = coeffs
-        basis.is_red[ind] = false
+        basis.sigs[l] = sig
+        basis.sigmasks[l] = (ind, zero(DivMask))
+        basis.sigratios[l] = lm
+        basis.rewrite_nodes[l+1] = [-1, 1]
+        basis.monomials[l] = mons
+        basis.coefficients[l] = coeffs
+        basis.is_red[l] = false
         push!(basis.degs, lm.deg)
-        basis.lm_masks[ind] = lm_divm
+        basis.lm_masks[l] = lm_divm
         basis.input_load += 1
 
         # add child to rewrite root
-        push!(basis.rewrite_nodes[1], ind+1)
+        push!(basis.rewrite_nodes[1], l+1)
         basis.rewrite_nodes[1][1] += 1
 
         # add unitvector as pair

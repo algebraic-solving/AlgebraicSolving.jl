@@ -1,8 +1,7 @@
 # updating the pairset and basis
 
 # add new reduced rows to basis/syzygies
-# TODO: make a new symbol ht everytime?
-function update_basis!(basis::Basis,
+function update_siggb!(basis::Basis,
                        matrix::MacaulayMatrix,
                        pairset::Pairset{N},
                        symbol_ht::MonomialHashtable,
@@ -15,9 +14,7 @@ function update_basis!(basis::Basis,
     new_basis_c = 0
     new_syz_c = 0
 
-    # TODO: this can be done more optimally
     toadd = matrix.toadd[1:matrix.toadd_length]
-    # sort!(toadd, by = i -> matrix.sigs[i], lt = lt_pot)
 
     @inbounds for i in toadd
         # determine if row is zero
@@ -42,6 +39,92 @@ function update_basis!(basis::Basis,
                             tr, ind_order, tags)
         end
     end
+    if new_basis_c != 0 || new_syz_c != 0
+        @info "$(new_basis_c) new, $(new_syz_c) zero"
+    end
+end
+
+# add new reduced rows to basis/syzygies
+function update_sigdecomp!(queue::Vector{Tuple{Basis{N}, Pairset{N}}},
+                           basis::Basis,
+                           matrix::MacaulayMatrix,
+                           pairset::Pairset{N},
+                           symbol_ht::MonomialHashtable,
+                           basis_ht::MonomialHashtable,
+                           ind_order::IndOrder,
+                           tags::Tags,
+                           tr::Tracer,
+                           vchar::Val{Char}) where {N, Char}
+
+    new_basis_c = 0
+    new_syz_c = 0
+
+    toadd = matrix.toadd[1:matrix.toadd_length]
+
+    split_row_index = 0
+    @inbounds for i in toadd
+        # determine if row is zero
+        row = matrix.rows[i]
+        new_sig = matrix.sigs[i]
+        new_idx = index(new_sig)
+        new_sig_mon = monomial(new_sig)
+        new_sig_mask = (new_idx, divmask(new_sig_mon, basis_ht.divmap,
+                                         basis_ht.ndivbits))
+        if isempty(row)
+            new_syz_c += 1
+
+            if !iszero(split_row_index) && gettag(tags, index(new_sig)) == :seq
+                split_row_index = i
+            else
+                process_syzygy!(basis, basis_ht, pairset, new_sig, new_sig_mask,
+                                tags, ind_order, tr, vchar)
+            end
+        else
+            new_basis_c += 1
+            coeffs = matrix.coeffs[i]
+            parent_ind = matrix.parent_inds[i]
+            add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
+                            row, coeffs,
+                            new_sig, new_sig_mask, parent_ind,
+                            tr, ind_order, tags)
+        end
+    end
+
+    @inbounds if !iszero(split_row_index)
+        # go through the splitting
+        zd_sig = matrix.sigs[split_row_index]
+        zd_ind = index(zd_sig)
+        
+        # initialize and fill new basis with
+        basis_new = new_basis(basis.basis_size, basis.syz_size,
+                              basis.input_size)
+
+        # add every input element except for
+        # the one in index zd_ind
+        j = 0
+        for i in 1:basis.input_load
+            sig = basis.sigs[i]
+            if index(sig) == zd_ind
+                continue
+            end
+            j += 1
+            overwrite_basis!(basis, basis_new, i, j)
+            basis_new.input_load += 1
+            push!(new_basis.rewrite_nodes[1], j)
+
+            # this information we can keep as part of the new GB
+            k = j
+            l = i
+            if ind_order.ord[index(sig)] < ind_order.ord[zd_ind]
+                curr_node = basis.rewrite_nodes[l+1]
+                while true
+                    overwrite_basis!(basis_new, basis, l, k)
+                    basis_new.rewrite_nodes[k+1] = [-1, 1]
+                    # TODO: ...
+                end
+            end
+    end
+    
     if new_basis_c != 0 || new_syz_c != 0
         @info "$(new_basis_c) new, $(new_syz_c) zero"
     end
@@ -331,111 +414,6 @@ function update_pairset!(pairset::Pairset{N},
     end
 end
 
-@inline function rewriteable_syz(basis::Basis,
-                                 sig::Sig,
-                                 sigmask::DivMask,
-                                 tags::Tags)
-
-    ind = index(sig)
-    if gettag(tags, ind) == :colins
-        return false
-    end
-
-    @inbounds for i in 1:basis.syz_load
-        if index(basis.syz_masks[i]) == ind
-            is_rewr = divch(basis.syz_sigs[i], monomial(sig),
-                            basis.syz_masks[i][2], sigmask) 
-            is_rewr && return true
-        end
-    end
-    return false
-end
-
-@inline function rewriteable_basis(basis::Basis,
-                                   idx::Int,
-                                   sig::Sig,
-                                   sigmask::DivMask,
-                                   tags::Tags)
-
-    ind = index(sig)
-    if gettag(tags, ind) == :colins
-        return false
-    end
-
-    k = find_canonical_rewriter(basis, sig, sigmask)
-    return k != idx
-end
-
-function find_canonical_rewriter(basis::Basis,
-                                 sig::Sig,
-                                 sigmask::DivMask)
-
-    node_ind = 1
-    while true
-        @inbounds node = basis.rewrite_nodes[node_ind]
-        @inbounds node[1] == -1 && break
-        found_div = false
-        @inbounds for i in 3:3+node[1]
-            ch = node[i]
-            basis_sig = basis.sigs[ch - 1]
-            basis_sigmask = basis.sigmasks[ch - 1]
-            index(basis_sig) != index(sig) && continue
-            if divch(monomial(basis_sig), monomial(sig),
-                     mask(basis_sigmask), sigmask)
-                node_ind = ch
-                found_div = true
-                break
-            end
-        end
-        !found_div && break
-    end
-    return node_ind - 1
-end
-
-@inline function rewriteable_koszul(basis::Basis,
-                                    basis_ht::MonomialHashtable,
-                                    sig::Sig,
-                                    sigmask::DivMask,
-                                    ind_order::IndOrder,
-                                    tags::Tags)
-
-    s_ind = index(sig)
-    if gettag(tags, s_ind) == :colins
-        return false
-    end
-
-    @inbounds for i in basis.basis_offset:basis.basis_load
-        b_ind = index(basis.sigs[i])
-        if ind_order.ord[b_ind] < ind_order.ord[s_ind]
-            if divch(basis.lm_masks[i], sigmask)
-                if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
-                    return true
-                end
-            end
-        end
-    end
-    return false
-end
-
-function rewriteable(basis::Basis,
-                     basis_ht::MonomialHashtable,
-                     idx::Int,
-                     sig::Sig,
-                     sigmask::DivMask,
-                     ind_order::IndOrder,
-                     tags::Tags)
-
-    s_ind = index(sig)
-    if gettag(tags, s_ind) == :colins
-        return false
-    end
-
-    rewriteable_syz(basis, sig, sigmask, tags) && return true
-    rewriteable_basis(basis, idx, sig, sigmask, tags) && return true
-    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags) && return true
-    return false
-end
-
 # helper functions
 function leading_monomial(basis::Basis,
                           basis_ht::MonomialHashtable,
@@ -444,18 +422,8 @@ function leading_monomial(basis::Basis,
     return basis_ht.exponents[first(basis.monomials[i])]
 end
 
-@inline function comp_sigratio(basis::Basis, ind1::Int, ind2::Int)
-
-    rat1 = basis.sigratios[ind1]
-    rat2 = basis.sigratios[ind2]
-    if rat1 == rat2
-        return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
-    end
-    return lt_drl(rat1, rat2)
-end
-
 function gettag(tags::Tags, i::SigIndex)
-    return get(tags, i, :default)
+    return get(tags, i, :seq)
 end
 
 function dont_build_pair(ind1::SigIndex, ind2::SigIndex,
