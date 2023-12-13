@@ -308,8 +308,10 @@ function overwrite!(basis1::Basis,
         basis2.sigs[j]          = basis1.sigs[i]
         basis2.sigmasks[j]      = basis1.sigmasks[i]
         basis2.sigratios[j]     = basis1.sigratios[i]
-        rnodes = basis1.rewrite_nodes[i+1]
-        basis2.rewrite_nodes[j+1] = copy(rnodes)
+
+        rnodes = copy(basis1.rewrite_nodes[i+1])
+        basis2.rewrite_nodes[j+1] = rnodes
+
         basis2.lm_masks[j]      = basis1.lm_masks[i]
 
         # TODO: this does not copy, is that safe?

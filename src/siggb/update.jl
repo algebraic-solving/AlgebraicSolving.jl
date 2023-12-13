@@ -101,28 +101,53 @@ function update_sigdecomp!(queue::Vector{Tuple{Basis{N}, Pairset{N}}},
 
         # add every input element except for
         # the one in index zd_ind
-        j = 0
-        for i in 1:basis.input_load
-            sig = basis.sigs[i]
-            if index(sig) == zd_ind
+        j = 1
+        i = 1
+        old_to_new_index = Vector{Int}(undef, basis.basis_load+1)
+        incr_ind = ind -> ind == basis.input_load ? basis.basis_offset : ind+1
+        while i < basis.basis_load
+            s_ind = index(sig)
+
+            # skip if index is the same as the zd
+            if s_ind == zd_ind
+                i = incr_ind(i)
                 continue
             end
-            j += 1
-            overwrite_basis!(basis, basis_new, i, j)
-            basis_new.input_load += 1
-            push!(new_basis.rewrite_nodes[1], j)
 
-            # this information we can keep as part of the new GB
-            k = j
-            l = i
-            if ind_order.ord[index(sig)] < ind_order.ord[zd_ind]
-                curr_node = basis.rewrite_nodes[l+1]
-                while true
-                    overwrite_basis!(basis_new, basis, l, k)
-                    basis_new.rewrite_nodes[k+1] = [-1, 1]
-                    # TODO: ...
-                end
+            # skip if index is > index of zd and not input el
+            if ind_order.ord[s_ind] > ind_order.ord[zd_ind] && i > basis.input_load
+                i = incr_ind(i)
+                continue
             end
+            
+            # write into new basis
+            overwrite_basis!(basis, basis_new, i, j)
+            i <= basis.input_load ? basis_new.input_load += 1 : basis_new.basis_load += 1
+            old_to_new_index[i+1] = j+1
+
+            # fix rewrite tree
+            if i <= basis.input_load
+                push!(new_basis.rewrite_nodes[1], j)
+                new_basis.rewrite_nodes[j+1] = [-1, 1]
+            else
+                rnodes = basis_new.rewrite_nodes[j+1]
+
+                old_par_ind = rnodes[2]
+                new_par_ind = old_to_new_index[old_parent_ind]
+
+                # fix parent index
+                rnodes[2] = new_par_ind
+                
+                # fix child index in parent
+                par_nodes = basis_new.rewrite_nodes[new_par_ind]
+                k = findfirst(ch -> ch == i+1, par_nodes[3:end])
+                par_nodes[k+2] = j+1 
+            end
+
+            i = incr_ind(i)
+        end
+
+        # TODO: tbc...
     end
     
     if new_basis_c != 0 || new_syz_c != 0
