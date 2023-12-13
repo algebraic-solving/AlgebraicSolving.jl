@@ -8,9 +8,9 @@ function select_normal!(pairset::Pairset{N},
 
     # number of selected pairs
     npairs = 0
-    deg = zero(Exp) 
+    deg = Exp(-1) 
     for i in 1:pairset.load
-        if iszero(deg)
+        if deg == -1
             deg = pairset.elems[i].deg
             npairs += 1
             continue

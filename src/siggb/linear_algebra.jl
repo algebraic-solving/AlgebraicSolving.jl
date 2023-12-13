@@ -12,12 +12,6 @@ function echelonize!(matrix::MacaulayMatrix,
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
     pivots = matrix.pivots
 
-    println("sigs")
-    for i in 1:matrix.nrows
-        row_ind = matrix.sig_order[i]
-        println(matrix.sigs[row_ind])
-    end
-
     tr_mat = TracerMatrix(Dict{Sig, Tuple{Int, Int}}(),
                           Dict{Int, Sig}(),
                           Vector{Coeff}(undef, matrix.nrows),
