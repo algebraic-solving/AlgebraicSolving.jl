@@ -27,6 +27,17 @@ function update_siggb!(basis::Basis,
         if isempty(row)
             new_syz_c += 1
 
+            if gettag(tags, new_idx) == :seq
+                # TODO: do some membership test
+                mat_ind = length(tr.mats)
+                cofac_coeffs, cofac_mons = construct_module(new_sig, basis, mat_ind, tr, vchar,
+                                                            ind_order.max_ind,
+                                                            ind_order, new_idx)[new_idx]
+                cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
+                return true, cofac_coeffs, cofac_mons_hashed
+                
+            end
+
             process_syzygy!(basis, basis_ht, pairset, new_sig, new_sig_mask,
                             tags, ind_order, tr, vchar)
         else
@@ -39,120 +50,12 @@ function update_siggb!(basis::Basis,
                             tr, ind_order, tags)
         end
     end
+
     if new_basis_c != 0 || new_syz_c != 0
         @info "$(new_basis_c) new, $(new_syz_c) zero"
     end
-end
 
-# add new reduced rows to basis/syzygies
-function update_sigdecomp!(queue::Vector{Tuple{Basis{N}, Pairset{N}}},
-                           basis::Basis,
-                           matrix::MacaulayMatrix,
-                           pairset::Pairset{N},
-                           symbol_ht::MonomialHashtable,
-                           basis_ht::MonomialHashtable,
-                           ind_order::IndOrder,
-                           tags::Tags,
-                           tr::Tracer,
-                           vchar::Val{Char}) where {N, Char}
-
-    new_basis_c = 0
-    new_syz_c = 0
-
-    toadd = matrix.toadd[1:matrix.toadd_length]
-
-    split_row_index = 0
-    @inbounds for i in toadd
-        # determine if row is zero
-        row = matrix.rows[i]
-        new_sig = matrix.sigs[i]
-        new_idx = index(new_sig)
-        new_sig_mon = monomial(new_sig)
-        new_sig_mask = (new_idx, divmask(new_sig_mon, basis_ht.divmap,
-                                         basis_ht.ndivbits))
-        if isempty(row)
-            new_syz_c += 1
-
-            if !iszero(split_row_index) && gettag(tags, index(new_sig)) == :seq
-                split_row_index = i
-            else
-                process_syzygy!(basis, basis_ht, pairset, new_sig, new_sig_mask,
-                                tags, ind_order, tr, vchar)
-            end
-        else
-            new_basis_c += 1
-            coeffs = matrix.coeffs[i]
-            parent_ind = matrix.parent_inds[i]
-            add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
-                            row, coeffs,
-                            new_sig, new_sig_mask, parent_ind,
-                            tr, ind_order, tags)
-        end
-    end
-
-    @inbounds if !iszero(split_row_index)
-        # go through the splitting
-        zd_sig = matrix.sigs[split_row_index]
-        zd_ind = index(zd_sig)
-        
-        # initialize and fill new basis with
-        basis_new = new_basis(basis.basis_size, basis.syz_size,
-                              basis.input_size)
-
-        # add every input element except for
-        # the one in index zd_ind
-        j = 1
-        i = 1
-        old_to_new_index = Vector{Int}(undef, basis.basis_load+1)
-        incr_ind = ind -> ind == basis.input_load ? basis.basis_offset : ind+1
-        while i < basis.basis_load
-            s_ind = index(sig)
-
-            # skip if index is the same as the zd
-            if s_ind == zd_ind
-                i = incr_ind(i)
-                continue
-            end
-
-            # skip if index is > index of zd and not input el
-            if ind_order.ord[s_ind] > ind_order.ord[zd_ind] && i > basis.input_load
-                i = incr_ind(i)
-                continue
-            end
-            
-            # write into new basis
-            overwrite_basis!(basis, basis_new, i, j)
-            i <= basis.input_load ? basis_new.input_load += 1 : basis_new.basis_load += 1
-            old_to_new_index[i+1] = j+1
-
-            # fix rewrite tree
-            if i <= basis.input_load
-                push!(new_basis.rewrite_nodes[1], j)
-                new_basis.rewrite_nodes[j+1] = [-1, 1]
-            else
-                rnodes = basis_new.rewrite_nodes[j+1]
-
-                old_par_ind = rnodes[2]
-                new_par_ind = old_to_new_index[old_parent_ind]
-
-                # fix parent index
-                rnodes[2] = new_par_ind
-                
-                # fix child index in parent
-                par_nodes = basis_new.rewrite_nodes[new_par_ind]
-                k = findfirst(ch -> ch == i+1, par_nodes[3:end])
-                par_nodes[k+2] = j+1 
-            end
-
-            i = incr_ind(i)
-        end
-
-        # TODO: tbc...
-    end
-    
-    if new_basis_c != 0 || new_syz_c != 0
-        @info "$(new_basis_c) new, $(new_syz_c) zero"
-    end
+    return false, Coeff[], MonIdx[]
 end
 
 function add_basis_elem!(basis::Basis,
@@ -278,7 +181,6 @@ function process_syzygy!(basis::Basis{N},
         # construct cofactor of zero reduction and ins in hashtable
         mat_ind = length(tr.mats)
         cofac_coeffs, cofac_mons = construct_module(new_sig, basis, mat_ind, tr, vchar,
-                                                    Dict{Sig, Vector{Polynomial{N}}}(),
                                                     ind_order.max_ind, ind_order, new_idx)[new_idx]
         cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
 

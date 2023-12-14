@@ -91,13 +91,8 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     nv = nvars(R)
     basis_ht = initialize_basis_hash_table(Val(nv))
 
-    # initialize basis
-    basis = new_basis(init_basis_size, init_syz_size, sysl)
-
-    # initialize pairset
-    pairset = Pairset{nv}(Vector{SPair{nv}}(undef, init_pair_size),
-                          0,
-                          init_pair_size)
+    sys_mons = Vector{Vector{MonIdx}}(undef, sysl)
+    sys_coeffs = Vector{Vector{Coeff}}(undef, sysl)
 
     # store initial pols in basis and pairset
     @inbounds for i in 1:sysl
@@ -122,13 +117,14 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         end
         s = sortperm(mons, by = eidx -> basis_ht.exponents[eidx],
                      lt = lt_drl, rev = true)
-        @inbounds mons = mons[s]
-        @inbounds coeffs = coeffs[s]
-
-        add_input_element!(basis, pairset, SigIndex(i),
-                           mons, coeffs, zero(DivMask),
-                           basis_ht.exponents[first(mons)])
+        mons = mons[s]
+        coeffs = coeffs[s]
+        sys_mons[i] = copy(mons)
+        sys_coeffs[i] = copy(coeffs)
     end
+
+    # fill basis and pairset
+    basis, pairset = setup!(sys_mons, sys_coeffs, basis_ht)
 
     # compute divmasks
     fill_divmask!(basis_ht)
@@ -204,7 +200,7 @@ function siggb!(basis::Basis{N},
     end
 end
 
-function sigdecomp!(basis::Basis{N},
+function sig_split!(basis::Basis{N},
                     pairset::Pairset,
                     basis_ht::MonomialHashtable,
                     char::Val{Char},
@@ -221,36 +217,62 @@ function sigdecomp!(basis::Basis{N},
     # tags
     tags = Tags()
 
-    # component queue
-    queue = [(basis, pairset)]
-
-    
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
-    while !isempty(queue)
-        basis, pairset = first(queue)
-        while !iszero(pairset.load)
-            if !iszero(degbound) && first(pairset.elems).deg > degbound
-                break
-            end
-            matrix = initialize_matrix(Val(N))
-            symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-            deg = select_normal!(pairset, basis, matrix,
-                                 basis_ht, symbol_ht, ind_order, tags)
-            symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
-                         ind_order, tags)
-            finalize_matrix!(matrix, symbol_ht, ind_order)
-            iszero(matrix.nrows) && continue
-            tr_mat = echelonize!(matrix, tr, tags, char, shift)
-
-            push!(tr.mats, tr_mat)
-
-            update_siggb!(basis, matrix, pairset, symbol_ht,
-                          basis_ht, ind_order, tags,
-                          tr, char)
-            sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+    while !iszero(pairset.load)
+        if !iszero(degbound) && first(pairset.elems).deg > degbound
+            break
         end
+	matrix = initialize_matrix(Val(N))
+        symbol_ht = initialize_secondary_hash_table(basis_ht)
+
+        deg = select_normal!(pairset, basis, matrix,
+                             basis_ht, symbol_ht, ind_order, tags)
+        symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+                     ind_order, tags)
+        finalize_matrix!(matrix, symbol_ht, ind_order)
+        iszero(matrix.nrows) && continue
+        tr_mat = echelonize!(matrix, tr, tags, char, shift)
+
+        push!(tr.mats, tr_mat)
+
+        found_zd, coeffs, mons = update_siggb!(basis, matrix, pairset, symbol_ht,
+                                               basis_ht, ind_order, tags,
+                                               tr, char)
+        if found_zd
+            return false, coeffs, mons
+        end
+        sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
+
+    return true, Coeff[], MonIdx[]
+end
+
+function setup!(sys_mons::Vector{Vector{MonIdx}},
+                sys_coeffs::Vector{Vector{Coeff}},
+                basis_ht::MonomialHashtable{N}) where N
+
+    # initialize basis
+    sysl = length(sys_mons)
+    basis = new_basis(init_basis_size, init_syz_size, sysl, Val(N))
+
+    # initialize pairset
+    pairset = Pairset{N}(Vector{SPair{N}}(undef, init_pair_size),
+                         0,
+                         init_pair_size)
+
+    @inbounds for i in 1:sysl
+        mons = sys_mons[i]
+        coeffs = sys_coeffs[i]
+        lm = basis_ht.exponents[first(mons)]
+        lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
+
+        add_input_element!(basis, pairset, SigIndex(i),
+                           sys_mons[i], sys_coeffs[i],
+                           lm_mask, lm)
+    end
+
+    return basis, pairset
 end
 
 # miscallaneous helper functions
@@ -272,17 +294,17 @@ function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
 end
 
 function new_basis(basis_size, syz_size,
-                   input_length)
+                   input_length, ::Val{N}) where N
 
-    sigs = Vector{Sig{nv}}(undef, basis_size)
+    sigs = Vector{Sig{N}}(undef, basis_size)
     sigmasks = Vector{MaskSig}(undef, basis_size)
-    sigratios = Vector{Monomial{nv}}(undef, basis_size)
+    sigratios = Vector{Monomial{N}}(undef, basis_size)
     rewrite_nodes = Vector{Vector{Int}}(undef, basis_size+1)
     lm_masks = Vector{DivMask}(undef, basis_size)
     monomials = Vector{Vector{MonIdx}}(undef, basis_size)
     coeffs = Vector{Vector{Coeff}}(undef, basis_size)
     is_red = Vector{Bool}(undef, basis_size)
-    syz_sigs = Vector{Monomial{nv}}(undef, syz_size)
+    syz_sigs = Vector{Monomial{N}}(undef, syz_size)
     syz_masks = Vector{MaskSig}(undef, syz_size)
     basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
                   lm_masks, monomials, coeffs, is_red,

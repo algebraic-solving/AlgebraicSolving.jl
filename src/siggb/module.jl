@@ -2,9 +2,9 @@ function construct_module(basis::Basis{N},
                           basis_index::Int,
                           tr::Tracer,
                           vchar::Val{Char},
-                          mod_cache::Dict{Sig, Vector{Polynomial{N}}},
                           mod_dim::SigIndex,
                           ind_order::IndOrder,
+                          mod_cache::Dict{Sig, Vector{Polynomial{N}}}=Dict{Sig, Vector{Polynomial{N}}}(),
                           just_index::SigIndex=SigIndex(0)) where {N, Char}
 
     @inbounds sig = basis.sigs[basis_index]
@@ -12,9 +12,10 @@ function construct_module(basis::Basis{N},
     if basis_index >= basis.basis_offset
         @inbounds mat_ind = tr.basis_ind_to_mat[basis_index]
         return construct_module(sig, basis, mat_ind, tr,
-                                vchar, mod_cache, 
+                                vchar, 
                                 mod_dim, ind_order,
-                                just_index)
+                                just_index,
+                                mod_cache)
     else
         # if it was an input element we just take the signature
         res = [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
@@ -32,10 +33,10 @@ function construct_module(sig::Sig{N},
                           mat_index::Int,
                           tr::Tracer,
                           vchar::Val{Char},
-                          mod_cache::Dict{Sig, Vector{Polynomial{N}}},
                           mod_dim::SigIndex,
                           ind_ord::IndOrder,
-                          just_index::SigIndex=SigIndex(0)) where {N, Char}
+                          just_index::SigIndex=SigIndex(0),
+                          mod_cache::Dict{Sig, Vector{Polynomial{N}}}=Dict{Sig, Vector{Polynomial{N}}}()) where {N, Char}
 
     if haskey(mod_cache, sig)
         return mod_cache[sig]
@@ -51,8 +52,8 @@ function construct_module(sig::Sig{N},
 
     # construct module representation of canonical rewriter
     rewr_mod = construct_module(basis, rewr_basis_ind, tr, vchar,
-                                mod_cache,
-                                mod_dim, ind_ord, just_index)
+                                mod_dim, ind_ord, just_index,
+                                mod_cache)
 
     # multiply by monomial
     rewr_sig = basis.sigs[rewr_basis_ind]
@@ -67,8 +68,9 @@ function construct_module(sig::Sig{N},
     @inbounds for (j, coeff)  in row_ops
         j_sig = tr_mat.row_ind_to_sig[j]
         j_sig_mod = construct_module(j_sig, basis, mat_index,
-                                     tr, vchar, mod_cache,
-                                     mod_dim, ind_ord, just_index)
+                                     tr, vchar,
+                                     mod_dim, ind_ord,
+                                     just_index, mod_cache)
         for i in 1:mod_dim
             !iszero(just_index) && i != just_index
             res_i_coeffs = res[i][1]
