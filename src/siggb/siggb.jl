@@ -124,7 +124,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     end
 
     # fill basis and pairset
-    basis, pairset = setup!(sys_mons, sys_coeffs, basis_ht)
+    basis, pairset, tags = setup!(sys_mons, sys_coeffs, basis_ht, sysl+1)
 
     # compute divmasks
     fill_divmask!(basis_ht)
@@ -134,7 +134,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
-        siggb!(basis, pairset, basis_ht, char, shift,
+        siggb!(basis, pairset, basis_ht, char, shift, tags,
                degbound = degbound)
     end
 
@@ -161,7 +161,8 @@ function siggb!(basis::Basis{N},
                 pairset::Pairset,
                 basis_ht::MonomialHashtable,
                 char::Val{Char},
-                shift::Val{Shift};
+                shift::Val{Shift},
+                tags::Tags;
                 degbound = 0) where {N, Char, Shift}
 
     # index order
@@ -170,9 +171,6 @@ function siggb!(basis::Basis{N},
 
     # tracer
     tr = new_tracer()
-
-    # tags
-    tags = Tags()
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -250,7 +248,8 @@ end
 
 function setup!(sys_mons::Vector{Vector{MonIdx}},
                 sys_coeffs::Vector{Vector{Coeff}},
-                basis_ht::MonomialHashtable{N}) where N
+                basis_ht::MonomialHashtable{N},
+                nz_from::Int) where N
 
     # initialize basis
     sysl = length(sys_mons)
@@ -261,18 +260,25 @@ function setup!(sys_mons::Vector{Vector{MonIdx}},
                          0,
                          init_pair_size)
 
+    # tags
+    tags = Tags()
+
     @inbounds for i in 1:sysl
+        s_ind = SigIndex(i)
+        if i >= nz_from
+            tags[s_ind] = :col
+        end
         mons = sys_mons[i]
         coeffs = sys_coeffs[i]
         lm = basis_ht.exponents[first(mons)]
         lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
 
-        add_input_element!(basis, pairset, SigIndex(i),
+        add_input_element!(basis, pairset, s_ind,
                            sys_mons[i], sys_coeffs[i],
                            lm_mask, lm)
     end
 
-    return basis, pairset
+    return basis, pairset, tags
 end
 
 # miscallaneous helper functions
