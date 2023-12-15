@@ -120,7 +120,10 @@ function _core_normal_form(
     end
 
     #= first get a degree reverse lexicographical Gröbner basis for I =#
-    G = groebner_basis(I, eliminate = 0, la_option = 44, info_level = info_level)
+    if !haskey(I.gb, 0)
+        groebner_basis(I, eliminate = 0, la_option = 44, info_level = info_level)
+    end
+    G = I.gb[0]
 
     tbr_nr_gens = length(F)
     bs_nr_gens  = length(G)
