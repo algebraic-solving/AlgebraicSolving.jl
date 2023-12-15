@@ -105,6 +105,51 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     return outp
 end
 
+function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
+
+    # data structure setup/conversion
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
+    
+    sysl = length(sys)
+
+    # fill basis and pairset
+    basis, pairset, tags = fill_data_structs(sys_mons, sys_coeffs,
+                                             basis_ht, sysl+1, :split)
+
+    # compute divmasks
+    fill_divmask!(basis_ht)
+    @inbounds for i in 1:sysl
+        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
+    end
+
+    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    result = with_logger(logger) do
+        sig_decomp!(basis, pairset, basis_ht, char, shift, tags)
+    end
+
+    # output
+    R = parent(first(sys))
+    eltp = typeof(first(sys))
+    outp = LocClosedSet{eltp}[]
+    for i in 1:length(result)
+        lc_set = LocClosedSet(eltp[], eltp[])
+        bs, tgs = result[i]
+        @inbounds for j in 1:bs.input_load
+            s_ind = index(bs.sigs[j])
+            pol = convert_to_pol(R,
+                                 [basis_ht.exponents[m] for m in bs.monomials[j]],
+                                 bs.coefficients[j])
+            if gettag(tgs, s_ind) == :split
+                push!(lc_set.eqns, pol)
+            elseif gettag(tgs, s_ind) == :col
+                push!(lc_set.ineqns, pol)
+            end
+        end
+        push!(outp, lc_set)
+    end
+
+    return outp
+end
 
 #---------------- function for sig_groebner_basis --------------------#
 
@@ -156,10 +201,11 @@ function sig_decomp!(basis::Basis{N},
                      pairset::Pairset,
                      basis_ht::MonomialHashtable,
                      char::Val{Char},
-                     shift::Val{Shift}) where {N, Char, Shift}
+                     shift::Val{Shift},
+                     tags::Tags) where {N, Char, Shift}
 
     queue = [(basis, pairset, tags)]
-    result = Basis{N}[]
+    result = Tuple{Basis{N}, Tags}[]
 
     while !isempty(queue)
         bs, ps, tgs = popfirst!(queue)
@@ -172,7 +218,7 @@ function sig_decomp!(basis::Basis{N},
             push!(queue, (bs2, ps2, tgs2))
             push!(queue, (bs1, ps1, tgs1))
         else
-            push!(result, bs1)
+            push!(result, (bs, tgs))
         end
     end
     return result
@@ -208,16 +254,16 @@ function siggb_for_split!(basis::Basis{N},
 
         push!(tr.mats, tr_mat)
 
-        found_zd, coeffs, mons = update_siggb!(basis, matrix, pairset, symbol_ht,
-                                               basis_ht, ind_order, tags,
-                                               tr, char)
+        found_zd, coeffs, mons, zd_ind = update_siggb!(basis, matrix, pairset, symbol_ht,
+                                                       basis_ht, ind_order, tags,
+                                                       tr, char)
         if found_zd
-            return false, coeffs, mons
+            return false, coeffs, mons, zd_ind
         end
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
 
-    return true, Coeff[], MonIdx[]
+    return false, Coeff[], MonIdx[], zero(SigIndex)
 end
 
 function split!(basis::Basis,
@@ -372,7 +418,7 @@ function fill_data_structs(sys_mons::Vector{Vector{MonIdx}},
         if i >= nz_from
             tags[s_ind] = :col
         elseif def_tag != :seq
-            tags[s_ind] == :split
+            tags[s_ind] = :split
         end
         mons = sys_mons[i]
         coeffs = sys_coeffs[i]
@@ -519,4 +565,26 @@ function _is_gb(gb::Vector{Tuple{Tuple{Int, P}, P}}) where {P <: MPolyRingElem}
     res1 = all(u -> any(v -> divides(u, v)[1], lms_gb), lms_msolve)
     res2 = all(u -> any(v -> divides(u, v)[1], lms_msolve), lms_gb)
     return res1 && res2
+end
+
+# for displaying locally closed sets
+function Base.show(io::IO, lc::LocClosedSet)
+    string_rep = "V("
+    for (i, f) in enumerate(lc.eqns)
+        if i != length(lc.eqns)
+            string_rep *= "$f, "
+        else
+            string_rep *= "$(f)) \\ "
+        end
+    end
+    string_rep *= "V("
+    for (i, f) in enumerate(lc.ineqns)
+        if i != length(lc.ineqns)
+            string_rep *= "($f)*"
+        else
+            string_rep *= "($f)"
+        end
+    end
+    string_rep *= ")"
+    print(io, string_rep)
 end

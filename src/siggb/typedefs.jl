@@ -137,3 +137,9 @@ end
 
 # This is to store where certain elements come from
 const Tags = Dict{SigIndex, Symbol}
+
+# For output of decomp (at the moment)
+struct LocClosedSet{T<:MPolyRingElem}
+    eqns::Vector{T}
+    ineqns::Vector{T}
+end
