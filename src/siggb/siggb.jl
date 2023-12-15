@@ -14,6 +14,9 @@ include("symbolic_pp.jl")
 include("linear_algebra.jl")
 include("module.jl")
 
+
+#---------------- user functions --------------------#
+
 @doc Markdown.doc"""
     sig_groebner_basis(sys::Vector{T}; info_level::Int = 0, degbound::Int = 0) where {T <: MPolyRingElem}
 
@@ -61,6 +64,225 @@ julia> sig_groebner_basis(Fhom)
 ```
 """
 function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) where {T <: MPolyRingElem}
+
+    # data structure setup/conversion
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
+    
+    sysl = length(sys)
+
+    # fill basis and pairset
+    basis, pairset, tags = fill_data_structs(sys_mons, sys_coeffs, basis_ht, sysl+1)
+
+    # compute divmasks
+    fill_divmask!(basis_ht)
+    @inbounds for i in 1:sysl
+        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
+    end
+
+    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    with_logger(logger) do
+        siggb!(basis, pairset, basis_ht, char, shift, tags,
+               degbound = degbound)
+    end
+
+    # output
+    R = parent(first(sys))
+    eltp = typeof(first(sys))
+    outp = Tuple{Tuple{Int, eltp}, eltp}[]
+    @inbounds for i in basis.basis_offset:basis.basis_load
+        pol = convert_to_pol(R,
+                             [basis_ht.exponents[m] for m in basis.monomials[i]],
+                             basis.coefficients[i])
+
+        s = basis.sigs[i]
+        ctx = MPolyBuildCtx(R)
+        push_term!(ctx, 1, Vector{Int}(monomial(s).exps))
+        sig = (Int(index(s)), finish(ctx))
+
+        push!(outp, (sig, pol))
+    end
+
+    return outp
+end
+
+
+#---------------- function for sig_groebner_basis --------------------#
+
+function siggb!(basis::Basis{N},
+                pairset::Pairset,
+                basis_ht::MonomialHashtable,
+                char::Val{Char},
+                shift::Val{Shift},
+                tags::Tags;
+                degbound = 0) where {N, Char, Shift}
+
+    # index order
+    ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
+                         SigIndex(basis.basis_offset-1))
+
+    # tracer
+    tr = new_tracer()
+
+    sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+
+    while !iszero(pairset.load)
+        if !iszero(degbound) && first(pairset.elems).deg > degbound
+            break
+        end
+	matrix = initialize_matrix(Val(N))
+        symbol_ht = initialize_secondary_hash_table(basis_ht)
+
+        deg = select_normal!(pairset, basis, matrix,
+                             basis_ht, symbol_ht, ind_order, tags)
+        symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+                     ind_order, tags)
+        finalize_matrix!(matrix, symbol_ht, ind_order)
+        iszero(matrix.nrows) && continue
+        tr_mat = echelonize!(matrix, tr, tags, char, shift)
+
+        push!(tr.mats, tr_mat)
+
+        update_siggb!(basis, matrix, pairset, symbol_ht,
+                      basis_ht, ind_order, tags,
+                      tr, char)
+        sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+    end
+end
+
+
+#---------------- functions for splitting --------------------#
+
+function sig_decomp!(basis::Basis{N},
+                     pairset::Pairset,
+                     basis_ht::MonomialHashtable,
+                     char::Val{Char},
+                     shift::Val{Shift}) where {N, Char, Shift}
+
+    queue = [(basis, pairset, tags)]
+    result = Basis{N}[]
+
+    while !isempty(queue)
+        bs, ps, tgs = popfirst!(queue)
+        found_zd, zd_coeffs, zd_mons, zd_ind = siggb_for_split!(bs, ps, tgs,
+                                                                basis_ht, char,
+                                                                shift)
+        if found_zd
+            bs1, ps1, tgs1, bs2, ps2, tgs2 = split!(bs, basis_ht, zd_mons,
+                                                    zd_coeffs, zd_ind, tgs)
+            push!(queue, (bs2, ps2, tgs2))
+            push!(queue, (bs1, ps1, tgs1))
+        else
+            push!(result, bs1)
+        end
+    end
+    return result
+end
+
+function siggb_for_split!(basis::Basis{N},
+                          pairset::Pairset,
+                          tags::Tags,
+                          basis_ht::MonomialHashtable,
+                          char::Val{Char},
+                          shift::Val{Shift}) where {N, Char, Shift}
+
+    # index order
+    ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
+                         SigIndex(basis.basis_offset-1))
+
+    # tracer
+    tr = new_tracer()
+
+    sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+
+    while !iszero(pairset.load)
+	matrix = initialize_matrix(Val(N))
+        symbol_ht = initialize_secondary_hash_table(basis_ht)
+
+        deg = select_normal!(pairset, basis, matrix,
+                             basis_ht, symbol_ht, ind_order, tags)
+        symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+                     ind_order, tags)
+        finalize_matrix!(matrix, symbol_ht, ind_order)
+        iszero(matrix.nrows) && continue
+        tr_mat = echelonize!(matrix, tr, tags, char, shift)
+
+        push!(tr.mats, tr_mat)
+
+        found_zd, coeffs, mons = update_siggb!(basis, matrix, pairset, symbol_ht,
+                                               basis_ht, ind_order, tags,
+                                               tr, char)
+        if found_zd
+            return false, coeffs, mons
+        end
+        sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+    end
+
+    return true, Coeff[], MonIdx[]
+end
+
+function split!(basis::Basis,
+                basis_ht::MonomialHashtable,
+                cofac_mons::Vector{MonIdx},
+                cofac_coeffs::Vector{Coeff},
+                zd_ind::SigIndex,
+                tags::Tags)
+
+    @inbounds begin
+        # 1st component
+        sys1_mons = copy(basis.monomials[1:basis.input_load])
+        sys1_coeffs = copy(basis.coefficients[1:basis.input_load])
+        sys1l = length(sys1_mons)
+        nz_from1 = findfirst(sig -> gettag(tags, index(sig)) == :col,
+                            basis.sigs[1:basis.input_load])
+        if isnothing(nz_from1)
+            nz_from = sys1l + 1 
+        end
+        
+        # find out where to insert zero divisor
+        zd_deg = basis_ht.exponents[first(cofac_mons)].deg
+        ins_ind = findfirst(d -> d > zd_deg, basis.degs)
+        if isnothing(ins_ind)
+            ins_ind = sys1l + 1
+        end
+
+        # insert zd in system
+        insert!(sys1_mons, ins_ind, cofac_mons)
+        insert!(sys1_coeffs, ins_ind, cofac_coeffs)
+
+        # build basis/pairset/tags for first new system
+        basis1, pairset1, tags1 = fill_data_structs(sys1_mons, sys1_coeffs,
+                                                    basis_ht, nz_from1 + 1,
+                                                    :split)
+
+        # 2nd component
+        sys2_mons = basis.monomials[1:basis.input_load]
+        sys2_coeffs = basis.coefficients[1:basis.input_load]
+        deleteat!(sys2_mons, zd_ind)
+        deleteat!(sys2_coeffs, zd_ind)
+        sys2l = length(sys2_mons)
+        nz_from2 = nz_from1 - 1
+
+        # append zd as nonzero condition
+        push!(sys2_mons, copy(cofac_mons))
+        push!(sys2_coeffs, copy(cofac_coeffs))
+
+        # build basis/pairset/tags for second new system
+        basis2, pairset2, tags2 = fill_data_structs(sys2_mons, sys2_coeffs,
+                                                    basis_ht, nz_from2, :split)
+    end
+
+    return basis1, pairset1, tags1, basis2, pairset2, tags2
+end    
+
+
+#---------------- functions for setting up data structures --------------------#
+
+function input_setup(sys::Vector{<:MPolyRingElem})
+
+    if isempty(sys)
+        error("Input system is empty.")
+    end
+    
     R = first(sys).parent
     Rchar = characteristic(R)
 
@@ -123,188 +345,15 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         sys_coeffs[i] = copy(coeffs)
     end
 
-    # fill basis and pairset
-    basis, pairset, tags = setup!(sys_mons, sys_coeffs, basis_ht, sysl+1)
-
-    # compute divmasks
-    fill_divmask!(basis_ht)
-    @inbounds for i in 1:sysl
-        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
-    end
-
-    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
-    with_logger(logger) do
-        siggb!(basis, pairset, basis_ht, char, shift, tags,
-               degbound = degbound)
-    end
-
-    # output
-    eltp = typeof(first(sys))
-    outp = Tuple{Tuple{Int, eltp}, eltp}[]
-    @inbounds for i in basis.basis_offset:basis.basis_load
-        pol = convert_to_pol(R,
-                             [basis_ht.exponents[m] for m in basis.monomials[i]],
-                             basis.coefficients[i])
-
-        s = basis.sigs[i]
-        ctx = MPolyBuildCtx(R)
-        push_term!(ctx, 1, Vector{Int}(monomial(s).exps))
-        sig = (Int(index(s)), finish(ctx))
-
-        push!(outp, (sig, pol))
-    end
-
-    return outp
+    return sys_mons, sys_coeffs, basis_ht, char, shift
 end
 
-function siggb!(basis::Basis{N},
-                pairset::Pairset,
-                basis_ht::MonomialHashtable,
-                char::Val{Char},
-                shift::Val{Shift},
-                tags::Tags;
-                degbound = 0) where {N, Char, Shift}
 
-    # index order
-    ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
-                         SigIndex(basis.basis_offset-1))
-
-    # tracer
-    tr = new_tracer()
-
-    sort_pairset_by_degree!(pairset, 1, pairset.load-1)
-
-    while !iszero(pairset.load)
-        if !iszero(degbound) && first(pairset.elems).deg > degbound
-            break
-        end
-	matrix = initialize_matrix(Val(N))
-        symbol_ht = initialize_secondary_hash_table(basis_ht)
-
-        deg = select_normal!(pairset, basis, matrix,
-                             basis_ht, symbol_ht, ind_order, tags)
-        symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
-                     ind_order, tags)
-        finalize_matrix!(matrix, symbol_ht, ind_order)
-        iszero(matrix.nrows) && continue
-        tr_mat = echelonize!(matrix, tr, tags, char, shift)
-
-        push!(tr.mats, tr_mat)
-
-        update_siggb!(basis, matrix, pairset, symbol_ht,
-                      basis_ht, ind_order, tags,
-                      tr, char)
-        sort_pairset_by_degree!(pairset, 1, pairset.load-1)
-    end
-end
-
-function siggb_for_split!(basis::Basis{N},
-                          pairset::Pairset,
-                          basis_ht::MonomialHashtable,
-                          char::Val{Char},
-                          shift::Val{Shift};
-                          degbound = 0) where {N, Char, Shift}
-
-    # index order
-    ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
-                         SigIndex(basis.basis_offset-1))
-
-    # tracer
-    tr = new_tracer()
-
-    # tags
-    tags = Tags()
-
-    sort_pairset_by_degree!(pairset, 1, pairset.load-1)
-
-    while !iszero(pairset.load)
-        if !iszero(degbound) && first(pairset.elems).deg > degbound
-            break
-        end
-	matrix = initialize_matrix(Val(N))
-        symbol_ht = initialize_secondary_hash_table(basis_ht)
-
-        deg = select_normal!(pairset, basis, matrix,
-                             basis_ht, symbol_ht, ind_order, tags)
-        symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
-                     ind_order, tags)
-        finalize_matrix!(matrix, symbol_ht, ind_order)
-        iszero(matrix.nrows) && continue
-        tr_mat = echelonize!(matrix, tr, tags, char, shift)
-
-        push!(tr.mats, tr_mat)
-
-        found_zd, coeffs, mons = update_siggb!(basis, matrix, pairset, symbol_ht,
-                                               basis_ht, ind_order, tags,
-                                               tr, char)
-        if found_zd
-            return false, coeffs, mons
-        end
-        sort_pairset_by_degree!(pairset, 1, pairset.load-1)
-    end
-
-    return true, Coeff[], MonIdx[]
-end
-
-function split!(basis::Basis,
-                basis_ht::MonomialHashtable,
-                cofac_mons::Vector{MonIdx},
-                cofac_coeffs::Vector{Coeff},
-                zd_ind::SigIndex,
-                tags::Tags)
-
-    @inbounds begin
-        # 1st component
-        sys1_mons = copy(basis.monomials[1:basis.input_load])
-        sys1_coeffs = copy(basis.coefficients[1:basis.input_load])
-        sys1l = length(sys1_mons)
-        nz_from1 = findfirst(sig -> gettag(tags, index(sig)) == :col,
-                            basis.sigs[1:basis.input_load])
-        if isnothing(nz_from1)
-            nz_from = sys1l + 1 
-        end
-        
-        # find out where to insert zero divisor
-        zd_deg = basis_ht.exponents[first(cofac_mons)].deg
-        ins_ind = findfirst(d -> d > zd_deg, basis.degs)
-        if isnothing(ins_ind)
-            ins_ind = sys1l + 1
-        end
-
-        # insert zd in system
-        insert!(sys1_mons, ins_ind, cofac_mons)
-        insert!(sys1_coeffs, ins_ind, cofac_coeffs)
-
-        # build basis/pairset/tags for first new system
-        basis1, pairset1, tags1 = setup!(sys1_mons, sys1_coeffs,
-                                         basis_ht, nz_from1 + 1,
-                                         :split)
-
-        # 2nd component
-        sys2_mons = basis.monomials[1:basis.input_load]
-        sys2_coeffs = basis.coefficients[1:basis.input_load]
-        deleteat!(sys2_mons, zd_ind)
-        deleteat!(sys2_coeffs, zd_ind)
-        sys2l = length(sys2_mons)
-        nz_from2 = nz_from1 - 1
-
-        # append zd as nonzero condition
-        push!(sys2_mons, copy(cofac_mons))
-        push!(sys2_coeffs, copy(cofac_coeffs))
-
-        # build basis/pairset/tags for second new system
-        basis2, pairset2, tags2 = setup!(sys2_mons, sys2_coeffs,
-                                         basis_ht, nz_from2, :split)
-    end
-
-    return basis1, pairset1, tags1, basis2, pairset2, tags2
-end    
-
-function setup!(sys_mons::Vector{Vector{MonIdx}},
-                sys_coeffs::Vector{Vector{Coeff}},
-                basis_ht::MonomialHashtable{N},
-                nz_from::Int,
-                def_tag::Symbol=:seq) where N
+function fill_data_structs(sys_mons::Vector{Vector{MonIdx}},
+                           sys_coeffs::Vector{Vector{Coeff}},
+                           basis_ht::MonomialHashtable{N},
+                           nz_from::Int,
+                           def_tag::Symbol=:seq) where N
 
     # initialize basis
     sysl = length(sys_mons)
@@ -338,8 +387,6 @@ function setup!(sys_mons::Vector{Vector{MonIdx}},
     return basis, pairset, tags
 end
 
-# miscallaneous helper functions
-
 function convert_to_pol(R::MPolyRing,
                         exps::Vector{<:Monomial},
                         coeffs::Vector{Coeff})
@@ -349,11 +396,6 @@ function convert_to_pol(R::MPolyRing,
         push_term!(ctx, c, Vector{Int}(e.exps))
     end
     return finish(ctx)
-end
-
-function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
-    ordr = Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
-    sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
 end
 
 function new_basis(basis_size, syz_size,
@@ -381,29 +423,6 @@ function new_basis(basis_size, syz_size,
     basis.rewrite_nodes[1] = [-1, -1]
 
     return basis
-end
-
-# write stuff from index i in basis1 to index j in basis2
-# WARNING: rewrite nodes need to be set outside this function 
-function overwrite!(basis1::Basis,
-                    basis2::Basis,
-                    i::Int, j::Int)
-
-    @inbounds begin
-        basis2.sigs[j]          = basis1.sigs[i]
-        basis2.sigmasks[j]      = basis1.sigmasks[i]
-        basis2.sigratios[j]     = basis1.sigratios[i]
-
-        rnodes = copy(basis1.rewrite_nodes[i+1])
-        basis2.rewrite_nodes[j+1] = rnodes
-
-        basis2.lm_masks[j]      = basis1.lm_masks[i]
-
-        # TODO: this does not copy, is that safe?
-        basis2.monomials[j]     = basis1.monomials[i]
-        basis2.coefficients[j]  = basis1.coefficients[i]
-        basis2.is_red[j]        = basis1.is_red[i]
-    end
 end
 
 function add_input_element!(basis::Basis{N},
@@ -444,6 +463,31 @@ function add_input_element!(basis::Basis{N},
                                                  zero(DivMask), Int(ind),
                                                  0, lm.deg)
         pairset.load += 1
+    end
+end
+
+
+#---------------- helper functions --------------------#
+
+# write stuff from index i in basis1 to index j in basis2
+function overwrite!(basis1::Basis,
+                    basis2::Basis,
+                    i::Int, j::Int)
+
+    @inbounds begin
+        basis2.sigs[j]          = basis1.sigs[i]
+        basis2.sigmasks[j]      = basis1.sigmasks[i]
+        basis2.sigratios[j]     = basis1.sigratios[i]
+
+        rnodes = copy(basis1.rewrite_nodes[i+1])
+        basis2.rewrite_nodes[j+1] = rnodes
+
+        basis2.lm_masks[j]      = basis1.lm_masks[i]
+
+        # TODO: this does not copy, is that safe?
+        basis2.monomials[j]     = basis1.monomials[i]
+        basis2.coefficients[j]  = basis1.coefficients[i]
+        basis2.is_red[j]        = basis1.is_red[i]
     end
 end
 

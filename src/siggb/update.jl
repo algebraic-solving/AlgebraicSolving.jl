@@ -51,7 +51,7 @@ function update_siggb!(basis::Basis,
                                                                 ind_order.max_ind,
                                                                 ind_order, new_idx)[new_idx]
                     cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
-                    return true, cofac_coeffs, cofac_mons_hashed
+                    return true, cofac_coeffs, cofac_mons_hashed, new_idx
                 else
                     @info "cofac contained in ideal, not splitting"
                 end
@@ -74,7 +74,7 @@ function update_siggb!(basis::Basis,
         @info "$(new_basis_c) new, $(new_syz_c) zero"
     end
 
-    return false, Coeff[], MonIdx[]
+    return false, Coeff[], MonIdx[], zero(SigIndex)
 end
 
 function add_basis_elem!(basis::Basis,
@@ -388,6 +388,12 @@ function dont_build_pair(ind1::SigIndex, ind2::SigIndex,
     end
     return false
 end
+
+function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
+    ordr = Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
+    sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
+end
+
 
 # remove pairs that are rewriteable
 function remove_red_pairs!(pairset::Pairset)
