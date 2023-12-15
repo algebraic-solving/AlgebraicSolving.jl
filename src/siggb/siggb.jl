@@ -198,12 +198,12 @@ function siggb!(basis::Basis{N},
     end
 end
 
-function sig_split!(basis::Basis{N},
-                    pairset::Pairset,
-                    basis_ht::MonomialHashtable,
-                    char::Val{Char},
-                    shift::Val{Shift};
-                    degbound = 0) where {N, Char, Shift}
+function siggb_for_split!(basis::Basis{N},
+                          pairset::Pairset,
+                          basis_ht::MonomialHashtable,
+                          char::Val{Char},
+                          shift::Val{Shift};
+                          degbound = 0) where {N, Char, Shift}
 
     # index order
     ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
@@ -246,10 +246,65 @@ function sig_split!(basis::Basis{N},
     return true, Coeff[], MonIdx[]
 end
 
+function split!(basis::Basis,
+                basis_ht::MonomialHashtable,
+                cofac_mons::Vector{MonIdx},
+                cofac_coeffs::Vector{Coeff},
+                zd_ind::SigIndex,
+                tags::Tags)
+
+    @inbounds begin
+        # 1st component
+        sys1_mons = copy(basis.monomials[1:basis.input_load])
+        sys1_coeffs = copy(basis.coefficients[1:basis.input_load])
+        sys1l = length(sys1_mons)
+        nz_from1 = findfirst(sig -> gettag(tags, index(sig)) == :col,
+                            basis.sigs[1:basis.input_load])
+        if isnothing(nz_from1)
+            nz_from = sys1l + 1 
+        end
+        
+        # find out where to insert zero divisor
+        zd_deg = basis_ht.exponents[first(cofac_mons)].deg
+        ins_ind = findfirst(d -> d > zd_deg, basis.degs)
+        if isnothing(ins_ind)
+            ins_ind = sys1l + 1
+        end
+
+        # insert zd in system
+        insert!(sys1_mons, ins_ind, cofac_mons)
+        insert!(sys1_coeffs, ins_ind, cofac_coeffs)
+
+        # build basis/pairset/tags for first new system
+        basis1, pairset1, tags1 = setup!(sys1_mons, sys1_coeffs,
+                                         basis_ht, nz_from1 + 1,
+                                         :split)
+
+        # 2nd component
+        sys2_mons = basis.monomials[1:basis.input_load]
+        sys2_coeffs = basis.coefficients[1:basis.input_load]
+        deleteat!(sys2_mons, zd_ind)
+        deleteat!(sys2_coeffs, zd_ind)
+        sys2l = length(sys2_mons)
+        nz_from2 = nz_from1 - 1
+
+        # append zd as nonzero condition
+        push!(sys2_mons, copy(cofac_mons))
+        push!(sys2_coeffs, copy(cofac_coeffs))
+
+        # build basis/pairset/tags for second new system
+        basis2, pairset2, tags2 = setup!(sys2_mons, sys2_coeffs,
+                                         basis_ht, nz_from2, :split)
+    end
+
+    return basis1, pairset1, tags1, basis2, pairset2, tags2
+end    
+
 function setup!(sys_mons::Vector{Vector{MonIdx}},
                 sys_coeffs::Vector{Vector{Coeff}},
                 basis_ht::MonomialHashtable{N},
-                nz_from::Int) where N
+                nz_from::Int,
+                def_tag::Symbol=:seq) where N
 
     # initialize basis
     sysl = length(sys_mons)
@@ -267,6 +322,8 @@ function setup!(sys_mons::Vector{Vector{MonIdx}},
         s_ind = SigIndex(i)
         if i >= nz_from
             tags[s_ind] = :col
+        elseif def_tag != :seq
+            tags[s_ind] == :split
         end
         mons = sys_mons[i]
         coeffs = sys_coeffs[i]
