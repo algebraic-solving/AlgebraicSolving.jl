@@ -611,7 +611,7 @@ function overwrite!(basis1::Basis,
 end
 
 # homogenize w.r.t. the last variable
-function _homogenize(F::Vector{P}) where {P <: MPolyRingElem}
+function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
     S, vars = polynomial_ring(base_ring(R), ["x$i" for i in 1:nvars(R)+1],
                              ordering = :degrevlex)
