@@ -9,7 +9,8 @@ function update_siggb!(basis::Basis,
                        ind_order::IndOrder,
                        tags::Tags,
                        tr::Tracer,
-                       vchar::Val{Char}) where {N, Char}
+                       vchar::Val{Char},
+                       syz_queue::Vector{Sig{N}}=Sig{N}[]) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
@@ -27,35 +28,9 @@ function update_siggb!(basis::Basis,
         if isempty(row)
             new_syz_c += 1
 
-            # use syzgyy to split if applicable
-            cofac_is_one = all(iszero, new_sig_mon.exps)
-            if gettag(tags, new_idx) == :split && !cofac_is_one
-
-                # this membership test is temporary
-                does_div = false
-                for j in basis.basis_offset:basis.basis_load
-                    tg = gettag(tags, index(basis.sigs[j]))
-                    tg == :col && continue
-                    lm_msk = basis.lm_masks[j]
-                    lm = basis_ht.exponents[first(basis.monomials[j])]
-                    if divch(lm, new_sig_mon,
-                             lm_msk, mask(new_sig_mask))
-                        does_div = true
-                        break
-                    end
-                end
-                
-                if !does_div
-                    @info "found something to split with"
-                    mat_ind = length(tr.mats)
-                    cofac_coeffs, cofac_mons = construct_module(new_sig, basis, mat_ind, tr, vchar,
-                                                                ind_order.max_ind,
-                                                                ind_order, new_idx)[new_idx]
-                    cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
-                    return true, cofac_coeffs, cofac_mons_hashed, new_idx
-                else
-                    @info "cofac contained in ideal, not splitting"
-                end
+            # check if syzygy could be interesting to split with
+            if !all(iszero, new_sig_mon.exps) && gettag(tags, new_idx) == :split
+                push!(syz_queue, new_sig)
             end
 
             process_syzygy!(basis, basis_ht, pairset, new_sig, new_sig_mask,
@@ -75,7 +50,7 @@ function update_siggb!(basis::Basis,
         @info "$(new_basis_c) new, $(new_syz_c) zero"
     end
 
-    return false, Coeff[], MonIdx[], zero(SigIndex)
+    return 
 end
 
 function add_basis_elem!(basis::Basis,
@@ -481,3 +456,30 @@ function make_room_new_input_el!(basis::Basis,
         end
     end
 end
+
+
+# # this membership test is temporary
+# does_div = false
+# for j in basis.basis_offset:basis.basis_load
+#     tg = gettag(tags, index(basis.sigs[j]))
+#     tg == :col && continue
+#     lm_msk = basis.lm_masks[j]
+#     lm = basis_ht.exponents[first(basis.monomials[j])]
+#     if divch(lm, new_sig_mon,
+#              lm_msk, mask(new_sig_mask))
+#         does_div = true
+#         break
+#     end
+# end
+
+# if !does_div
+#     @info "found something to split with"
+#     mat_ind = length(tr.mats)
+#     cofac_coeffs, cofac_mons = construct_module(new_sig, basis, mat_ind, tr, vchar,
+#                                                 ind_order.max_ind,
+#                                                 ind_order, new_idx)[new_idx]
+#     cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
+#     return true, cofac_coeffs, cofac_mons_hashed, new_idx
+# else
+#     @info "cofac contained in ideal, not splitting"
+# end

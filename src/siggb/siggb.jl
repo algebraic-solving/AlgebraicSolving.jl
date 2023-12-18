@@ -242,6 +242,23 @@ function siggb_for_split!(basis::Basis{N},
     # tracer
     tr = new_tracer()
 
+    # syzygy queue
+    syz_queue = Sig{N}[]
+
+    # lms of nonzero conditions
+    @inbounds nz_from = findfirst(sig -> gettag(tags, index(sig)) == :col,
+                                  basis.sigs[1:basis.input_load])
+    nz_lms = [one_monomial(Monomial{N})]
+    @inbounds if !isnothing(nz_from)
+        for i in nz_from:basis.input_load
+            lm_hash_idx = first(basis.monomials[i])
+            lm = basis_ht.exponents[lm_hash_idx]
+            push!(nz_lms, lm)
+        end
+    end
+    nz_length = length(nz_lms)
+    max_nz_deg = maximum(lm -> lm.deg, nz_lms)
+
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
     while !iszero(pairset.load)
@@ -252,18 +269,58 @@ function siggb_for_split!(basis::Basis{N},
                              basis_ht, symbol_ht, ind_order, tags)
         symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
                      ind_order, tags)
+
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
         tr_mat = echelonize!(matrix, tr, tags, char, shift)
-
         push!(tr.mats, tr_mat)
+        tr.deg_to_mat[deg] = length(tr.mats)
 
-        found_zd, coeffs, mons, zd_ind = update_siggb!(basis, matrix, pairset, symbol_ht,
-                                                       basis_ht, ind_order, tags,
-                                                       tr, char)
-        if found_zd
-            return true, coeffs, mons, zd_ind
+        update_siggb!(basis, matrix, pairset, symbol_ht,
+                      basis_ht, ind_order, tags,
+                      tr, char, syz_queue)
+
+        # check to see if we can split with one of the syzygies
+        @inbounds while !isempty(syz_queue)
+            @info "checking known syzygies"
+            syz_sig = first(syz_queue)
+            syz_mon = monomial(syz_sig)
+            if syz_mon.deg + max_nz_deg <= deg
+                popfirst!(syz_queue)
+                
+                # membership check with leading monomials
+                syz_mon_tms_nz = [mul(syz_mon, lm) for lm in nz_lms]
+                syz_masks_tms_nz = [divmask(mon, basis_ht.divmap, basis_ht.ndivbits)
+                                    for mon in syz_mon_tms_nz]
+                does_div = false
+                for j in basis.basis_offset:basis.basis_load
+                    lm = basis_ht.exponents[first(basis.monomials[j])]
+                    lm_msk = basis.lm_masks[j]
+                    for i in 1:nz_length
+                        mon = syz_mon_tms_nz[i]
+                        msk = syz_masks_tms_nz[i]
+                        if divch(lm, mon, lm_msk, msk)
+                            does_div = true
+                            break
+                        end
+                    end
+                end
+                does_div && break
+
+                # from here on we assume that the membership check passed
+                @info "membership check passed, constructing module rep"
+                syz_ind = index(syz_sig)
+                tr_ind = tr.deg_to_mat[syz_mon.deg + basis.degs[syz_ind]]
+                cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind, tr, char,
+                                                            ind_order.max_ind,
+                                                            ind_order, syz_ind)[syz_ind]
+                cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
+                return true, cofac_coeffs, cofac_mons_hashed, syz_ind
+            else
+                break
+            end
         end
+
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
 
@@ -484,7 +541,7 @@ function add_input_element!(basis::Basis{N},
                             lm::Monomial) where N
 
     @inbounds begin
-        one_mon = monomial(SVector{N}(zeros(Exp, N)))
+        one_mon = one_monomial(Monomial{N})
         zero_sig = (zero(SigIndex), one_mon)
 
         # signature

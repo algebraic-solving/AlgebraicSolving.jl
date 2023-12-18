@@ -37,6 +37,12 @@ function select_normal!(pairset::Pairset{N},
         pair = pairset.elems[i]
         # for each unique pair signature
         curr_top_sig = pair.top_sig
+
+        # for now: ignore any colon ideal stuff
+        if gettag(tags, index(curr_top_sig)) == :col
+            continue
+        end
+        
         rewr_ind = find_canonical_rewriter(basis, pair.top_sig,
                                            pair.top_sig_mask)
 

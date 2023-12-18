@@ -125,6 +125,7 @@ end
 mutable struct Tracer
     mats::Vector{TracerMatrix}
     basis_ind_to_mat::Vector{Int}
+    deg_to_mat::Dict{Exp, Int}
     load::Int
     size::Int
 end

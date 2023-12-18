@@ -215,7 +215,8 @@ function new_tracer()
     mats = TracerMatrix[]
     basis_ind_to_mat = Vector{Int}(undef, init_basis_size)
     return Tracer(mats, basis_ind_to_mat,
-                  0, init_basis_size)
+                  Dict{Exp, Int}(), 0,
+                  init_basis_size)
 end
 
 # for debug helping
