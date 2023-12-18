@@ -315,6 +315,17 @@ function siggb_for_split!(basis::Basis{N},
                 cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind, tr, char,
                                                             ind_order.max_ind,
                                                             ind_order, syz_ind)[syz_ind]
+
+                # normalize cofac coefficients
+                inver = inv(first(cofac_coeffs), char)
+                @inbounds for i in eachindex(cofac_coeffs)
+                    if isone(i)
+                        cofac_coeffs[i] = one(Coeff)
+                        continue
+                    end
+                    cofac_coeffs[i] = mul(inver, cofac_coeffs[i], char)
+                end
+
                 cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
                 return true, cofac_coeffs, cofac_mons_hashed, syz_ind
             else

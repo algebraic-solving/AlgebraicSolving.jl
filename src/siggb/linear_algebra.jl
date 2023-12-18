@@ -138,9 +138,10 @@ function echelonize!(matrix::MacaulayMatrix,
         m = monomial(row_sig)
         @inbounds if isempty(new_row) || (matrix.rows[row_ind][1] != new_row[1] && any(!iszero, m.exps))
             # TODO: not super happy with this check
-            row_ind in matrix.toadd[1:matrix.toadd_length] && continue
-            matrix.toadd[matrix.toadd_length+1] = row_ind
-            matrix.toadd_length += 1
+            if !(row_ind in matrix.toadd[1:matrix.toadd_length])
+                matrix.toadd[matrix.toadd_length+1] = row_ind
+                matrix.toadd_length += 1
+            end
         end
 
         matrix.rows[row_ind] = new_row
@@ -148,6 +149,11 @@ function echelonize!(matrix::MacaulayMatrix,
     end
     if !iszero(arit_ops)
         @info "$(arit_ops) submul's"
+    end
+
+    if !is_triangular(matrix)
+        print(matrix)
+        error("not triangular")
     end
 
     return tr_mat
@@ -224,4 +230,24 @@ end
 function is_triangular(matrix::MacaulayMatrix)
     lms = [first(row) for row in matrix.rows[1:matrix.nrows] if !isempty(row)]
     return length(lms) == length(unique(lms))
+end
+
+function Base.show(io::IO, matrix::MacaulayMatrix)
+    print_mat = zeros(Int, matrix.nrows, matrix.ncols)
+    col2hash = matrix.col2hash
+    hash2col = Vector{MonIdx}(undef, matrix.ncols)
+    @inbounds for i in 1:matrix.ncols
+        hash2col[col2hash[i]] = MonIdx(i)
+    end
+    for i in 1:matrix.nrows
+        row_ind = matrix.sig_order[i]
+        # buffer the row
+        row_coeffs = matrix.coeffs[row_ind]
+        row_cols = matrix.rows[row_ind]
+        @inbounds for (k, j) in enumerate(row_cols)
+            col_idx = hash2col[j]
+            print_mat[i, col_idx] = row_coeffs[k]
+        end
+    end
+    display(print_mat)
 end
