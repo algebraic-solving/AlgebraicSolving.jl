@@ -135,6 +135,7 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
         lc_set = LocClosedSet(eltp[], eltp[])
         bs, tgs = result[i]
         @inbounds for j in 1:bs.input_load
+            bs.is_red[j] && continue
             s_ind = index(bs.sigs[j])
             pol = convert_to_pol(R,
                                  [basis_ht.exponents[m] for m in bs.monomials[j]],
