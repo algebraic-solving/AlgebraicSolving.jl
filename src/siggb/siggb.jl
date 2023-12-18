@@ -710,17 +710,24 @@ function _msolve_haszero_normal_form(exps::Vector{Monomial{N}},
                                      basis_ht::MonomialHashtable{N},
                                      vchar::Val{Char}) where {N, Char}
 
+    R, _ = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N])
     
-    nr_vars     = N
-    field_char  = Char
+    G = [convert_to_pol(R,
+                        [basis_ht.exponents[m] for m in basis.monomials[i]],
+                        basis.coefficients[i])
+         for i in basis.basis_offset:basis.basis_load]
+    F = [convert_to_pol(R, exps, cfs)]
+
+    nr_vars     = nvars(R)
+    field_char  = Int(characteristic(R))
+
+    tbr_nr_gens = length(F)
+    bs_nr_gens  = length(G)
+    is_gb       = 1
 
     # convert ideal to flattened arrays of ints
-    tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve(exps, cfs)
-    bs_lens, bs_cfs, bs_exps = _convert_basis_to_msolve(basis, basis_ht)
-
-    tbr_nr_gens = 1
-    bs_nr_gens  = length(bs_lens)
-    is_gb       = 1
+    tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve(F)
+    bs_lens, bs_cfs, bs_exps    = _convert_to_msolve(G)
 
     nf_ld  = Ref(Cint(0))
     nf_len = Ref(Ptr{Cint}(0))
@@ -741,6 +748,9 @@ function _msolve_haszero_normal_form(exps::Vector{Monomial{N}},
     jl_exp  = Base.unsafe_wrap(Array, nf_exp[], nr_terms*nr_vars)
     ptr     = reinterpret(Ptr{Int32}, nf_cf[])
     jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
+
+   basis = _convert_finite_field_array_to_abstract_algebra(
+                jl_ld, jl_len, jl_cf, jl_exp, R, 0)
 
     ccall((:free_f4_julia_result_data, libneogb), Nothing ,
           (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
