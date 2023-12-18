@@ -16,6 +16,7 @@ function update_siggb!(basis::Basis,
     new_syz_c = 0
 
     toadd = matrix.toadd[1:matrix.toadd_length]
+    added_unit = false
 
     @inbounds for i in toadd
         # determine if row is zero
@@ -42,10 +43,10 @@ function update_siggb!(basis::Basis,
             new_basis_c += 1
             coeffs = matrix.coeffs[i]
             parent_ind = matrix.parent_inds[i]
-            add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
-                            row, coeffs,
-                            new_sig, new_sig_mask, parent_ind,
-                            tr, ind_order, tags)
+            added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
+                                         row, coeffs,
+                                         new_sig, new_sig_mask, parent_ind,
+                                         tr, ind_order, tags)
         end
     end
 
@@ -53,10 +54,10 @@ function update_siggb!(basis::Basis,
         @info "$(new_basis_c) new, $(new_syz_c) zero"
     end
 
-    return 
+    return added_unit
 end
 
-function add_basis_elem!(basis::Basis,
+function add_basis_elem!(basis::Basis{N},
                          pairset::Pairset,
                          basis_ht::MonomialHashtable,
                          symbol_ht::MonomialHashtable,
@@ -67,7 +68,7 @@ function add_basis_elem!(basis::Basis,
                          parent_ind::Int,
                          tr::Tracer,
                          ind_order::IndOrder,
-                         tags::Tags)
+                         tags::Tags) where N
 
     # make sure we have enough space
     if basis.basis_load == basis.basis_size
@@ -78,6 +79,11 @@ function add_basis_elem!(basis::Basis,
     insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
     lm = basis_ht.exponents[first(row)]
     s = new_sig
+
+    # check if we're adding a power of the homogenizing variable
+    if length(row) == 1 && all(iszero, lm.exps[1:N-1])
+        return true
+    end
 
     # add everything to basis
     l = basis.basis_load + 1
@@ -127,6 +133,8 @@ function add_basis_elem!(basis::Basis,
 
     # build new pairs
     update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
+
+    return false
 end
 
 function process_syzygy!(basis::Basis{N},

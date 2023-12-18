@@ -72,7 +72,7 @@ function select_normal!(pairset::Pairset{N},
                 lm = mul(mult, leading_monomial(basis, ht, rewr_ind))
                 l_idx = find_in_hash_table(symbol_ht, lm)
                 if !iszero(l_idx)
-                    if !iszero(matrix.pivots[l_idx])
+                    if matrix.pivot_size >= l_idx && !iszero(matrix.pivots[l_idx])
                         add_cond = matrix.sigs[matrix.pivots[l_idx]] != curr_top_sig
                     end
                 end

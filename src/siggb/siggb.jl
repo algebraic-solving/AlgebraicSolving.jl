@@ -211,9 +211,14 @@ function sig_decomp!(basis::Basis{N},
     while !isempty(queue)
         @info "starting component"
         bs, ps, tgs = popfirst!(queue)
-        found_zd, zd_coeffs, zd_mons, zd_ind = siggb_for_split!(bs, ps, tgs,
-                                                                basis_ht, char,
-                                                                shift)
+        found_zd, zd_coeffs, zd_mons, zd_ind, isempty = siggb_for_split!(bs, ps, tgs,
+                                                                         basis_ht, char,
+                                                                         shift)
+        if isempty
+            @info "empty component"
+            @info "------------------------------------------"
+            continue
+        end
         if found_zd
             @info "splitting component"
             bs1, ps1, tgs1, bs2, ps2, tgs2 = split!(bs, basis_ht, zd_mons,
@@ -250,11 +255,14 @@ function siggb_for_split!(basis::Basis{N},
     @inbounds nz_from = findfirst(sig -> gettag(tags, index(sig)) == :col,
                                   basis.sigs[1:basis.input_load])
     nz_lms = [one_monomial(Monomial{N})]
+    nz_conds_mons = [[one_monomial(Monomial{N})]]
+    nz_conds_coeffs = [[one(Coeff)]]
     @inbounds if !isnothing(nz_from)
         for i in nz_from:basis.input_load
-            lm_hash_idx = first(basis.monomials[i])
-            lm = basis_ht.exponents[lm_hash_idx]
-            push!(nz_lms, lm)
+            nz_cond = [basis_ht.exponents[m_idx] for m_idx in basis.monomials[i]]
+            push!(nz_conds_mons, nz_cond)
+            push!(nz_conds_coeffs, basis.coefficients[i])
+            push!(nz_lms, first(nz_cond))
         end
     end
     nz_length = length(nz_lms)
@@ -277,9 +285,21 @@ function siggb_for_split!(basis::Basis{N},
         push!(tr.mats, tr_mat)
         tr.deg_to_mat[deg] = length(tr.mats)
 
-        update_siggb!(basis, matrix, pairset, symbol_ht,
-                      basis_ht, ind_order, tags,
-                      tr, char, syz_queue)
+        added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
+                                   basis_ht, ind_order, tags,
+                                   tr, char, syz_queue)
+
+        # check nonzero conditions
+        if !added_unit
+            added_unit = _msolve_haszero_normal_form([one_monomial(Monomial{N})], [one(Coeff)],
+                                                     nz_conds_mons, nz_conds_coeffs,
+                                                     basis, basis_ht, char)
+        end
+
+        # return if a unit was added
+        if added_unit
+            return false, Coeff[], MonIdx[], zero(SigIndex), true
+        end
 
         # check to see if we can split with one of the syzygies
         @inbounds while !isempty(syz_queue)
@@ -313,9 +333,9 @@ function siggb_for_split!(basis::Basis{N},
                                                             ind_order, syz_ind)[syz_ind]
                 if does_div
                     # do a membership check
-                    if _msolve_haszero_normal_form(cofac_mons, cofac_coeffs, basis,
+                    if _msolve_haszero_normal_form(cofac_mons, cofac_coeffs, nz_conds_mons,
+                                                   nz_conds_coeffs, basis,
                                                    basis_ht, char)
-                        @info "membership check not passed, not splitting"
                         continue
                     end
                 end
@@ -337,7 +357,7 @@ function siggb_for_split!(basis::Basis{N},
                 end
 
                 cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
-                return true, cofac_coeffs, cofac_mons_hashed, syz_ind
+                return true, cofac_coeffs, cofac_mons_hashed, syz_ind, false
             else
                 break
             end
@@ -346,7 +366,7 @@ function siggb_for_split!(basis::Basis{N},
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
 
-    return false, Coeff[], MonIdx[], zero(SigIndex)
+    return false, Coeff[], MonIdx[], zero(SigIndex), false
 end
 
 function split!(basis::Basis,
@@ -706,6 +726,8 @@ end
 # *without* computing a GB for the corresponding ideal
 function _msolve_haszero_normal_form(exps::Vector{Monomial{N}},
                                      cfs::Vector{Coeff},
+                                     nz_mons::Vector{Vector{Monomial{N}}},
+                                     nz_coeffs::Vector{Vector{Coeff}},
                                      basis::Basis{N},
                                      basis_ht::MonomialHashtable{N},
                                      vchar::Val{Char}) where {N, Char}
@@ -716,7 +738,9 @@ function _msolve_haszero_normal_form(exps::Vector{Monomial{N}},
                         [basis_ht.exponents[m] for m in basis.monomials[i]],
                         basis.coefficients[i])
          for i in basis.basis_offset:basis.basis_load]
-    F = [convert_to_pol(R, exps, cfs)]
+    f = convert_to_pol(R, exps, cfs)
+    nzs = [convert_to_pol(R, nze, nzc) for (nze, nzc) in zip(nz_mons, nz_coeffs)]
+    F = [f*nz for nz in nzs]
 
     nr_vars     = nvars(R)
     field_char  = Int(characteristic(R))
@@ -749,13 +773,15 @@ function _msolve_haszero_normal_form(exps::Vector{Monomial{N}},
     ptr     = reinterpret(Ptr{Int32}, nf_cf[])
     jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
 
-   basis = _convert_finite_field_array_to_abstract_algebra(
-                jl_ld, jl_len, jl_cf, jl_exp, R, 0)
+    result = _convert_finite_field_array_to_abstract_algebra(
+        jl_ld, jl_len, jl_cf, jl_exp, R, 0)
+
+    is_zro = any(iszero, result)
 
     ccall((:free_f4_julia_result_data, libneogb), Nothing ,
           (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
            Ptr{Ptr{Cvoid}}, Int, Int),
           cglobal(:jl_free), nf_len, nf_exp, nf_cf, jl_ld, field_char)
 
-    return iszero(first(jl_len))
+    return is_zro
 end
