@@ -306,12 +306,22 @@ function siggb_for_split!(basis::Basis{N},
                         end
                     end
                 end
-                does_div && break
+                syz_ind = index(syz_sig)
+                tr_ind = tr.deg_to_mat[syz_mon.deg + basis.degs[syz_ind]]
+                cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind, tr, char,
+                                                            ind_order.max_ind,
+                                                            ind_order, syz_ind)[syz_ind]
+                if does_div
+                    # do a membership check
+                    if _msolve_haszero_normal_form(cofac_mons, cofac_coeffs, basis,
+                                                   basis_ht, char)
+                        @info "membership check not passed, not splitting"
+                        continue
+                    end
+                end
 
                 # from here on we assume that the membership check passed
                 @info "membership check passed, constructing module rep"
-                syz_ind = index(syz_sig)
-                tr_ind = tr.deg_to_mat[syz_mon.deg + basis.degs[syz_ind]]
                 cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind, tr, char,
                                                             ind_order.max_ind,
                                                             ind_order, syz_ind)[syz_ind]
@@ -660,4 +670,82 @@ function Base.show(io::IO, lc::LocClosedSet)
     end
     string_rep *= ")"
     print(io, string_rep)
+end
+
+# compute normal forms with msolve
+@inline function _convert_to_msolve(exps::Vector{<:Monomial},
+                                    cfs::Vector{Coeff})
+
+    len = length(exps)
+    @inbounds ms_cfs = [Int32(cfs[i]) for i in 1:len]
+    @inbounds ms_exps = vcat([convert(Vector{Int32}, exps[i].exps) for i in 1:len]...)
+    return [Int32(len)], ms_cfs, ms_exps
+end
+
+function _convert_basis_to_msolve(basis::Basis,
+                                  basis_ht::MonomialHashtable)
+
+    l = basis.basis_load - basis.basis_offset + 1
+    lens = Vector{Int32}(undef, l)
+    ms_cfs = Int32[]
+    ms_exps = Int32[]
+
+    @inbounds for i in basis.basis_offset:basis.basis_load
+        exps = [basis_ht.exponents[eidx] for eidx in basis.monomials[i]]
+        cfs = basis.coefficients[i]
+        plen, pms_cfs, pms_exps = _convert_to_msolve(exps, cfs)
+        append!(lens, plen)
+        append!(ms_cfs, pms_cfs)
+        append!(ms_exps, pms_exps)
+    end
+
+    return lens, ms_cfs, ms_exps
+end
+
+# compute normal form with respect to basis
+# *without* computing a GB for the corresponding ideal
+function _msolve_haszero_normal_form(exps::Vector{Monomial{N}},
+                                     cfs::Vector{Coeff},
+                                     basis::Basis{N},
+                                     basis_ht::MonomialHashtable{N},
+                                     vchar::Val{Char}) where {N, Char}
+
+    
+    nr_vars     = N
+    field_char  = Char
+
+    # convert ideal to flattened arrays of ints
+    tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve(exps, cfs)
+    bs_lens, bs_cfs, bs_exps = _convert_basis_to_msolve(basis, basis_ht)
+
+    tbr_nr_gens = 1
+    bs_nr_gens  = length(bs_lens)
+    is_gb       = 1
+
+    nf_ld  = Ref(Cint(0))
+    nf_len = Ref(Ptr{Cint}(0))
+    nf_exp = Ref(Ptr{Cint}(0))
+    nf_cf  = Ref(Ptr{Cvoid}(0))
+
+    nr_terms  = ccall((:export_nf, libneogb), Int,
+        (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
+        Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid},
+        Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+        cglobal(:jl_malloc), nf_ld, nf_len, nf_exp, nf_cf, tbr_nr_gens, tbr_lens, tbr_exps,
+        tbr_cfs, bs_nr_gens, bs_lens, bs_exps, bs_cfs, field_char, 0, 0, nr_vars, is_gb,
+        1, 0)
+
+    # convert to julia array, also give memory management to julia
+    jl_ld   = nf_ld[]
+    jl_len  = Base.unsafe_wrap(Array, nf_len[], jl_ld)
+    jl_exp  = Base.unsafe_wrap(Array, nf_exp[], nr_terms*nr_vars)
+    ptr     = reinterpret(Ptr{Int32}, nf_cf[])
+    jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
+
+    ccall((:free_f4_julia_result_data, libneogb), Nothing ,
+          (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
+           Ptr{Ptr{Cvoid}}, Int, Int),
+          cglobal(:jl_free), nf_len, nf_exp, nf_cf, jl_ld, field_char)
+
+    return iszero(first(jl_len))
 end
