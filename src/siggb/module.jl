@@ -52,8 +52,8 @@ function construct_module(sig::Sig{N},
 
     # construct module representation of canonical rewriter
     rewr_mod = construct_module(basis, rewr_basis_ind, tr, vchar,
-                                mod_dim, ind_ord, just_index,
-                                mod_cache)
+                                mod_dim, ind_ord, mod_cache,
+                                just_index)
 
     # multiply by monomial
     rewr_sig = basis.sigs[rewr_basis_ind]

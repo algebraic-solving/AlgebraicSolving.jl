@@ -60,10 +60,12 @@ function echelonize!(matrix::MacaulayMatrix,
                 if row_tag == :colins
                     does_red = piv_tag == :colins
                     does_red && break
-                end
-                if row_tag == :col
+                elseif row_tag == :col
                     does_red = piv_tag != :col
                     does_red && break
+                else
+                    does_red = true
+                    break
                 end
             end
         end
@@ -132,9 +134,11 @@ function echelonize!(matrix::MacaulayMatrix,
         # store that we normalized the row
         tr_mat.diagonal[row_ind] = inver
 
-        # check if row lead reduced, TODO: dont know if this is reliable
+        # check if row lead reduced
         m = monomial(row_sig)
         @inbounds if isempty(new_row) || (matrix.rows[row_ind][1] != new_row[1] && any(!iszero, m.exps))
+            # TODO: not super happy with this check
+            row_ind in matrix.toadd[1:matrix.toadd_length] && continue
             matrix.toadd[matrix.toadd_length+1] = row_ind
             matrix.toadd_length += 1
         end

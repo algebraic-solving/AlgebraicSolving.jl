@@ -208,18 +208,22 @@ function sig_decomp!(basis::Basis{N},
     result = Tuple{Basis{N}, Tags}[]
 
     while !isempty(queue)
+        @info "starting component"
         bs, ps, tgs = popfirst!(queue)
         found_zd, zd_coeffs, zd_mons, zd_ind = siggb_for_split!(bs, ps, tgs,
                                                                 basis_ht, char,
                                                                 shift)
         if found_zd
+            @info "splitting component"
             bs1, ps1, tgs1, bs2, ps2, tgs2 = split!(bs, basis_ht, zd_mons,
                                                     zd_coeffs, zd_ind, tgs)
             push!(queue, (bs2, ps2, tgs2))
             push!(queue, (bs1, ps1, tgs1))
         else
+            @info "finished component"
             push!(result, (bs, tgs))
         end
+        @info "------------------------------------------"
     end
     return result
 end
@@ -258,7 +262,7 @@ function siggb_for_split!(basis::Basis{N},
                                                        basis_ht, ind_order, tags,
                                                        tr, char)
         if found_zd
-            return false, coeffs, mons, zd_ind
+            return true, coeffs, mons, zd_ind
         end
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
@@ -281,7 +285,7 @@ function split!(basis::Basis,
         nz_from1 = findfirst(sig -> gettag(tags, index(sig)) == :col,
                             basis.sigs[1:basis.input_load])
         if isnothing(nz_from1)
-            nz_from = sys1l + 1 
+            nz_from1 = sys1l + 1 
         end
         
         # find out where to insert zero divisor

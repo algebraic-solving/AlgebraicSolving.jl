@@ -28,7 +28,8 @@ function update_siggb!(basis::Basis,
             new_syz_c += 1
 
             # use syzgyy to split if applicable
-            if gettag(tags, new_idx) == :split
+            cofac_is_one = all(iszero, new_sig_mon.exps)
+            if gettag(tags, new_idx) == :split && !cofac_is_one
 
                 # this membership test is temporary
                 does_div = false
@@ -38,13 +39,13 @@ function update_siggb!(basis::Basis,
                     lm_msk = basis.lm_masks[j]
                     lm = basis_ht.exponents[first(basis.monomials[j])]
                     if divch(lm, new_sig_mon,
-                             lm_mask, mask(new_sig_mask))
+                             lm_msk, mask(new_sig_mask))
                         does_div = true
                         break
                     end
                 end
                 
-                if does_div
+                if !does_div
                     @info "found something to split with"
                     mat_ind = length(tr.mats)
                     cofac_coeffs, cofac_mons = construct_module(new_sig, basis, mat_ind, tr, vchar,
