@@ -138,9 +138,6 @@ function _core_groebner_basis(
     nr_gens     = length(F)
     field_char  = Int(characteristic(R))
 
-    println(field_char)
-    println(I)
-
     mon_order       = 0
     elim_block_size = eliminate
     reduce_gb       = Int(complete_reduction)
