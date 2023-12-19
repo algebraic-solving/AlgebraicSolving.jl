@@ -121,9 +121,17 @@ function _core_normal_form(
 
     #= first get a degree reverse lexicographical Gröbner basis for I =#
     if !haskey(I.gb, 0)
-        groebner_basis(I, eliminate = 0, la_option = 44, info_level = info_level)
+        if field_char > 2^17
+            groebner_basis(I, eliminate = 0, la_option = 44, info_level = info_level)
+        else
+            groebner_basis(I, eliminate = 0, la_option = 2, info_level = info_level)
+        end
     end
     G = I.gb[0]
+
+    if G == [R(0)]
+        return F
+    end
 
     tbr_nr_gens = length(F)
     bs_nr_gens  = length(G)

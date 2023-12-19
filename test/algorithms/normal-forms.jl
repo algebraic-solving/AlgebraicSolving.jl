@@ -13,4 +13,6 @@
     I = Ideal([y*x+17-y, x+13*y])
     F = [x+13*y, x*y+16]
     @test normal_form(F, I) == [0, y + 65520]
+    I = Ideal([R(0)])
+    @test normal_form(F, I) == F
 end

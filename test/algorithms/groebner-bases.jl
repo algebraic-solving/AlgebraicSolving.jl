@@ -25,6 +25,10 @@
     L = eliminate(I,2)
     @test L == H
     @test I.gb[2] == H
+
+    I = Ideal([R(0)])
+    G = groebner_basis(I)
+    @test G == [R(0)]
 end
 
 @testset "Algorithms -> Sig Gröbner bases" begin
