@@ -131,9 +131,15 @@ function _core_groebner_basis(
 
     F = I.gens
     R = first(F).parent
+    if F == [R(0)]
+        return F
+    end
     nr_vars     = nvars(R)
     nr_gens     = length(F)
     field_char  = Int(characteristic(R))
+
+    println(field_char)
+    println(I)
 
     mon_order       = 0
     elim_block_size = eliminate
