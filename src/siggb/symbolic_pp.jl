@@ -8,6 +8,7 @@ function select_normal!(pairset::Pairset{N},
 
     # number of selected pairs
     npairs = 0
+    min_pair_ind = 0
     deg = Exp(-1) 
     for i in 1:pairset.load
         if deg == -1

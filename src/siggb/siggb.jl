@@ -205,17 +205,17 @@ function sig_decomp!(basis::Basis{N},
                      shift::Val{Shift},
                      tags::Tags) where {N, Char, Shift}
 
-    queue = [(basis, pairset, tags)]
+    queue = [(basis, pairset, tags, basis.input_load)]
     result = Tuple{Basis{N}, Tags}[]
 
     while !isempty(queue)
         @info "starting component"
-        bs, ps, tgs = popfirst!(queue)
+        bs, ps, tgs, allowed_codim = popfirst!(queue)
         found_zd, zd_coeffs, zd_mons, zd_ind, isempty = siggb_for_split!(bs, ps, tgs,
                                                                          basis_ht, char,
-                                                                         shift)
+                                                                         shift, allowed_codim)
         if isempty
-            @info "empty component"
+            @info "empty/superflous component"
             @info "------------------------------------------"
             continue
         end
@@ -223,8 +223,8 @@ function sig_decomp!(basis::Basis{N},
             @info "splitting component"
             bs1, ps1, tgs1, bs2, ps2, tgs2 = split!(bs, basis_ht, zd_mons,
                                                     zd_coeffs, zd_ind, tgs)
-            push!(queue, (bs2, ps2, tgs2))
-            push!(queue, (bs1, ps1, tgs1))
+            push!(queue, (bs2, ps2, tgs2, allowed_codim))
+            push!(queue, (bs1, ps1, tgs1, allowed_codim-1))
         else
             @info "finished component"
             push!(result, (bs, tgs))
@@ -239,7 +239,8 @@ function siggb_for_split!(basis::Basis{N},
                           tags::Tags,
                           basis_ht::MonomialHashtable,
                           char::Val{Char},
-                          shift::Val{Shift}) where {N, Char, Shift}
+                          shift::Val{Shift},
+                          allowed_codim::Int) where {N, Char, Shift}
 
     # index order
     ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
@@ -251,7 +252,7 @@ function siggb_for_split!(basis::Basis{N},
     # syzygy queue
     syz_queue = Sig{N}[]
 
-    # lms of nonzero conditions
+    # data for nonzero conditions
     @inbounds nz_from = findfirst(sig -> gettag(tags, index(sig)) == :col,
                                   basis.sigs[1:basis.input_load])
     nz_lms = [one_monomial(Monomial{N})]
@@ -267,6 +268,9 @@ function siggb_for_split!(basis::Basis{N},
     end
     nz_length = length(nz_lms)
     max_nz_deg = maximum(lm -> lm.deg, nz_lms)
+
+    # max. ind set to track codimension
+    max_ind_set = trues(N)
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -287,13 +291,12 @@ function siggb_for_split!(basis::Basis{N},
 
         added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
                                    basis_ht, ind_order, tags,
-                                   tr, char, syz_queue)
+                                   tr, char, max_ind_set, syz_queue)
 
-        # check nonzero conditions
+        # check if nonzero conditions vanish everywhere
         if !added_unit
-            added_unit = _msolve_haszero_normal_form([one_monomial(Monomial{N})], [one(Coeff)],
-                                                     nz_conds_mons, nz_conds_coeffs,
-                                                     basis, basis_ht, char)
+            added_unit = _msolve_prod_has_zero_nf(nz_conds_mons, nz_conds_coeffs,
+                                                  basis, basis_ht, char)
         end
 
         # return if a unit was added
@@ -301,7 +304,15 @@ function siggb_for_split!(basis::Basis{N},
             return false, Coeff[], MonIdx[], zero(SigIndex), true
         end
 
+        # check codimension
+        codim = length(findall(b -> !b, max_ind_set))
+        if codim > allowed_codim
+            return false, Coeff[], MonIdx[], zero(SigIndex), true
+        end
+
         # check to see if we can split with one of the syzygies
+        # big membership check
+        sort!(syz_queue, by = syz_sig -> monomial(syz_sig).deg)
         @inbounds while !isempty(syz_queue)
             @info "checking known syzygies"
             syz_sig = first(syz_queue)
@@ -746,6 +757,66 @@ function _msolve_haszero_normal_form(exps::Vector{Monomial{N}},
     field_char  = Int(characteristic(R))
 
     tbr_nr_gens = length(F)
+    bs_nr_gens  = length(G)
+    is_gb       = 1
+
+    # convert ideal to flattened arrays of ints
+    tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve(F)
+    bs_lens, bs_cfs, bs_exps    = _convert_to_msolve(G)
+
+    nf_ld  = Ref(Cint(0))
+    nf_len = Ref(Ptr{Cint}(0))
+    nf_exp = Ref(Ptr{Cint}(0))
+    nf_cf  = Ref(Ptr{Cvoid}(0))
+
+    nr_terms  = ccall((:export_nf, libneogb), Int,
+        (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
+        Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid},
+        Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+        cglobal(:jl_malloc), nf_ld, nf_len, nf_exp, nf_cf, tbr_nr_gens, tbr_lens, tbr_exps,
+        tbr_cfs, bs_nr_gens, bs_lens, bs_exps, bs_cfs, field_char, 0, 0, nr_vars, is_gb,
+        1, 0)
+
+    # convert to julia array, also give memory management to julia
+    jl_ld   = nf_ld[]
+    jl_len  = Base.unsafe_wrap(Array, nf_len[], jl_ld)
+    jl_exp  = Base.unsafe_wrap(Array, nf_exp[], nr_terms*nr_vars)
+    ptr     = reinterpret(Ptr{Int32}, nf_cf[])
+    jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
+
+    result = _convert_finite_field_array_to_abstract_algebra(
+        jl_ld, jl_len, jl_cf, jl_exp, R, 0)
+
+    is_zro = any(iszero, result)
+
+    ccall((:free_f4_julia_result_data, libneogb), Nothing ,
+          (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
+           Ptr{Ptr{Cvoid}}, Int, Int),
+          cglobal(:jl_free), nf_len, nf_exp, nf_cf, jl_ld, field_char)
+
+    return is_zro
+end
+
+
+function _msolve_prod_has_zero_nf(mons::Vector{Vector{Monomial{N}}},
+                                  coeffs::Vector{Vector{Coeff}},
+                                  basis::Basis{N},
+                                  basis_ht::MonomialHashtable{N},
+                                  vchar::Val{Char}) where {N, Char}
+
+    R, _ = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N])
+    
+    G = [convert_to_pol(R,
+                        [basis_ht.exponents[m] for m in basis.monomials[i]],
+                        basis.coefficients[i])
+         for i in basis.basis_offset:basis.basis_load]
+    pols = [convert_to_pol(R, e, c) for (e, c) in zip(mons, coeffs)]
+    F = [prod(pols)]
+
+    nr_vars     = nvars(R)
+    field_char  = Int(characteristic(R))
+
+    tbr_nr_gens = 1
     bs_nr_gens  = length(G)
     is_gb       = 1
 

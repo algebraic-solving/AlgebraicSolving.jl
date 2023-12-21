@@ -10,6 +10,7 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
+                       max_ind_set::BitVector,
                        syz_queue::Vector{Sig{N}}=Sig{N}[]) where {N, Char}
 
     new_basis_c = 0
@@ -46,7 +47,7 @@ function update_siggb!(basis::Basis,
             added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
                                          row, coeffs,
                                          new_sig, new_sig_mask, parent_ind,
-                                         tr, ind_order, tags)
+                                         tr, ind_order, tags, max_ind_set)
         end
     end
 
@@ -68,7 +69,8 @@ function add_basis_elem!(basis::Basis{N},
                          parent_ind::Int,
                          tr::Tracer,
                          ind_order::IndOrder,
-                         tags::Tags) where N
+                         tags::Tags,
+                         max_ind_set::BitVector) where N
 
     # make sure we have enough space
     if basis.basis_load == basis.basis_size
@@ -79,6 +81,14 @@ function add_basis_elem!(basis::Basis{N},
     insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
     lm = basis_ht.exponents[first(row)]
     s = new_sig
+
+    # check if we need to shrink the MIS
+    nz_exps_inds = findall(e -> !iszero(e), lm.exps)
+    ind_var_inds = findall(max_ind_set)
+    if all(i -> i in ind_var_inds, nz_exps_inds)
+        ind = first(nz_exps_inds)
+        max_ind_set[ind] = false
+    end
 
     # check if we're adding a power of the homogenizing variable
     if length(row) == 1 && all(iszero, lm.exps[1:N-1])
