@@ -13,6 +13,7 @@ include("update.jl")
 include("symbolic_pp.jl")
 include("linear_algebra.jl")
 include("module.jl")
+include("normalform.jl")
 
 
 #---------------- user functions --------------------#
@@ -184,7 +185,7 @@ function siggb!(basis::Basis{N},
                      ind_order, tags)
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tr_mat = echelonize!(matrix, tr, tags, char, shift)
+        tr_mat = echelonize!(matrix, tags, char, shift)
 
         push!(tr.mats, tr_mat)
 
@@ -285,7 +286,7 @@ function siggb_for_split!(basis::Basis{N},
 
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tr_mat = echelonize!(matrix, tr, tags, char, shift)
+        tr_mat = echelonize!(matrix, tags, char, shift)
         push!(tr.mats, tr_mat)
         tr.deg_to_mat[deg] = length(tr.mats)
 
@@ -341,24 +342,39 @@ function siggb_for_split!(basis::Basis{N},
                 end
                 syz_ind = index(syz_sig)
                 tr_ind = tr.deg_to_mat[syz_mon.deg + basis.degs[syz_ind]]
-                cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind, tr, char,
-                                                            ind_order.max_ind,
-                                                            ind_order, syz_ind)[syz_ind]
+                cofac_ind = syz_ind
                 if does_div
-                    # do a membership check
-                    if _msolve_haszero_normal_form(cofac_mons, cofac_coeffs, nz_conds_mons,
-                                                   nz_conds_coeffs, basis,
-                                                   basis_ht, char)
-                        continue
+                    cofac_coeffs = Coeff[]
+                    cofac_mons = Monomial{N}[]
+                    all_in_ideal = true
+                    # do membership checks
+                    for i in syz_ind:-1:1
+                        cofac_ind = SigIndex(i)
+                        cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind,
+                                                                    tr, char,
+                                                                    ind_order.max_ind,
+                                                                    ind_order, cofac_ind)[cofac_ind]
+                        isempty(cofac_coeffs) && continue
+                        if !_msolve_haszero_normal_form(cofac_mons, cofac_coeffs,
+                                                        nz_conds_mons,
+                                                        nz_conds_coeffs, basis,
+                                                        basis_ht, char)
+                            all_in_ideal = false
+                            break
+                        end
                     end
-                    # TODO: if this membership check passes we also need to check the other cofactors
+                    all_in_ideal && continue
+                else
+                    cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind,
+                                                                tr, char,
+                                                                ind_order.max_ind,
+                                                                ind_order, syz_ind)[syz_ind]
+                    cofac_ind = syz_ind
                 end
+                    
 
                 # from here on we assume that the membership check passed
-                @info "membership check passed, constructing module rep"
-                cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind, tr, char,
-                                                            ind_order.max_ind,
-                                                            ind_order, syz_ind)[syz_ind]
+                @info "membership check passed"
 
                 # normalize cofac coefficients
                 inver = inv(first(cofac_coeffs), char)
@@ -371,7 +387,7 @@ function siggb_for_split!(basis::Basis{N},
                 end
 
                 cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
-                return true, cofac_coeffs, cofac_mons_hashed, syz_ind, false
+                return true, cofac_coeffs, cofac_mons_hashed, cofac_ind, false
             else
                 break
             end

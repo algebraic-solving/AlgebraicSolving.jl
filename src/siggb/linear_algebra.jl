@@ -1,8 +1,8 @@
 function echelonize!(matrix::MacaulayMatrix,
-                     tr::Tracer,
                      tags::Tags,
                      char::Val{Char},
-                     shift::Val{Shift}) where {Char, Shift}
+                     shift::Val{Shift};
+                     trace::Bool=true) where {Char, Shift}
 
     arit_ops = 0
 
@@ -12,10 +12,22 @@ function echelonize!(matrix::MacaulayMatrix,
     rev_sigorder = Vector{Int}(undef, matrix.nrows)
     pivots = matrix.pivots
 
+    tr_diagonal = if trace
+        Vector{Coeff}(undef, matrix.nrows)
+    else
+        Coeff[]
+    end
+
+    tr_mat_data = if trace
+        Vector{Vector{Tuple{Int, Coeff}}}(undef, matrix.nrows)
+    else
+        Vector{Tuple{Int, Coeff}}[]
+    end
+
     tr_mat = TracerMatrix(Dict{Sig, Tuple{Int, Int}}(),
                           Dict{Int, Sig}(),
-                          Vector{Coeff}(undef, matrix.nrows),
-                          Vector{Vector{Tuple{Int, Coeff}}}(undef, matrix.nrows))
+                          tr_diagonal,
+                          tr_mat_data)
 
     @inbounds for i in 1:matrix.nrows
         rev_sigorder[matrix.sig_order[i]] = i
@@ -31,19 +43,21 @@ function echelonize!(matrix::MacaulayMatrix,
 
         # store tracer data
         row_sig = matrix.sigs[row_ind]
-        tr_mat.rows[row_sig] = (row_ind, matrix.parent_inds[row_ind])
+        if trace
+            tr_mat.rows[row_sig] = (row_ind, matrix.parent_inds[row_ind])
 
-        # allocate a row for the tracer matrix
-        # at most we subtract (i-1) other rows
-        row_ops = Vector{Tuple{Int, Coeff}}(undef, i - 1)
-        tr_mat.col_inds_and_coeffs[row_ind] = row_ops
-        tr_mat.row_ind_to_sig[row_ind] = row_sig
-        tr_mat.diagonal[row_ind] = one(Coeff)
+            # allocate a row for the tracer matrix
+            # at most we subtract (i-1) other rows
+            row_ops = Vector{Tuple{Int, Coeff}}(undef, i - 1)
+            tr_mat.col_inds_and_coeffs[row_ind] = row_ops
+            tr_mat.row_ind_to_sig[row_ind] = row_sig
+            tr_mat.diagonal[row_ind] = one(Coeff)
+        end
 
         row_cols = matrix.rows[row_ind]
         l_col_idx = hash2col[first(row_cols)]
         if pivots[l_col_idx] == row_ind
-            resize!(row_ops, 0)
+            trace && resize!(row_ops, 0)
             continue
         end
 
@@ -93,7 +107,9 @@ function echelonize!(matrix::MacaulayMatrix,
             end
 
             n_row_subs += 1
-            row_ops[n_row_subs] = (pividx, a)
+            if trace
+                row_ops[n_row_subs] = (pividx, a)
+            end
 
             # subtract a*rows[pivots[j]] from buffer
             pivmons = matrix.rows[pividx]
@@ -105,7 +121,7 @@ function echelonize!(matrix::MacaulayMatrix,
         end
 
         # finalize tracer row, add it to tracer matrix
-        resize!(row_ops, n_row_subs)
+        trace && resize!(row_ops, n_row_subs)
 
         new_row_length = 0
         @inbounds for j in 1:matrix.ncols
@@ -132,7 +148,9 @@ function echelonize!(matrix::MacaulayMatrix,
             j += 1
         end
         # store that we normalized the row
-        tr_mat.diagonal[row_ind] = inver
+        if trace
+            tr_mat.diagonal[row_ind] = inver
+        end
 
         # check if row lead reduced
         m = monomial(row_sig)
