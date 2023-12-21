@@ -294,7 +294,9 @@ function siggb_for_split!(basis::Basis{N},
                                    tr, char, max_ind_set, syz_queue)
 
         # check if nonzero conditions vanish everywhere
+        # TODO: this is very inefficient
         if !added_unit
+            @info "checking nonzero conditions"
             added_unit = _msolve_prod_has_zero_nf(nz_conds_mons, nz_conds_coeffs,
                                                   basis, basis_ht, char)
         end
@@ -349,6 +351,7 @@ function siggb_for_split!(basis::Basis{N},
                                                    basis_ht, char)
                         continue
                     end
+                    # TODO: if this membership check passes we also need to check the other cofactors
                 end
 
                 # from here on we assume that the membership check passed
