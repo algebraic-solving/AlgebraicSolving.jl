@@ -256,21 +256,23 @@ function siggb_for_split!(basis::Basis{N},
     # data for nonzero conditions
     @inbounds nz_from = findfirst(sig -> gettag(tags, index(sig)) == :col,
                                   basis.sigs[1:basis.input_load])
-    nz_lms = [one_monomial(Monomial{N})]
-    nz_conds_mons = [[one_monomial(Monomial{N})]]
-    nz_conds_coeffs = [[one(Coeff)]]
+    nz_mons = [one_monomial(Monomial{N})]
+    nz_coeffs = [one(Coeff)]
     @inbounds if !isnothing(nz_from)
         for i in nz_from:basis.input_load
-            nz_cond = [basis_ht.exponents[m_idx] for m_idx in basis.monomials[i]]
-            push!(nz_conds_mons, nz_cond)
-            push!(nz_conds_coeffs, basis.coefficients[i])
-            push!(nz_lms, first(nz_cond))
+            nz_i_mons = [basis_ht.exponents[m_idx]
+                         for m_idx in basis.monomials[i]]
+            nz_i_coeffs = basis.coefficients[i]
+            nz_mons, nz_coeffs = mult_pols(nz_mons, nz_i_mons,
+                                           nz_coeffs, nz_i_coeffs,
+                                           char)
         end
     end
-    nz_length = length(nz_lms)
-    max_nz_deg = maximum(lm -> lm.deg, nz_lms)
+    nz_lm_mask = divmask(first(nz_mons), basis_ht.divmap, basis_ht.ndivbits)
+    nz_deg = first(nz_mons).deg
 
     # max. ind set to track codimension
+    # TODO: think about this again
     max_ind_set = trues(N)
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
@@ -290,16 +292,18 @@ function siggb_for_split!(basis::Basis{N},
         push!(tr.mats, tr_mat)
         tr.deg_to_mat[deg] = length(tr.mats)
 
-        added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
-                                   basis_ht, ind_order, tags,
-                                   tr, char, max_ind_set, syz_queue)
+        added_unit, nz_does_red = update_siggb!(basis, matrix, pairset, symbol_ht,
+                                                basis_ht, ind_order, tags,
+                                                tr, char, max_ind_set, nz_lm_mask,
+                                                syz_queue)
 
         # check if nonzero conditions vanish everywhere
-        # TODO: this is very inefficient
-        if !added_unit
+        if !added_unit && nz_does_red
             @info "checking nonzero conditions"
-            added_unit = _msolve_prod_has_zero_nf(nz_conds_mons, nz_conds_coeffs,
-                                                  basis, basis_ht, char)
+            nz_mons, nz_coeffs = normalform(nz_mons, nz_coeffs, basis,
+                                            basis_ht, ind_order,
+                                            shift, char)
+            added_unit = isempty(nz_mons)
         end
 
         # return if a unit was added
@@ -320,24 +324,19 @@ function siggb_for_split!(basis::Basis{N},
             @info "checking known syzygies"
             syz_sig = first(syz_queue)
             syz_mon = monomial(syz_sig)
-            if syz_mon.deg + max_nz_deg <= deg
+            if syz_mon.deg + nz_deg <= deg
                 popfirst!(syz_queue)
                 
                 # membership check with leading monomials
-                syz_mon_tms_nz = [mul(syz_mon, lm) for lm in nz_lms]
-                syz_masks_tms_nz = [divmask(mon, basis_ht.divmap, basis_ht.ndivbits)
-                                    for mon in syz_mon_tms_nz]
+                syz_mon_tms_nz = mul(syz_mon, first(nz_mons))
+                syz_mask_tms_nz = divmask(syz_mon_tms_nz, basis_ht.divmap, basis_ht.ndivbits)
                 does_div = false
                 for j in basis.basis_offset:basis.basis_load
                     lm = basis_ht.exponents[first(basis.monomials[j])]
                     lm_msk = basis.lm_masks[j]
-                    for i in 1:nz_length
-                        mon = syz_mon_tms_nz[i]
-                        msk = syz_masks_tms_nz[i]
-                        if divch(lm, mon, lm_msk, msk)
-                            does_div = true
-                            break
-                        end
+                    if divch(lm, syz_mon_tms_nz, lm_msk, syz_mask_tms_nz)
+                        does_div = true
+                        break
                     end
                 end
                 syz_ind = index(syz_sig)
@@ -355,10 +354,16 @@ function siggb_for_split!(basis::Basis{N},
                                                                     ind_order.max_ind,
                                                                     ind_order, cofac_ind)[cofac_ind]
                         isempty(cofac_coeffs) && continue
-                        if !_msolve_haszero_normal_form(cofac_mons, cofac_coeffs,
-                                                        nz_conds_mons,
-                                                        nz_conds_coeffs, basis,
-                                                        basis_ht, char)
+                        mul_cofac_mons, mul_cofac_coeffs = mult_pols(cofac_mons, nz_mons,
+                                                                     cofac_coeffs,
+                                                                     nz_coeffs)
+                        if !isempty(first(normalform(mul_cofac_mons,
+                                                     mul_cofac_coeffs,
+                                                     basis,
+                                                     basis_ht,
+                                                     ind_order,
+                                                     shift,
+                                                     char)))
                             all_in_ideal = false
                             break
                         end

@@ -11,6 +11,7 @@ function update_siggb!(basis::Basis,
                        tr::Tracer,
                        vchar::Val{Char},
                        max_ind_set::BitVector,
+                       nz_lm_mask::DivMask,
                        syz_queue::Vector{Sig{N}}=Sig{N}[]) where {N, Char}
 
     new_basis_c = 0
@@ -18,6 +19,7 @@ function update_siggb!(basis::Basis,
 
     toadd = matrix.toadd[1:matrix.toadd_length]
     added_unit = false
+    nz_does_red = false
 
     @inbounds for i in toadd
         # determine if row is zero
@@ -44,10 +46,11 @@ function update_siggb!(basis::Basis,
             new_basis_c += 1
             coeffs = matrix.coeffs[i]
             parent_ind = matrix.parent_inds[i]
-            added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
-                                         row, coeffs,
-                                         new_sig, new_sig_mask, parent_ind,
-                                         tr, ind_order, tags, max_ind_set)
+            added_unit, nz_does_red = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
+                                                      row, coeffs,
+                                                      new_sig, new_sig_mask, parent_ind,
+                                                      tr, ind_order, tags, max_ind_set,
+                                                      nz_lm_mask)
         end
     end
 
@@ -55,7 +58,7 @@ function update_siggb!(basis::Basis,
         @info "$(new_basis_c) new, $(new_syz_c) zero"
     end
 
-    return added_unit
+    return added_unit, nz_does_red
 end
 
 function add_basis_elem!(basis::Basis{N},
@@ -70,7 +73,9 @@ function add_basis_elem!(basis::Basis{N},
                          tr::Tracer,
                          ind_order::IndOrder,
                          tags::Tags,
-                         max_ind_set::BitVector) where N
+                         max_ind_set::BitVector,
+                         nz_lm_mask::DivMask) where N
+
 
     # make sure we have enough space
     if basis.basis_load == basis.basis_size
@@ -80,7 +85,11 @@ function add_basis_elem!(basis::Basis{N},
     # add to basis hashtable
     insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
     lm = basis_ht.exponents[first(row)]
+    lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
     s = new_sig
+
+    # check if nonzero condition may reduce
+    nz_does_red = divch(lm_mask, nz_lm_mask)
 
     # check if we need to shrink the MIS
     nz_exps_inds = findall(e -> !iszero(e), lm.exps)
@@ -92,7 +101,7 @@ function add_basis_elem!(basis::Basis{N},
 
     # check if we're adding a power of the homogenizing variable
     if length(row) == 1 && all(iszero, lm.exps[1:N-1])
-        return true
+        return true, nz_does_red
     end
 
     # add everything to basis
@@ -102,8 +111,7 @@ function add_basis_elem!(basis::Basis{N},
     new_sig_ratio = divide(lm, monomial(new_sig))
     basis.sigratios[l] = new_sig_ratio
 
-    basis.lm_masks[l] = divmask(lm, basis_ht.divmap,
-                                basis_ht.ndivbits)
+    basis.lm_masks[l] = lm_mask
     basis.monomials[l] = row
     basis.coefficients[l] = coeffs
 
@@ -144,7 +152,7 @@ function add_basis_elem!(basis::Basis{N},
     # build new pairs
     update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
 
-    return false
+    return false, nz_does_red
 end
 
 function process_syzygy!(basis::Basis{N},
