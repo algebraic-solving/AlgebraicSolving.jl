@@ -155,7 +155,6 @@ function select_normal!(pairset::Pairset{N},
         pairset.elems[i] = pairset.elems[i+npairs]
     end
     pairset.load -= npairs
-    resize_pivots!(matrix, symbol_ht)
     return deg
 end
 
@@ -170,6 +169,8 @@ function symbolic_pp!(basis::Basis{N},
     mult = similar(ht.buffer)
     mult2 = similar(ht.buffer)
     red_sig_mon = similar(ht.buffer)
+
+    resize_pivots!(matrix, symbol_ht)
 
     # iterate over monomials in symbolic ht
     @inbounds while i <= symbol_ht.load

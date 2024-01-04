@@ -28,7 +28,7 @@ function normalform(exps::Vector{Monomial{N}},
     finalize_matrix!(matrix, symbol_ht, ind_order)
     pop!(ind_order.ord)
 
-    echelonize!(matrix, tags, vchar, shift)
+    echelonize!(matrix, tags, vchar, shift, trace = false)
 
     # get result
     @inbounds res_exps = [symbol_ht.exponents[m_idx]

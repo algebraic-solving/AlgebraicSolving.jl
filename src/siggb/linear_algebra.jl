@@ -85,7 +85,7 @@ function echelonize!(matrix::MacaulayMatrix,
         end
         if !does_red
             pivots[l_col_idx] = row_ind
-            resize!(row_ops, 0)
+            trace && resize!(row_ops, 0)
             continue
         end
 
@@ -248,6 +248,11 @@ end
 function is_triangular(matrix::MacaulayMatrix)
     lms = [first(row) for row in matrix.rows[1:matrix.nrows] if !isempty(row)]
     return length(lms) == length(unique(lms))
+end
+
+function assert_sigs(matrix::MacaulayMatrix)
+    @inbounds sgs = matrix.sigs[1:matrix.nrows]
+    return length(sgs) == length(unique(sgs))
 end
 
 function Base.show(io::IO, matrix::MacaulayMatrix)

@@ -303,8 +303,10 @@ function siggb_for_split!(basis::Basis{N},
             nz_mons, nz_coeffs = normalform(nz_mons, nz_coeffs, basis,
                                             basis_ht, ind_order, tags,
                                             shift, char)
-            nz_lm_mask = divmask(first(nz_mons), basis_ht.divmap, basis_ht.ndivbits)
             added_unit = isempty(nz_mons)
+            if !isempty(nz_mons)
+                nz_lm_mask = divmask(first(nz_mons), basis_ht.divmap, basis_ht.ndivbits)
+            end
         end
 
         # return if a unit was added
@@ -350,10 +352,12 @@ function siggb_for_split!(basis::Basis{N},
                     # do membership checks
                     for i in syz_ind:-1:1
                         cofac_ind = SigIndex(i)
-                        cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind,
-                                                                    tr, char,
-                                                                    ind_order.max_ind,
-                                                                    ind_order, cofac_ind)[cofac_ind]
+                        mod_rep = construct_module(syz_sig, basis, tr_ind,
+                                                   tr, char, ind_order.max_ind,
+                                                   ind_order, cofac_ind)
+                        cofac_mons, cofac_coeffs = normalform(mod_rep[i][2], mod_rep[i][1],
+                                                              basis, basis_ht, ind_order,
+                                                              tags, shift, char)
                         isempty(cofac_coeffs) && continue
                         mul_cofac_mons, mul_cofac_coeffs = mult_pols(cofac_mons, nz_mons,
                                                                      cofac_coeffs,
@@ -704,6 +708,47 @@ function _is_gb(gb::Vector{Tuple{Tuple{Int, P}, P}}) where {P <: MPolyRingElem}
     return res1 && res2
 end
 
+# compute dimension
+function dimen(F::Vector{<:MPolyRingElem})
+    R = parent(first(F))
+    gns = gens(R)
+    gb = copy(F)
+    dim = 0
+    for i in 1:length(gns)
+        hyp = sum([rand(Int)*v for v in gns]) + rand(Int)*one(R)
+        push!(gb, hyp)
+        gb = groebner_basis(Ideal(gb), complete_reduction = true)
+        one(R) in gb && return dim
+        dim += 1
+    end
+    return dim
+end
+
+function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
+    R = parent(first(F))
+    S, vars = polynomial_ring(base_ring(R), pushfirst!(["x$i" for i in 1:nvars(R)], "t"),
+                             ordering = :degrevlex)
+    Fconv = typeof(first(F))[]
+    for f in F
+        ctx = MPolyBuildCtx(S)
+        for (e, c) in zip(exponent_vectors(f), coefficients(f))
+            enew = pushfirst!(e, 0)
+            push_term!(ctx, c, e)
+        end
+        push!(Fconv, finish(ctx))
+    end
+
+    ctx = MPolyBuildCtx(S)
+    for (e, c) in zip(exponent_vectors(nz), coefficients(nz))
+        enew = pushfirst!(e, 0)
+        push_term!(ctx, c, e)
+    end
+    push!(Fconv, first(vars)*finish(ctx) - 1)
+
+    gb = groebner_basis(Ideal(Fconv), complete_reduction = true, eliminate = 1)
+    return gb
+end
+    
 # for displaying locally closed sets
 function Base.show(io::IO, lc::LocClosedSet)
     string_rep = "V("

@@ -42,8 +42,10 @@ function construct_module(sig::Sig{N},
         return mod_cache[sig]
     end
 
-    if ind_ord.ord[index(sig)] < ind_ord.ord[just_index]
-        return [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
+    if !iszero(just_index)
+        if ind_ord.ord[index(sig)] < ind_ord.ord[just_index]
+            return [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
+        end
     end
 
     tr_mat = tr.mats[mat_index]
@@ -64,6 +66,7 @@ function construct_module(sig::Sig{N},
         res[i] = (copy(rewr_mod[i][1]), isone ? copy(rewr_mod[i][2]) : mul_by_mon(rewr_mod[i][2], mult))
     end
 
+    # construct module rep of all reducers
     @inbounds row_ops = tr_mat.col_inds_and_coeffs[row_ind]
     @inbounds for (j, coeff)  in row_ops
         j_sig = tr_mat.row_ind_to_sig[j]
@@ -72,15 +75,15 @@ function construct_module(sig::Sig{N},
                                      mod_dim, ind_ord,
                                      just_index, mod_cache)
         for i in 1:mod_dim
-            !iszero(just_index) && i != just_index
+            !iszero(just_index) && i != just_index && continue
             res_i_coeffs = res[i][1]
             res_i_mons = res[i][2]
             j_mod_coeffs = j_sig_mod[i][1]
             mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar), vchar)
             j_mod_mons = j_sig_mod[i][2]
-            res[i] = add_pols(res_i_mons, j_mod_mons,
-                              res_i_coeffs, mul_j_mod_coeffs,
-                              vchar)
+            res[i] = add_pols_2(res_i_mons, j_mod_mons,
+                                res_i_coeffs, mul_j_mod_coeffs,
+                                vchar)
         end
     end
 
@@ -181,4 +184,33 @@ function add_pols(mons1::Vector{M},
     resize!(coeffs_res, new_l)
 
     return coeffs_res, mons_res
+end
+
+
+function add_pols_2(exps1::Vector{Monomial{N}},
+                    exps2::Vector{Monomial{N}},
+                    cfs1::Vector{Coeff},
+                    cfs2::Vector{Coeff},
+                    char::Val{Char}) where {N, Char}
+
+    R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
+                             ordering = :degrevlex)
+    p1 = convert_to_pol(R, exps1, cfs1)
+    p2 = convert_to_pol(R, exps2, cfs2)
+    p = p1+p2
+
+    lp = length(p)
+    exps = exponent_vectors(p)
+    cfs = coefficients(p)
+    
+    res_exps = Vector{Monomial{N}}(undef, lp)
+    res_cfs = Vector{Coeff}(undef, lp)
+    @inbounds for (i, (cf, evec)) in enumerate(zip(cfs, exps)) 
+        m = monomial(SVector{N}((Exp).(evec)))
+        cff = cf.data
+        res_exps[i] = m
+        res_cfs[i] = cff
+    end
+
+    return res_cfs, res_exps
 end
