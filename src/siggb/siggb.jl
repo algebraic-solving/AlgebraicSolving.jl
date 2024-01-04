@@ -35,20 +35,20 @@ signature and the second the underlying polynomial.
 julia> using AlgebraicSolving
 
 julia> R, vars = polynomial_ring(GF(17), ["x$i" for i in 1:4])
-(Multivariate polynomial ring in 4 variables over GF(17), fpMPolyRingElem[x1, x2, x3, x4])
+(Multivariate polynomial ring in 4 variables over GF(17), FqMPolyRingElem[x1, x2, x3, x4])
 
 julia> F = AlgebraicSolving.cyclic(R)
-fpMPolyRingElem[x1 + x2 + x3 + x4, x1*x2 + x1*x4 + x2*x3 + x3*x4, x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4, x1*x2*x3*x4 + 16]
+FqMPolyRingElem[x1 + x2 + x3 + x4, x1*x2 + x1*x4 + x2*x3 + x3*x4, x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4, x1*x2*x3*x4 + 16]
 
 julia> Fhom = AlgebraicSolving._homogenize(F.gens)
-4-element Vector{fpMPolyRingElem}:
+4-element Vector{FqMPolyRingElem}:
  x1 + x2 + x3 + x4
  x1*x2 + x2*x3 + x1*x4 + x3*x4
  x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4
  x1*x2*x3*x4 + 16*x5^4
 
 julia> sig_groebner_basis(Fhom)
-7-element Vector{Tuple{Tuple{Int64, fpMPolyRingElem}, fpMPolyRingElem}}:
+7-element Vector{Tuple{Tuple{Int64, FqMPolyRingElem}, FqMPolyRingElem}}:
  ((1, 1), x1 + x2 + x3 + x4)
  ((2, 1), x2^2 + 2*x2*x4 + x4^2)
  ((3, 1), x2*x3^2 + x3^2*x4 + 16*x2*x4^2 + 16*x4^3)
@@ -59,7 +59,7 @@ julia> sig_groebner_basis(Fhom)
 ```
 """
 function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) where {T <: MPolyRingElem}
-    R = first(sys).parent
+    R = parent(first(sys))
     Rchar = characteristic(R)
 
     # check if input is ok
@@ -131,9 +131,9 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
             m = monomial(SVector{nv}((Exp).(exps[j])))
             eidx = insert_in_hash_table!(basis_ht, m)
             if isone(j)
-                inver = inv(Coeff(cfs[1].data), char)
+                inver = inv(Coeff(lift(ZZ, cfs[1])), char)
             end
-            cf = isone(j) ? one(Coeff) : mul(inver, Coeff(cfs[j].data), char)
+            cf = isone(j) ? one(Coeff) : mul(inver, Coeff(lift(ZZ, cfs[j])), char)
             mons[j] = eidx
             coeffs[j] = cf
         end
@@ -181,13 +181,13 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         exps = [basis_ht.exponents[m].exps for m in basis.monomials[i]]
         ctx = MPolyBuildCtx(R)
         for (e, c) in zip(exps, basis.coefficients[i])
-            push_term!(ctx, c, Vector{Int}(e))
+            push_term!(ctx, coefficient_ring(R)(c), Vector{Int}(e))
         end
         pol = finish(ctx)
 
         s = basis.sigs[i]
         ctx = MPolyBuildCtx(R)
-        push_term!(ctx, 1, Vector{Int}(monomial(s).exps))
+        push_term!(ctx, one(coefficient_ring(R)), Vector{Int}(monomial(s).exps))
         sig = (Int(index(s)), finish(ctx))
 
         push!(outp, (sig, pol))
