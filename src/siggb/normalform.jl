@@ -3,6 +3,7 @@ function normalform(exps::Vector{Monomial{N}},
                     basis::Basis{N},
                     basis_ht::MonomialHashtable{N},
                     ind_order::IndOrder,
+                    tags::Tags,
                     shift::Val{Shift},
                     vchar::Val{Char}) where {N, Char, Shift}
 
@@ -22,9 +23,10 @@ function normalform(exps::Vector{Monomial{N}},
     matrix.nrows = 1
 
     symbolic_pp!(basis, matrix, basis_ht, symbol_ht, ind_order, tags)
-    ind_order.ord[sig_ind] = sig_ind
+    @assert sig_ind == length(ind_order.ord) + 1
+    push!(ind_order.ord, sig_ind)
     finalize_matrix!(matrix, symbol_ht, ind_order)
-    delete!(ind_order, sig_ind)
+    pop!(ind_order.ord)
 
     echelonize!(matrix, tags, vchar, shift)
 
@@ -43,23 +45,23 @@ function mult_pols(exps1::Vector{Monomial{N}},
                    cfs2::Vector{Coeff},
                    char::Val{Char}) where {N, Char}
 
-    R, vrs = polynomial_ring(GF(Char), ["x$i" for i in 1:N],
+    R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
                              ordering = :degrevlex)
     p1 = convert_to_pol(R, exps1, cfs1)
     p2 = convert_to_pol(R, exps2, cfs2)
     p = p1*p2
 
     lp = length(p)
-    exps = collect(exponent_vectors(p))
-    cfs = collect(coefficients(p))
+    exps = exponent_vectors(p)
+    cfs = coefficients(p)
     
-    res_exps = Vector{MonIdx}(undef, lp)
+    res_exps = Vector{Monomial{N}}(undef, lp)
     res_cfs = Vector{Coeff}(undef, lp)
-    @inbounds for i in 1:lp
-        m = monomial(SVector{N}((Exp).(exps[i])))
-        cf = cfs[i].data
-        res_exps[i] = eidx
-        res_cfs[i] = cf
+    @inbounds for (i, (cf, evec)) in enumerate(zip(cfs, exps)) 
+        m = monomial(SVector{N}((Exp).(evec)))
+        cff = cf.data
+        res_exps[i] = m
+        res_cfs[i] = cff
     end
 
     return res_exps, res_cfs

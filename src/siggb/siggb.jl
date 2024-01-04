@@ -301,7 +301,7 @@ function siggb_for_split!(basis::Basis{N},
         if !added_unit && nz_does_red
             @info "checking nonzero conditions"
             nz_mons, nz_coeffs = normalform(nz_mons, nz_coeffs, basis,
-                                            basis_ht, ind_order,
+                                            basis_ht, ind_order, tags,
                                             shift, char)
             added_unit = isempty(nz_mons)
         end
@@ -356,14 +356,12 @@ function siggb_for_split!(basis::Basis{N},
                         isempty(cofac_coeffs) && continue
                         mul_cofac_mons, mul_cofac_coeffs = mult_pols(cofac_mons, nz_mons,
                                                                      cofac_coeffs,
-                                                                     nz_coeffs)
-                        if !isempty(first(normalform(mul_cofac_mons,
-                                                     mul_cofac_coeffs,
-                                                     basis,
-                                                     basis_ht,
-                                                     ind_order,
-                                                     shift,
-                                                     char)))
+                                                                     nz_coeffs,
+                                                                     char)
+                        nf_mons, _ = normalform(mul_cofac_mons, mul_cofac_coeffs,
+                                                basis, basis_ht, ind_order, tags,
+                                                shift, char)
+                        if !isempty(nf_mons)
                             all_in_ideal = false
                             break
                         end
