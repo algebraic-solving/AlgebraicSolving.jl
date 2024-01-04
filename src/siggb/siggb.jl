@@ -303,6 +303,7 @@ function siggb_for_split!(basis::Basis{N},
             nz_mons, nz_coeffs = normalform(nz_mons, nz_coeffs, basis,
                                             basis_ht, ind_order, tags,
                                             shift, char)
+            nz_lm_mask = divmask(first(nz_mons), basis_ht.divmap, basis_ht.ndivbits)
             added_unit = isempty(nz_mons)
         end
 

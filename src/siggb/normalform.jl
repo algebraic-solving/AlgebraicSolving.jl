@@ -33,7 +33,7 @@ function normalform(exps::Vector{Monomial{N}},
     # get result
     @inbounds res_exps = [symbol_ht.exponents[m_idx]
                 for m_idx in matrix.rows[1]]
-    @inbounds res_coeffs = matrix.rows[1]
+    @inbounds res_coeffs = matrix.coeffs[1]
 
     return res_exps, res_coeffs
 end
