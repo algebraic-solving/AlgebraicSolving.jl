@@ -10,7 +10,7 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       max_ind_set::BitVector,
+                       max_ind_sets::Vector{BitVector},
                        nz_lm_mask::DivMask,
                        syz_queue::Vector{Sig{N}}=Sig{N}[]) where {N, Char}
 
@@ -49,7 +49,7 @@ function update_siggb!(basis::Basis,
             added_unit, nz_does_red = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
                                                       row, coeffs,
                                                       new_sig, new_sig_mask, parent_ind,
-                                                      tr, ind_order, tags, max_ind_set,
+                                                      tr, ind_order, tags, max_ind_sets,
                                                       nz_lm_mask)
         end
     end
@@ -73,7 +73,7 @@ function add_basis_elem!(basis::Basis{N},
                          tr::Tracer,
                          ind_order::IndOrder,
                          tags::Tags,
-                         max_ind_set::BitVector,
+                         max_ind_sets::Vector{BitVector},
                          nz_lm_mask::DivMask) where N
 
 
@@ -92,12 +92,22 @@ function add_basis_elem!(basis::Basis{N},
     nz_does_red = divch(lm_mask, nz_lm_mask)
 
     # check if we need to shrink the MIS
-    nz_exps_inds = findall(e -> !iszero(e), lm.exps)
-    ind_var_inds = findall(max_ind_set)
-    if all(i -> i in ind_var_inds, nz_exps_inds)
-        ind = first(nz_exps_inds)
-        max_ind_set[ind] = false
+    to_del = Int[]
+    new_miss = BitVector[]
+    for (i, mis) in enumerate(max_ind_sets)
+        nz_exps_inds = findall(e -> !iszero(e), lm.exps)
+        ind_var_inds = findall(mis)
+        if all(k -> k in ind_var_inds, nz_exps_inds)
+            for j in nz_exps_inds
+                new_mis = copy(mis)
+                new_mis[j] = false
+                push!(new_miss, new_mis)
+            end
+            push!(to_del, i)
+        end
     end
+    deleteat!(max_ind_sets, to_del)
+    append!(max_ind_sets, new_miss)
 
     # check if we're adding a power of the homogenizing variable
     if length(row) == 1 && all(iszero, lm.exps[1:N-1])

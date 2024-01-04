@@ -224,8 +224,8 @@ function sig_decomp!(basis::Basis{N},
             @info "splitting component"
             bs1, ps1, tgs1, bs2, ps2, tgs2 = split!(bs, basis_ht, zd_mons,
                                                     zd_coeffs, zd_ind, tgs)
-            push!(queue, (bs2, ps2, tgs2, allowed_codim))
-            push!(queue, (bs1, ps1, tgs1, allowed_codim-1))
+            pushfirst!(queue, (bs2, ps2, tgs2, allowed_codim-1))
+            pushfirst!(queue, (bs1, ps1, tgs1, allowed_codim))
         else
             @info "finished component"
             push!(result, (bs, tgs))
@@ -273,7 +273,7 @@ function siggb_for_split!(basis::Basis{N},
 
     # max. ind set to track codimension
     # TODO: think about this again
-    max_ind_set = trues(N)
+    max_ind_sets = [trues(N)]
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -294,7 +294,7 @@ function siggb_for_split!(basis::Basis{N},
 
         added_unit, nz_does_red = update_siggb!(basis, matrix, pairset, symbol_ht,
                                                 basis_ht, ind_order, tags,
-                                                tr, char, max_ind_set, nz_lm_mask,
+                                                tr, char, max_ind_sets, nz_lm_mask,
                                                 syz_queue)
 
         # check if nonzero conditions vanish everywhere
@@ -315,10 +315,36 @@ function siggb_for_split!(basis::Basis{N},
         end
 
         # check codimension
-        codim = length(findall(b -> !b, max_ind_set))
-        if codim > allowed_codim
-            return false, Coeff[], MonIdx[], zero(SigIndex), true
+        @info "checking codimension"
+
+        # -----------FOR TESTING-------------
+        R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
+                                 ordering = :degrevlex)
+        eltp = typeof(first(vrs))
+        lc_set = LocClosedSet(eltp[], eltp[])
+        @inbounds for j in 1:basis.input_load
+            basis.is_red[j] && continue
+            s_ind = index(basis.sigs[j])
+            pol = convert_to_pol(R,
+                                 [basis_ht.exponents[m] for m in basis.monomials[j]],
+                                 basis.coefficients[j])
+            if gettag(tags, s_ind) == :split
+                push!(lc_set.eqns, pol)
+            elseif gettag(tags, s_ind) == :col
+                push!(lc_set.ineqns, pol)
+            end
         end
+        cdim = codim(lc_set)
+        if cdim > allowed_codim
+             return false, Coeff[], MonIdx[], zero(SigIndex), true
+        end
+
+        # -----------FOR TESTING-------------
+
+        # lowb_codim = N - maximum(mis -> length(findall(mis)), max_ind_sets)
+        # if lowb_codim > allowed_codim
+        #     return false, Coeff[], MonIdx[], zero(SigIndex), true
+        # end
 
         # check to see if we can split with one of the syzygies
         # big membership check
@@ -327,7 +353,8 @@ function siggb_for_split!(basis::Basis{N},
             @info "checking known syzygies"
             syz_sig = first(syz_queue)
             syz_mon = monomial(syz_sig)
-            if syz_mon.deg + nz_deg <= deg
+            if syz_mon.deg <= deg
+            # if syz_mon.deg + nz_deg <= deg
                 popfirst!(syz_queue)
                 
                 # membership check with leading monomials
@@ -355,17 +382,19 @@ function siggb_for_split!(basis::Basis{N},
                         mod_rep = construct_module(syz_sig, basis, tr_ind,
                                                    tr, char, ind_order.max_ind,
                                                    ind_order, cofac_ind)
+                        cofac_mons, cofac_coeffs = mod_rep[i][2], mod_rep[i][1]
+                        isempty(cofac_coeffs) && continue
                         cofac_mons, cofac_coeffs = normalform(mod_rep[i][2], mod_rep[i][1],
                                                               basis, basis_ht, ind_order,
                                                               tags, shift, char)
-                        isempty(cofac_coeffs) && continue
-                        mul_cofac_mons, mul_cofac_coeffs = mult_pols(cofac_mons, nz_mons,
-                                                                     cofac_coeffs,
-                                                                     nz_coeffs,
-                                                                     char)
-                        nf_mons, _ = normalform(mul_cofac_mons, mul_cofac_coeffs,
-                                                basis, basis_ht, ind_order, tags,
-                                                shift, char)
+                        # mul_cofac_mons, mul_cofac_coeffs = mult_pols(cofac_mons, nz_mons,
+                        #                                              cofac_coeffs,
+                        #                                              nz_coeffs,
+                        #                                              char)
+                        # nf_mons, _ = normalform(mul_cofac_mons, mul_cofac_coeffs,
+                        #                         basis, basis_ht, ind_order, tags,
+                        #                         shift, char)
+                        nf_mons = cofac_mons
                         if !isempty(nf_mons)
                             all_in_ideal = false
                             break
@@ -722,6 +751,22 @@ function dimen(F::Vector{<:MPolyRingElem})
         dim += 1
     end
     return dim
+end
+
+function ideal(X::LocClosedSet)
+    if isempty(X.ineqns)
+        return X.eqns
+    end
+    p = prod(X.ineqns)
+    gb = saturate(X.eqns, p)
+    return gb
+end
+
+# loc closed set dim
+function codim(X::LocClosedSet)
+    gb = ideal(X)
+    R = parent(first(gb))
+    return ngens(R) - dimen(gb)
 end
 
 function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
