@@ -27,10 +27,10 @@ Gröbner basis, then this one is first computed.
 julia> using AlgebraicSolving
 
 julia> R, (x,y) = polynomial_ring(GF(101),["x","y"])
-(Multivariate polynomial ring in 2 variables over GF(101), fpMPolyRingElem[x, y])
+(Multivariate polynomial ring in 2 variables over GF(101), FqMPolyRingElem[x, y])
 
 julia> I = Ideal([y*x^3+12-y, x+y])
-fpMPolyRingElem[x^3*y + 100*y + 12, x + y]
+FqMPolyRingElem[x^3*y + 100*y + 12, x + y]
 
 julia> f = 2*x^2+7*x*y
 2*x^2 + 7*x*y
@@ -74,18 +74,18 @@ Gröbner basis, then this one is first computed.
 julia> using AlgebraicSolving
 
 julia> R, (x,y) = polynomial_ring(GF(101),["x","y"])
-(Multivariate polynomial ring in 2 variables over GF(101), fpMPolyRingElem[x, y])
+(Multivariate polynomial ring in 2 variables over GF(101), FqMPolyRingElem[x, y])
 
 julia> I = Ideal([y*x^3+12-y, x+y])
-fpMPolyRingElem[x^3*y + 100*y + 12, x + y]
+FqMPolyRingElem[x^3*y + 100*y + 12, x + y]
 
 julia> F = [2*x^2+7*x*y, x+y]
-2-element Vector{fpMPolyRingElem}:
+2-element Vector{FqMPolyRingElem}:
  2*x^2 + 7*x*y
  x + y
 
 julia> normal_form(F,I)
-2-element Vector{fpMPolyRingElem}:
+2-element Vector{FqMPolyRingElem}:
  96*y^2
  0
 ```
