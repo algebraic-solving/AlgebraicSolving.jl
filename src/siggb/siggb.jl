@@ -206,12 +206,12 @@ function sig_decomp!(basis::Basis{N},
                      shift::Val{Shift},
                      tags::Tags) where {N, Char, Shift}
 
-    queue = [(basis, pairset, tags, basis.input_load)]
+    queue = [(basis, pairset, tags, basis.input_load, basis.input_load)]
     result = Tuple{Basis{N}, Tags}[]
 
     while !isempty(queue)
+        bs, ps, tgs, allowed_codim, neqns = popfirst!(queue)
         @info "starting component"
-        bs, ps, tgs, allowed_codim = popfirst!(queue)
         found_zd, zd_coeffs, zd_mons, zd_ind, isempty = siggb_for_split!(bs, ps, tgs,
                                                                          basis_ht, char,
                                                                          shift, allowed_codim)
@@ -224,8 +224,10 @@ function sig_decomp!(basis::Basis{N},
             @info "splitting component"
             bs1, ps1, tgs1, bs2, ps2, tgs2 = split!(bs, basis_ht, zd_mons,
                                                     zd_coeffs, zd_ind, tgs)
-            pushfirst!(queue, (bs2, ps2, tgs2, allowed_codim-1))
-            pushfirst!(queue, (bs1, ps1, tgs1, allowed_codim))
+            allowed_codim_2 = min(neqns-1, allowed_codim)
+            allowed_codim_1 = min(neqns+1, allowed_codim)
+            pushfirst!(queue, (bs2, ps2, tgs2, allowed_codim_2, neqns-1))
+            pushfirst!(queue, (bs1, ps1, tgs1, allowed_codim_1, neqns+1))
         else
             @info "finished component"
             push!(result, (bs, tgs))
@@ -335,6 +337,8 @@ function siggb_for_split!(basis::Basis{N},
             end
         end
         cdim = codim(lc_set)
+
+        @info "codim $(cdim)"
         if cdim > allowed_codim
              return false, Coeff[], MonIdx[], zero(SigIndex), true
         end
