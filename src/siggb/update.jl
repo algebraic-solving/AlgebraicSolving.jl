@@ -12,7 +12,7 @@ function update_siggb!(basis::Basis,
                        vchar::Val{Char},
                        max_ind_sets::Vector{BitVector},
                        nz_lm_mask::DivMask,
-                       syz_queue::Vector{Sig{N}}=Sig{N}[]) where {N, Char}
+                       syz_queue::Vector{Sig{N}}) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
@@ -432,6 +432,14 @@ function resize_basis!(basis::Basis)
     resize!(basis.monomials, basis.basis_size)
     resize!(basis.coefficients, basis.basis_size)
     resize!(basis.is_red, basis.basis_size)
+end
+
+function resize_syz!(basis::Basis)
+    if basis.syz_load == basis.syz_size
+        basis.syz_size *= 2
+        resize!(basis.syz_sigs, basis.syz_size)
+        resize!(basis.syz_masks, basis.syz_size)
+    end
 end
 
 function make_room_new_input_el!(basis::Basis,
