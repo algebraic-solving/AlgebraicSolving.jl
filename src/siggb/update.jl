@@ -10,16 +10,13 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       max_ind_sets::Vector{BitVector},
-                       nz_lm_mask::DivMask,
-                       syz_queue::Vector{Sig{N}}) where {N, Char}
+                       syz_queue::Vector{Int}) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
 
     toadd = matrix.toadd[1:matrix.toadd_length]
     added_unit = false
-    nz_does_red = false
 
     @inbounds for i in toadd
         # determine if row is zero
@@ -46,11 +43,10 @@ function update_siggb!(basis::Basis,
             new_basis_c += 1
             coeffs = matrix.coeffs[i]
             parent_ind = matrix.parent_inds[i]
-            added_unit, nz_does_red = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
-                                                      row, coeffs,
-                                                      new_sig, new_sig_mask, parent_ind,
-                                                      tr, ind_order, tags, max_ind_sets,
-                                                      nz_lm_mask)
+            added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
+                                         row, coeffs,
+                                         new_sig, new_sig_mask, parent_ind,
+                                         tr, ind_order, tags)
         end
     end
 
@@ -58,7 +54,7 @@ function update_siggb!(basis::Basis,
         @info "$(new_basis_c) new, $(new_syz_c) zero"
     end
 
-    return added_unit, nz_does_red
+    return added_unit
 end
 
 function add_basis_elem!(basis::Basis{N},
@@ -72,9 +68,7 @@ function add_basis_elem!(basis::Basis{N},
                          parent_ind::Int,
                          tr::Tracer,
                          ind_order::IndOrder,
-                         tags::Tags,
-                         max_ind_sets::Vector{BitVector},
-                         nz_lm_mask::DivMask) where N
+                         tags::Tags) where N
 
 
     # make sure we have enough space
@@ -88,30 +82,9 @@ function add_basis_elem!(basis::Basis{N},
     lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
     s = new_sig
 
-    # check if nonzero condition may reduce
-    nz_does_red = divch(lm_mask, nz_lm_mask)
-
-    # check if we need to shrink the MIS
-    to_del = Int[]
-    new_miss = BitVector[]
-    for (i, mis) in enumerate(max_ind_sets)
-        nz_exps_inds = findall(e -> !iszero(e), lm.exps)
-        ind_var_inds = findall(mis)
-        if all(k -> k in ind_var_inds, nz_exps_inds)
-            for j in nz_exps_inds
-                new_mis = copy(mis)
-                new_mis[j] = false
-                push!(new_miss, new_mis)
-            end
-            push!(to_del, i)
-        end
-    end
-    deleteat!(max_ind_sets, to_del)
-    append!(max_ind_sets, new_miss)
-
     # check if we're adding a power of the homogenizing variable
     if length(row) == 1 && all(iszero, lm.exps[1:N-1])
-        return true, nz_does_red
+        return true
     end
 
     # add everything to basis
@@ -162,7 +135,7 @@ function add_basis_elem!(basis::Basis{N},
     # build new pairs
     update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
 
-    return false, nz_does_red
+    return false
 end
 
 function process_syzygy!(basis::Basis{N},

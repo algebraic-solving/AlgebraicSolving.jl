@@ -69,11 +69,18 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     # data structure setup/conversion
     sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
     
+
+    # fill basis, pairset, tags
+    basis = fill_basis!(sys_mons, sys_coeffs, basis_ht)
+    nv = ngens(parent(first(sys)))
+    pairset = init_pairset(Val(nv))
+    tags = Tags()
+    @inbounds for i in 1:basis.input_load
+        add_unit_pair!(basis, pairset, i, basis.degs[i])
+        tags[SigIndex(i)] = :seq
+    end
+
     sysl = length(sys)
-
-    # fill basis and pairset
-    basis, pairset, tags = fill_data_structs(sys_mons, sys_coeffs, basis_ht, sysl+1)
-
     # compute divmasks
     fill_divmask!(basis_ht)
     @inbounds for i in 1:sysl
@@ -114,7 +121,7 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
     sysl = length(sys)
 
     # fill basis and pairset
-    basis, pairset, tags = fill_data_structs(sys_mons, sys_coeffs,
+    basis, pairset, tags = fill_basis!(sys_mons, sys_coeffs,
                                              basis_ht, sysl + 1, sysl+1,
                                              :split)
 
@@ -172,6 +179,17 @@ function siggb!(basis::Basis{N},
     # tracer
     tr = new_tracer()
 
+    # fake syz queue
+    syz_queue = Int[]
+
+    # sum of degrees of nonzero conditions
+    nz_deg = zero(Exp)
+    @inbounds for i in 1:basis.input_load
+        if gettag(tags, SigIndex(i)) == :col
+            nz_deg += basis.degs[i]
+        end
+    end
+
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
     while !iszero(pairset.load)
@@ -193,7 +211,7 @@ function siggb!(basis::Basis{N},
 
         update_siggb!(basis, matrix, pairset, symbol_ht,
                       basis_ht, ind_order, tags,
-                      tr, char)
+                      tr, char, syz_queue)
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
 end
@@ -243,75 +261,18 @@ end
 function siggb_for_split!(basis::Basis{N},
                           pairset::Pairset,
                           tags::Tags,
+                          ind_order::IndOrder,
                           basis_ht::MonomialHashtable,
                           char::Val{Char},
                           shift::Val{Shift},
                           allowed_codim::Int) where {N, Char, Shift}
 
-    # index order
-    ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
-                         SigIndex(basis.basis_offset-1))
-
     # tracer
     tr = new_tracer()
 
     # syz queue
-    syz_queue = Sig{N}[]
-    @inbounds syz_finished = [(index(basis.syz_masks[i]), basis.syz_sigs[i])
-                              for i in 1:basis.syz_load]
-
-    # data for nonzero conditions
-    @inbounds nz_from = findfirst(sig -> gettag(tags, index(sig)) == :col,
-                                  basis.sigs[1:basis.input_load])
-    nz_mons = [one_monomial(Monomial{N})]
-    nz_coeffs = [one(Coeff)]
-    @inbounds if !isnothing(nz_from)
-        for i in nz_from:basis.input_load
-            nz_i_mons = [basis_ht.exponents[m_idx]
-                         for m_idx in basis.monomials[i]]
-            nz_i_coeffs = basis.coefficients[i]
-            nz_mons, nz_coeffs = mult_pols(nz_mons, nz_i_mons,
-                                           nz_coeffs, nz_i_coeffs,
-                                           char)
-        end
-    end
-    neqns = length(findall(i -> gettag(tags, SigIndex(i)) == :split, 1:basis.input_load))
-    @info "number of equations: $(neqns)"
-    nz_lm_mask = divmask(first(nz_mons), basis_ht.divmap, basis_ht.ndivbits)
-
-    # max. ind set to track codimension
-    # TODO: think about this again
-    max_ind_sets = [trues(N)]
-
-    # -----------FOR TESTING-------------
-    R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
-                             ordering = :degrevlex)
-    eltp = typeof(first(vrs))
-    lc_set = LocClosedSet(eltp[], eltp[])
-    @inbounds for j in 1:basis.input_load
-        basis.is_red[j] && continue
-        s_ind = index(basis.sigs[j])
-        pol = convert_to_pol(R,
-                             [basis_ht.exponents[m] for m in basis.monomials[j]],
-                             basis.coefficients[j])
-        if gettag(tags, s_ind) == :split
-            push!(lc_set.eqns, pol)
-        elseif gettag(tags, s_ind) == :col
-            push!(lc_set.ineqns, pol)
-        end
-    end
-    @info "checking codimension $(allowed_codim)"
-    cdim_res = check_codim(lc_set, allowed_codim)
-    # if cdim_res == :greater
-    #     return false, true, Coeff[], MonIdx[], zero(SigIndex), syz_finished
-    # end
-
-    # cdim_res = check_codim(lc_set, neqns)
-    # if cdim_res == :equal
-    #     return false, false, Coeff[], MonIdx[], zero(SigIndex), syz_finished
-    # end
-    # -----------FOR TESTING-------------
-
+    syz_queue = Int[]
+    syz_finished = collect(1:basis.syz_load)
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -328,44 +289,23 @@ function siggb_for_split!(basis::Basis{N},
         iszero(matrix.nrows) && continue
         tr_mat = echelonize!(matrix, tags, char, shift)
         push!(tr.mats, tr_mat)
-        tr.deg_to_mat[deg] = length(tr.mats)
 
-        added_unit, nz_does_red = update_siggb!(basis, matrix, pairset, symbol_ht,
-                                                basis_ht, ind_order, tags,
-                                                tr, char, max_ind_sets, nz_lm_mask,
-                                                syz_queue)
-
-        # check if nonzero conditions vanish everywhere
-        if !added_unit && nz_does_red
-            @info "checking nonzero conditions"
-            nz_mons, nz_coeffs = normalform(nz_mons, nz_coeffs, basis,
-                                            basis_ht, ind_order, tags,
-                                            shift, char)
-            added_unit = isempty(nz_mons)
-            if !isempty(nz_mons)
-                nz_lm_mask = divmask(first(nz_mons), basis_ht.divmap, basis_ht.ndivbits)
-            end
-        end
+        added_unit = update_siggb!(basis, matrix, pairset,
+                                   symbol_ht, basis_ht,
+                                   ind_order, tags,
+                                   tr, char)
 
         # return if a unit was added
         if added_unit
             return false, true, Coeff[], MonIdx[], zero(SigIndex), syz_finished
         end
 
-        # check codimension
-        # @info "checking codimension"
-
-        # lowb_codim = minimum(mis -> length(findall((!).(mis))), max_ind_sets)
-        # if lowb_codim > allowed_codim
-        #     return false, true, Coeff[], MonIdx[], zero(SigIndex), syz_finished
-        # end
-
         # check to see if we can split with one of the syzygies
-        sort!(syz_queue, by = sig -> monomial(sig).deg)
+        sort!(syz_queue, by = i -> basis.sigs[i].deg)
         # big membership check
         does_split, cofac_coeffs, cofac_mons_hashed,
-        cofac_ind = process_syz_for_split!(syz_queue, syz_finished, nz_mons, nz_coeffs,
-                                           basis_ht, basis, tr, ind_order, tags, shift,
+        cofac_ind = process_syz_for_split!(syz_queue, syz_finished, basis_ht, basis, tr,
+                                           ind_order, tags, shift,
                                            char, deg)
 
         if does_split
@@ -423,7 +363,7 @@ function split!(basis::Basis,
         insert!(sys1_coeffs, ins_ind, cofac_coeffs)
 
         # build basis/pairset/tags for first new system
-        basis1, pairset1, tags1 = fill_data_structs(sys1_mons, sys1_coeffs,
+        basis1, pairset1, tags1 = fill_basis!(sys1_mons, sys1_coeffs,
                                                     basis_ht, ins_from1 + 1,
                                                     nz_from1 + 1,
                                                     :split)
@@ -452,7 +392,7 @@ function split!(basis::Basis,
         push!(sys2_coeffs, copy(cofac_coeffs))
 
         # build basis/pairset/tags for second new system
-        basis2, pairset2, tags2 = fill_data_structs(sys2_mons, sys2_coeffs,
+        basis2, pairset2, tags2 = fill_basis!(sys2_mons, sys2_coeffs,
                                                     basis_ht, ins_from2, nz_from2,
                                                     :split)
     end
@@ -462,8 +402,6 @@ end
 
 function process_syz_for_split!(syz_queue::Vector{Sig{N}},
                                 syz_finished::Vector{Sig{N}},
-                                nz_mons::Vector{Monomial{N}},
-                                nz_coeffs::Vector{Coeff},
                                 basis_ht::MonomialHashtable,
                                 basis::Basis{N},
                                 tr::Tracer,
@@ -471,31 +409,30 @@ function process_syz_for_split!(syz_queue::Vector{Sig{N}},
                                 tags::Tags,
                                 shift::Val{Shift},
                                 char::Val{Char},
-                                deg::Exp) where {Shift, Char, N}
+                                deg::Exp,
+                                deg_nz::Exp) where {Shift, Char, N}
     
-    nz_deg = first(nz_mons).deg
     @inbounds while !isempty(syz_queue)
         @info "checking known syzygies"
-        syz_sig = first(syz_queue)
-        syz_mon = monomial(syz_sig)
+        idx = first(syz_queue)
+        syz_mask = basis.syz_masks[idx]
+        syz_mon = basis.syz_sigs[idx]
         # TODO: what to do about this degree check
-        if iszero(deg) || syz_mon.deg <= deg 
+        if iszero(deg) || syz_mon.deg + deg_nz <= deg
             popfirst!(syz_queue)
             
             # membership check with leading monomials and signature
-            syz_mon_tms_nz = mul(syz_mon, first(nz_mons))
-            syz_mask_tms_nz = divmask(syz_mon_tms_nz, basis_ht.divmap, basis_ht.ndivbits)
             does_div = false
             for j in basis.basis_offset:basis.basis_load
                 lm = basis_ht.exponents[first(basis.monomials[j])]
                 lm_msk = basis.lm_masks[j]
-                if divch(lm, syz_mon_tms_nz, lm_msk, syz_mask_tms_nz)
+                if divch(lm, syz_mon, lm_msk, mask(syz_mask))
                     does_div = true
                     break
                 end
             end
-            syz_ind = index(syz_sig)
-            tr_ind = tr.deg_to_mat[syz_mon.deg + basis.degs[syz_ind]]
+            syz_ind = index(syz_mask)
+            tr_ind = tr.syz_ind_to_mat[idx]
             cofac_ind = syz_ind
 
             # full membership check
@@ -510,29 +447,22 @@ function process_syz_for_split!(syz_queue::Vector{Sig{N}},
                                                ind_order, cofac_ind)
                     cofac_mons, cofac_coeffs = mod_rep[i][2], mod_rep[i][1]
                     isempty(cofac_coeffs) && continue
-                    @info "checking with F5"
+                    @info "checking normal form"
                     cofac_mons, cofac_coeffs = normalform(mod_rep[i][2], mod_rep[i][1],
                                                           basis, basis_ht, ind_order,
                                                           tags, shift, char)
-                    isempty(cofac_mons) && continue
-                    @info "checking with msolve"
-                    mul_cofac_mons, mul_cofac_coeffs = mult_pols(cofac_mons, nz_mons,
-                                                                 cofac_coeffs,
-                                                                 nz_coeffs,
-                                                                 char)
-                    isz = my_iszero_normal_form(mul_cofac_mons, mul_cofac_coeffs,
-                                                basis, basis_ht, char)
+                    isz = isempty(cofac_mons)
                     if !isz
                         all_in_ideal = false
                         break
                     end
                 end
                 if all_in_ideal
-                    push!(syz_finished, syz_sig)
+                    push!(syz_finished, idx)
                     continue
                 end
             else
-                cofac_coeffs, cofac_mons = construct_module(syz_sig, basis, tr_ind,
+                cofac_coeffs, cofac_mons = construct_module((syz_ind, syz_mon), basis, tr_ind,
                                                             tr, char,
                                                             ind_order.max_ind,
                                                             ind_order, syz_ind)[syz_ind]
@@ -634,45 +564,27 @@ function input_setup(sys::Vector{<:MPolyRingElem})
 end
 
 
-function fill_data_structs(sys_mons::Vector{Vector{MonIdx}},
-                           sys_coeffs::Vector{Vector{Coeff}},
-                           basis_ht::MonomialHashtable{N},
-                           ins_from::Int,
-                           nz_from::Int,
-                           def_tag::Symbol=:seq) where N
+function fill_basis!(sys_mons::Vector{Vector{MonIdx}},
+                     sys_coeffs::Vector{Vector{Coeff}},
+                     basis_ht::MonomialHashtable{N}) where N
 
     # initialize basis
     sysl = length(sys_mons)
     basis = new_basis(init_basis_size, init_syz_size, sysl, Val(N))
 
-    # initialize pairset
-    pairset = Pairset{N}(Vector{SPair{N}}(undef, init_pair_size),
-                         0,
-                         init_pair_size)
-
-    # tags
-    tags = Tags()
-
     @inbounds for i in 1:sysl
         s_ind = SigIndex(i)
-        if ins_from <= i < nz_from
-            tags[s_ind] = :ins
-        elseif i >= nz_from
-            tags[s_ind] = :col
-        elseif def_tag != :seq
-            tags[s_ind] = :split
-        end
         mons = sys_mons[i]
         coeffs = sys_coeffs[i]
         lm = basis_ht.exponents[first(mons)]
         lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
 
-        add_input_element!(basis, pairset, s_ind,
+        add_input_element!(basis, s_ind,
                            sys_mons[i], sys_coeffs[i],
-                           lm_mask, lm, add_pair = i < nz_from)
+                           lm_mask, lm)
     end
 
-    return basis, pairset, tags
+    return basis
 end
 
 function convert_to_pol(R::MPolyRing,
@@ -713,18 +625,21 @@ function new_basis(basis_size, syz_size,
     return basis
 end
 
+function init_pairset(::Val{N}) where N
+    ps = Pairset(Vector{SPair{N}}(undef, init_pair_size),
+                 0, init_pair_size)
+    return ps
+end
+
 function add_input_element!(basis::Basis{N},
-                            pairset::Pairset,
                             ind::SigIndex,
                             mons::Vector{MonIdx},
                             coeffs::Vector{Coeff},
                             lm_divm::DivMask,
-                            lm::Monomial;
-                            add_pair=true) where N
+                            lm::Monomial) where N
 
     @inbounds begin
         one_mon = one_monomial(Monomial{N})
-        zero_sig = (zero(SigIndex), one_mon)
 
         # signature
         sig = (ind, one_mon)
@@ -746,16 +661,23 @@ function add_input_element!(basis::Basis{N},
         # add child to rewrite root
         push!(basis.rewrite_nodes[1], l+1)
         basis.rewrite_nodes[1][1] += 1
-
-        if add_pair
-            pairset.elems[pairset.load+1] = SPair{N}(sig, zero_sig, zero(DivMask),
-                                                     zero(DivMask), Int(ind),
-                                                     0, lm.deg)
-            pairset.load += 1
-        end
     end
 end
 
+function add_unit_pair!(basis::Basis{N},
+                        pairset::Pairset{N},
+                        ind::Int,
+                        deg::Exp) where N
+
+    one_mon = one_monomial(Monomial{N})
+    zero_sig = (zero(SigIndex), one_mon)
+    @inbounds sig = basis.sigs[ind]
+    @inbounds msk = basis.sigmasks[ind]
+    pairset.elems[pairset.load+1] = SPair{N}(sig, zero_sig, mask(msk),
+                                             zero(DivMask), Int(ind),
+                                             0, deg)
+    pairset.load += 1
+end
 
 #---------------- helper functions --------------------#
 
