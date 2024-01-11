@@ -87,6 +87,7 @@ function my_iszero_normal_form(mons::Vector{Monomial{N}},
     G0 = [convert_to_pol(R, [basis_ht.exponents[midx] for midx in basis.monomials[i]],
                          basis.coefficients[i]) for i in basis.basis_offset:basis.basis_load]
     G = groebner_basis(Ideal(G0), complete_reduction = true)
+    # G = G0
 
     tbr_nr_gens = length(F)
     bs_nr_gens  = length(G)

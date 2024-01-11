@@ -115,7 +115,8 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
 
     # fill basis and pairset
     basis, pairset, tags = fill_data_structs(sys_mons, sys_coeffs,
-                                             basis_ht, sysl+1, :split)
+                                             basis_ht, sysl + 1, sysl+1,
+                                             :split)
 
     # compute divmasks
     fill_divmask!(basis_ht)
@@ -138,6 +139,7 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
         @inbounds for j in 1:bs.input_load
             bs.is_red[j] && continue
             s_ind = index(bs.sigs[j])
+            gettag(tgs, s_ind) == :ins && continue
             pol = convert_to_pol(R,
                                  [basis_ht.exponents[m] for m in bs.monomials[j]],
                                  bs.coefficients[j])
@@ -264,7 +266,6 @@ function siggb_for_split!(basis::Basis{N},
     nz_mons = [one_monomial(Monomial{N})]
     nz_coeffs = [one(Coeff)]
     @inbounds if !isnothing(nz_from)
-        neqns = nz_from - 1
         for i in nz_from:basis.input_load
             nz_i_mons = [basis_ht.exponents[m_idx]
                          for m_idx in basis.monomials[i]]
@@ -273,9 +274,8 @@ function siggb_for_split!(basis::Basis{N},
                                            nz_coeffs, nz_i_coeffs,
                                            char)
         end
-    else
-        neqns = basis.input_load
     end
+    neqns = length(findall(i -> gettag(tags, SigIndex(i)) == :split, 1:basis.input_load))
     @info "number of equations: $(neqns)"
     nz_lm_mask = divmask(first(nz_mons), basis_ht.divmap, basis_ht.ndivbits)
 
@@ -300,14 +300,16 @@ function siggb_for_split!(basis::Basis{N},
             push!(lc_set.ineqns, pol)
         end
     end
-    @info "checking codimension"
-    if check_codim(lc_set, allowed_codim) == :greater
-        return false, true, Coeff[], MonIdx[], zero(SigIndex), syz_finished
-    end
+    @info "checking codimension $(allowed_codim)"
+    cdim_res = check_codim(lc_set, allowed_codim)
+    # if cdim_res == :greater
+    #     return false, true, Coeff[], MonIdx[], zero(SigIndex), syz_finished
+    # end
 
-    if check_codim(lc_set, neqns) == :equal
-        return false, false, Coeff[], MonIdx[], zero(SigIndex), syz_finished
-    end
+    # cdim_res = check_codim(lc_set, neqns)
+    # if cdim_res == :equal
+    #     return false, false, Coeff[], MonIdx[], zero(SigIndex), syz_finished
+    # end
     # -----------FOR TESTING-------------
 
 
@@ -355,7 +357,7 @@ function siggb_for_split!(basis::Basis{N},
 
         # lowb_codim = minimum(mis -> length(findall((!).(mis))), max_ind_sets)
         # if lowb_codim > allowed_codim
-        #     return false, Coeff[], MonIdx[], zero(SigIndex), true
+        #     return false, true, Coeff[], MonIdx[], zero(SigIndex), syz_finished
         # end
 
         # check to see if we can split with one of the syzygies
@@ -392,6 +394,7 @@ function split!(basis::Basis,
                 tags::Tags,
                 known_syz::Vector{<:Sig})
 
+
     @inbounds begin
         # 1st component
         sys1_mons = copy(basis.monomials[1:basis.input_load])
@@ -402,12 +405,17 @@ function split!(basis::Basis,
         if isnothing(nz_from1)
             nz_from1 = sys1l + 1 
         end
+        ins_from1 = findfirst(sig -> gettag(tags, index(sig)) == :ins,
+                              basis.sigs[1:basis.input_load])
+        if isnothing(ins_from1)
+            ins_from1 = nz_from1
+        end
         
         # find out where to insert zero divisor
         zd_deg = basis_ht.exponents[first(cofac_mons)].deg
-        ins_ind = findfirst(d -> d > zd_deg, basis.degs)
+        ins_ind = findfirst(d -> d > zd_deg, basis.degs[1:nz_from1-1])
         if isnothing(ins_ind)
-            ins_ind = sys1l + 1
+            ins_ind = ins_from1
         end
 
         # insert zd in system
@@ -416,7 +424,8 @@ function split!(basis::Basis,
 
         # build basis/pairset/tags for first new system
         basis1, pairset1, tags1 = fill_data_structs(sys1_mons, sys1_coeffs,
-                                                    basis_ht, nz_from1 + 1,
+                                                    basis_ht, ins_from1 + 1,
+                                                    nz_from1 + 1,
                                                     :split)
 
         for (sig_ind, sig_mon) in known_syz
@@ -429,12 +438,14 @@ function split!(basis::Basis,
         end
 
         # 2nd component
-        sys2_mons = basis.monomials[1:basis.input_load]
-        sys2_coeffs = basis.coefficients[1:basis.input_load]
+        nz_from2 = nz_from1
+        ins_from2 = ins_from1 - 1 
+        sys2_mons = copy(basis.monomials[1:basis.input_load])
+        sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
+        insert!(sys2_mons, nz_from2, copy(sys2_mons[zd_ind]))
+        insert!(sys2_coeffs, nz_from2, copy(sys2_coeffs[zd_ind]))
         deleteat!(sys2_mons, zd_ind)
         deleteat!(sys2_coeffs, zd_ind)
-        sys2l = length(sys2_mons)
-        nz_from2 = nz_from1 - 1
 
         # append zd as nonzero condition
         push!(sys2_mons, copy(cofac_mons))
@@ -442,7 +453,8 @@ function split!(basis::Basis,
 
         # build basis/pairset/tags for second new system
         basis2, pairset2, tags2 = fill_data_structs(sys2_mons, sys2_coeffs,
-                                                    basis_ht, nz_from2, :split)
+                                                    basis_ht, ins_from2, nz_from2,
+                                                    :split)
     end
 
     return basis1, pairset1, tags1, basis2, pairset2, tags2
@@ -466,7 +478,8 @@ function process_syz_for_split!(syz_queue::Vector{Sig{N}},
         @info "checking known syzygies"
         syz_sig = first(syz_queue)
         syz_mon = monomial(syz_sig)
-        if iszero(deg) || syz_mon.deg <= deg + nz_deg
+        # TODO: what to do about this degree check
+        if iszero(deg) || syz_mon.deg <= deg 
             popfirst!(syz_queue)
             
             # membership check with leading monomials and signature
@@ -497,10 +510,12 @@ function process_syz_for_split!(syz_queue::Vector{Sig{N}},
                                                ind_order, cofac_ind)
                     cofac_mons, cofac_coeffs = mod_rep[i][2], mod_rep[i][1]
                     isempty(cofac_coeffs) && continue
+                    @info "checking with F5"
                     cofac_mons, cofac_coeffs = normalform(mod_rep[i][2], mod_rep[i][1],
                                                           basis, basis_ht, ind_order,
                                                           tags, shift, char)
                     isempty(cofac_mons) && continue
+                    @info "checking with msolve"
                     mul_cofac_mons, mul_cofac_coeffs = mult_pols(cofac_mons, nz_mons,
                                                                  cofac_coeffs,
                                                                  nz_coeffs,
@@ -622,6 +637,7 @@ end
 function fill_data_structs(sys_mons::Vector{Vector{MonIdx}},
                            sys_coeffs::Vector{Vector{Coeff}},
                            basis_ht::MonomialHashtable{N},
+                           ins_from::Int,
                            nz_from::Int,
                            def_tag::Symbol=:seq) where N
 
@@ -639,7 +655,9 @@ function fill_data_structs(sys_mons::Vector{Vector{MonIdx}},
 
     @inbounds for i in 1:sysl
         s_ind = SigIndex(i)
-        if i >= nz_from
+        if ins_from <= i < nz_from
+            tags[s_ind] = :ins
+        elseif i >= nz_from
             tags[s_ind] = :col
         elseif def_tag != :seq
             tags[s_ind] = :split
@@ -826,11 +844,22 @@ function check_codim(X::LocClosedSet, c::Int)
     if one(R) in w1
         return :greater
     end
-    w2 = witness(w1, X.ineqns, d+1)
+    w2 = witness(w1, X.ineqns, 1)
     if one(R) in w2
         return :equal
     end
     return :neither
+end
+
+function codim(X::LocClosedSet)
+    R = parent(first(X.eqns))
+    for c in 1:ngens(R)
+        r = check_codim(X, c)
+        if r == :equal
+            return c
+        end
+    end
+    return -1
 end
 
 function witness(F::Vector{P}, nzs::Vector{P}, d::Int) where {P <: MPolyRingElem}
@@ -841,6 +870,9 @@ function witness(F::Vector{P}, nzs::Vector{P}, d::Int) where {P <: MPolyRingElem
     for nz in nzs
         res = saturate(res, nz)
         one(R) in res && break
+    end
+    if isempty(nzs)
+        return groebner_basis(Ideal(res), complete_reduction = true)
     end
     return res
 end
