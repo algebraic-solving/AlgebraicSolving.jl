@@ -10,7 +10,7 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       syz_queue::Vector{Int}) where {N, Char}
+                       syz_queue::Vector{Tuple{Int, BitVector}}) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
@@ -34,7 +34,8 @@ function update_siggb!(basis::Basis,
                 # mark input element as redundant
                 basis.is_red[new_idx] = true
             elseif gettag(tags, new_idx) == :split
-                push!(syz_queue, new_sig)
+                check_flags = falses(ind_order.max_ind)
+                push!(syz_queue, (basis.syz_load+1, check_flags))
             end
 
             process_syzygy!(basis, basis_ht, pairset, new_sig, new_sig_mask,
@@ -203,23 +204,16 @@ function process_syzygy!(basis::Basis{N},
 
         # sig index for cofactor
         ind = ind_order.max_ind + one(SigIndex)
-        ind_order.max_ind = ind
 
         # update index order
         col_inds = findall(tag -> tag == :col, tags)
         filter!(col_ind -> ind_order.ord[col_ind] > ind_order.ord[new_idx], col_inds)
         if !isempty(col_inds)
-            min_larger_ind, _ = findmin(col_ind -> ind_order.ord[col_ind], col_inds)
-            @inbounds for i in eachindex(ind_order.ord)
-                ord_i = ind_order.ord[i]
-                if ord_i >= min_larger_ind
-                    ind_order.ord[i] += one(SigIndex)
-                end
-            end
-            push!(ind_order.ord, min_larger_ind)
+            ord_ind, _ = findmin(col_ind -> ind_order.ord[col_ind], col_inds)
         else
-            push!(ind_order.ord, ind)
+            ord_ind = ind
         end
+        ins_index!(ind_order, ord_ind)
 
         # update tags
         tags[ind] = :colins
@@ -382,6 +376,18 @@ function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
 end
 
+# insert new index
+function ins_index!(ind_order::IndOrder,
+                    new_ord_ind::SigIndex)
+
+    @inbounds for i in eachindex(ind_order)
+        if ind_order.ord[i] >= new_ord_ind
+            ind_order.ord[i] += one(SigIndex)
+        end
+    end
+    push!(ind_order.ord, new_ord_ind)
+    ind_order.max_ind += 1
+end
 
 # remove pairs that are rewriteable
 function remove_red_pairs!(pairset::Pairset)
