@@ -38,7 +38,8 @@ function update_siggb!(basis::Basis,
                 push!(syz_queue, (basis.syz_load+1, check_flags))
             end
 
-            process_syzygy!(basis, basis_ht, pairset, new_sig, new_sig_mask,
+            process_syzygy!(basis, basis_ht, pairset, new_sig,
+                            new_sig_mask,
                             tags, ind_order, tr, vchar)
         else
             new_basis_c += 1
@@ -167,6 +168,9 @@ function process_syzygy!(basis::Basis{N},
     basis.syz_masks[l] = new_sig_mask
     basis.syz_load += 1
 
+    # add info to tracer
+    push!(tr.syz_ind_to_mat, length(tr.mats)) 
+
     # kill pairs with known syz signature
     @inbounds for j in 1:pairset.load
         p = pairset.elems[j]
@@ -188,9 +192,13 @@ function process_syzygy!(basis::Basis{N},
         @info "inserting cofactor from colon ideal computation"
         # construct cofactor of zero reduction and ins in hashtable
         mat_ind = length(tr.mats)
-        cofac_coeffs, cofac_mons = construct_module(new_sig, basis, mat_ind, tr, vchar,
-                                                    ind_order.max_ind, ind_order, new_idx)[new_idx]
-        cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
+        cofac_coeffs, cofac_mons = construct_module(new_sig, basis,
+                                                    mat_ind, tr,
+                                                    vchar,
+                                                    ind_order.max_ind,
+                                                    ind_order, new_idx)[new_idx]
+        cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon)
+                             for mon in cofac_mons]
 
         # normalize coefficients
         inver = inv(first(cofac_coeffs), vchar)
@@ -207,7 +215,8 @@ function process_syzygy!(basis::Basis{N},
 
         # update index order
         col_inds = findall(tag -> tag == :col, tags)
-        filter!(col_ind -> ind_order.ord[col_ind] > ind_order.ord[new_idx], col_inds)
+        filter!(col_ind -> ind_order.ord[col_ind] > ind_order.ord[new_idx],
+                col_inds)
         if !isempty(col_inds)
             ord_ind, _ = findmin(col_ind -> ind_order.ord[col_ind], col_inds)
         else
@@ -224,7 +233,7 @@ function process_syzygy!(basis::Basis{N},
         end
         lm = first(cofac_mons)
         lm_divm = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
-        add_input_element!(basis, pairset, ind, cofac_mons_hashed,
+        add_input_element!(basis, ind, cofac_mons_hashed,
                            cofac_coeffs, lm_divm, lm)
     end
 end
@@ -380,7 +389,7 @@ end
 function ins_index!(ind_order::IndOrder,
                     new_ord_ind::SigIndex)
 
-    @inbounds for i in eachindex(ind_order)
+    @inbounds for i in eachindex(ind_order.ord)
         if ind_order.ord[i] >= new_ord_ind
             ind_order.ord[i] += one(SigIndex)
         end
@@ -445,7 +454,9 @@ function make_room_new_input_el!(basis::Basis,
 
         # adjusts rewrite nodes at the start
         for i in 1:basis.input_load
-            basis.rewrite_nodes[i+1][3] += shift
+            if basis.rewrite_nodes[i+1][1] >= 0
+                basis.rewrite_nodes[i+1][3] += shift
+            end
         end
 
         for i in basis.basis_load:-1:basis.basis_offset

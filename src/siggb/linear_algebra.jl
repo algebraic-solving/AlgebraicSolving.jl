@@ -238,7 +238,7 @@ end
 function new_tracer()
     mats = TracerMatrix[]
     basis_ind_to_mat = Vector{Int}(undef, init_basis_size)
-    syz_ind_to_mat = Vector{Int}(undef, init_syz_size)
+    syz_ind_to_mat = Int[]
     return Tracer(mats, basis_ind_to_mat,
                   syz_ind_to_mat, 0,
                   init_basis_size)

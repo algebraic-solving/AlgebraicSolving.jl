@@ -117,7 +117,6 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
     # data structure setup/conversion
     sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
     
-
     # fill basis, pairset, tags
     basis = fill_basis!(sys_mons, sys_coeffs, basis_ht)
     nv = ngens(parent(first(sys)))
@@ -184,7 +183,7 @@ function siggb!(basis::Basis{N},
     tr = new_tracer()
 
     # fake syz queue
-    syz_queue = Int[]
+    syz_queue = Tuple{Int, BitVector}[]
 
     # sum of degrees of nonzero conditions
     nz_deg = zero(Exp)
@@ -244,8 +243,7 @@ function sig_decomp!(basis::Basis{N},
         zd_mons, zd_ind, syz_finished = siggb_for_split!(bs, ps,
                                                          tgs, ind_ord,
                                                          basis_ht, char,
-                                                         shift,
-                                                         allowed_codim)
+                                                         shift)
         if isempty
             @info "empty/superflous component"
             @info "------------------------------------------"
@@ -253,9 +251,10 @@ function sig_decomp!(basis::Basis{N},
         end
         if found_zd
             @info "splitting component"
-            bs1, ps1, tgs1, ind_ord1
+            bs1, ps1, tgs1, ind_ord1,
             bs2, ps2, tgs2, ind_ord2 = split!(bs, basis_ht, zd_mons,
                                               zd_coeffs, zd_ind, tgs,
+                                              ind_ord,
                                               syz_finished)
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2))
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1))
@@ -274,8 +273,7 @@ function siggb_for_split!(basis::Basis{N},
                           ind_order::IndOrder,
                           basis_ht::MonomialHashtable,
                           char::Val{Char},
-                          shift::Val{Shift},
-                          allowed_codim::Int) where {N, Char, Shift}
+                          shift::Val{Shift}) where {N, Char, Shift}
 
     # tracer
     tr = new_tracer()
@@ -283,6 +281,10 @@ function siggb_for_split!(basis::Basis{N},
     # syz queue
     syz_queue = Tuple{Int, BitVector}[]
     syz_finished = collect(1:basis.syz_load)
+
+    # nonzero degree
+    deg_nz = Exp(sum([basis.degs[i] for i in 1:basis.input_load
+                      if gettag(tags, SigIndex(i)) == :col]))
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -303,7 +305,7 @@ function siggb_for_split!(basis::Basis{N},
         added_unit = update_siggb!(basis, matrix, pairset,
                                    symbol_ht, basis_ht,
                                    ind_order, tags,
-                                   tr, char)
+                                   tr, char, syz_queue)
 
         # return if a unit was added
         if added_unit
@@ -312,13 +314,13 @@ function siggb_for_split!(basis::Basis{N},
         end
 
         # check to see if we can split with one of the syzygies
-        sort!(syz_queue, by = ((i, _),) -> basis.sigs[i].deg)
+        sort!(syz_queue, by = sz -> monomial(basis.sigs[first(sz)]).deg)
         # big membership check
         does_split, cofac_coeffs, cofac_mons_hashed,
         cofac_ind = process_syz_for_split!(syz_queue, syz_finished,
                                            basis_ht, basis, tr,
                                            ind_order, tags, shift,
-                                           char, deg)
+                                           char, deg, deg_nz)
 
         if does_split
             return true, false, cofac_coeffs,
@@ -328,9 +330,10 @@ function siggb_for_split!(basis::Basis{N},
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
     does_split, cofac_coeffs, cofac_mons_hashed,
-    cofac_ind = process_syz_for_split!(syz_queue, syz_finished, nz_mons, nz_coeffs,
-                                       basis_ht, basis, tr, ind_order, tags, shift,
-                                       char, zero(Exp))
+    cofac_ind = process_syz_for_split!(syz_queue, syz_finished,
+                                       basis_ht, basis, tr,
+                                       ind_order, tags, shift,
+                                       char, zero(Exp), deg_nz)
 
     if does_split
         return true, false, cofac_coeffs, cofac_mons_hashed,
@@ -347,7 +350,7 @@ function split!(basis::Basis{N},
                 zd_ind::SigIndex,
                 tags::Tags,
                 ind_order::IndOrder,
-                known_syz::Vector{<:Sig}) where N
+                known_syz::Vector{Int}) where N
 
 
     @inbounds begin
@@ -358,7 +361,7 @@ function split!(basis::Basis{N},
         
         # find out where to insert zero divisor
         zd_deg = basis_ht.exponents[first(cofac_mons)].deg
-        split_inds = filter(ind -> gettag(tags, ind) == :split,
+        split_inds = filter(ind -> gettag(tags, SigIndex(ind)) == :split,
                             1:basis.input_load)
         filter!(ind -> basis.degs[ind] > zd_deg, split_inds)
         if isempty(split_inds)
@@ -381,7 +384,7 @@ function split!(basis::Basis{N},
         ps1 = init_pairset(Val(N))
         @inbounds for i in 1:basis1.input_load
             gettag(tags, SigIndex(i)) == :colins && continue
-            add_unit_pair!(basis, ps1, i, basis1.degs[i])
+            add_unit_pair!(basis1, ps1, i, basis1.degs[i])
         end
         
         # add trivializing syzygies
@@ -396,10 +399,8 @@ function split!(basis::Basis{N},
         # 2nd component
         sys2_mons = copy(basis.monomials[1:basis.input_load])
         sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
-        deleteat!(sys2_mons, zd_ind)
-        deleteat!(sys2_coeffs, zd_ind)
-        ind_ord2 = deep_copy(ind_order)
-        deleteat!(ind_ord2, zd_ind)
+        ind_ord2 = deepcopy(ind_order)
+        ins_index!(ind_ord2, ind_ord2.max_ind + one(SigIndex))
 
         # append zd as nonzero condition
         push!(sys2_mons, copy(cofac_mons))
@@ -408,10 +409,14 @@ function split!(basis::Basis{N},
         # build basis/pairset/tags for second new system
         basis2 = fill_basis!(sys2_mons, sys2_coeffs,
                              basis_ht)
+        tags2 = copy(tags)
+        tags2[basis2.input_load] = :col
+        
         ps2 = init_pairset(Val(N))
         @inbounds for i in 1:basis2.input_load
             gettag(tags, SigIndex(i)) == :colins && continue
-            add_unit_pair!(basis, ps2, i, basis2.degs[i])
+            i == zd_ind && continue
+            add_unit_pair!(basis2, ps2, i, basis2.degs[i])
         end
     end
 
@@ -930,3 +935,24 @@ function _convert_basis_to_msolve(basis::Basis,
 
     return lens, ms_cfs, ms_exps
 end
+
+# for debugging
+function print_sequence(basis::Basis{N},
+                        basis_ht::MonomialHashtable,
+                        ind_order::IndOrder,
+                        tags::Tags) where {N, Char}
+
+    R, _ = polynomial_ring(QQ, ["x$i" for i in 1:N])
+    inds = sort(collect(1:basis.input_load), by = i -> ind_order.ord[i])
+    for i in inds
+        mns_hsh = basis.monomials[i]
+        mns = [basis_ht.exponents[m] for m in mns_hsh]
+        cfs = basis.coefficients[i]
+        p = convert_to_pol(R, mns, cfs)
+        println("$p ------> $(gettag(tags, SigIndex(i))), $i, $(index(basis.sigs[i]))")
+    end
+    println(basis.rewrite_nodes[1])
+    println(basis.degs)
+    println("----")
+end
+        

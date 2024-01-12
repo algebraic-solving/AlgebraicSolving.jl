@@ -199,7 +199,7 @@ function symbolic_pp!(basis::Basis{N},
         @label target
         # find element in basis which divmask divides divmask of monomial
         @inbounds while j <= basis.basis_load && !basis.is_red[j] && !divch(basis.lm_masks[j], divm)
-            j += 1 
+            j += 1
         end
 
         if j <= basis.basis_load
