@@ -169,11 +169,6 @@ function echelonize!(matrix::MacaulayMatrix,
         @info "$(arit_ops) submul's"
     end
 
-    if !is_triangular(matrix)
-        print(matrix)
-        error("not triangular")
-    end
-
     return tr_mat
 end
 

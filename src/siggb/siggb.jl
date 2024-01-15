@@ -363,11 +363,12 @@ function split!(basis::Basis{N},
         zd_deg = basis_ht.exponents[first(cofac_mons)].deg
         split_inds = filter(ind -> gettag(tags, SigIndex(ind)) == :split,
                             1:basis.input_load)
-        filter!(ind -> basis.degs[ind] > zd_deg, split_inds)
-        if isempty(split_inds)
-            ins_ind = last(split_inds) + one(SigIndex)
+        split_inds_deg_geq = filter(ind -> basis.degs[ind] > zd_deg, split_inds)
+        if isempty(split_inds_deg_geq)
+            ins_ind, _ = findmax(ind -> ind_order.ord[ind], split_inds)
+            ins_ind += one(SigIndex)
         else
-            ins_ind, _ = findmin(ind -> ind_order.ord[ind], split_inds)
+            ins_ind, _ = findmin(ind -> ind_order.ord[ind], split_inds_deg_geq)
         end
         ind_ord1 = deepcopy(ind_order)
         ins_index!(ind_ord1, ins_ind)
@@ -472,7 +473,7 @@ function process_syz_for_split!(syz_queue::Vector{Tuple{Int, BitVector}},
                         continue
                     end
                     cofac_ind = SigIndex(j)
-                    mod_rep = construct_module(syz_sig, basis, tr_ind,
+                    mod_rep = construct_module((syz_ind, syz_mon), basis, tr_ind,
                                                tr, char,
                                                ind_order.max_ind,
                                                ind_order, cofac_ind)
@@ -498,7 +499,7 @@ function process_syz_for_split!(syz_queue::Vector{Tuple{Int, BitVector}},
                         break
                     end
                 end
-                if all(check_flags[j])
+                if all(check_flags)
                     push!(syz_finished, idx)
                     push!(to_del, i)
                     continue

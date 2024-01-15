@@ -476,7 +476,7 @@ function make_room_new_input_el!(basis::Basis,
             if rnodes[2] >= old_offset + 1
                 rnodes[2] += shift
             end
-            for j in 3:rnodes[1]
+            for j in 3:3+rnodes[1]
                 rnodes[j] += shift
             end
             basis.rewrite_nodes[i+1] = rnodes
