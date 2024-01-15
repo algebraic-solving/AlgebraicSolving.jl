@@ -74,6 +74,7 @@ function my_iszero_normal_form(mons::Vector{Monomial{N}},
                                coeffs::Vector{Coeff},
                                basis::Basis,
                                basis_ht::MonomialHashtable,
+                               tags::Tags,
                                char::Val{Char}) where {N, Char}
     
 
@@ -86,7 +87,9 @@ function my_iszero_normal_form(mons::Vector{Monomial{N}},
 
     #= first get a degree reverse lexicographical Gröbner basis for I =#
     G0 = [convert_to_pol(R, [basis_ht.exponents[midx] for midx in basis.monomials[i]],
-                         basis.coefficients[i]) for i in basis.basis_offset:basis.basis_load]
+                         basis.coefficients[i])
+          for i in basis.basis_offset:basis.basis_load
+          if gettag(tags, index(basis.sigs[i])) != :col]
     G = groebner_basis(Ideal(G0), complete_reduction = true)
     # G = G0
 

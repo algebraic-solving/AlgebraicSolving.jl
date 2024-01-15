@@ -10,7 +10,7 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       syz_queue::Vector{Tuple{Int, BitVector}}) where {N, Char}
+                       syz_queue::Vector{Int}) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
@@ -31,11 +31,13 @@ function update_siggb!(basis::Basis,
 
             # check if syzygy could be interesting to split with
             if all(iszero, new_sig_mon.exps)
+                if gettag(tags, new_idx) == :col
+                    return true
+                end
                 # mark input element as redundant
                 basis.is_red[new_idx] = true
             elseif gettag(tags, new_idx) == :split
-                check_flags = falses(ind_order.max_ind)
-                push!(syz_queue, (basis.syz_load+1, check_flags))
+                push!(syz_queue, basis.syz_load+1)
             end
 
             process_syzygy!(basis, basis_ht, pairset, new_sig,
@@ -229,7 +231,7 @@ function process_syzygy!(basis::Basis{N},
 
         # add cofactor to input sequence
         if basis.input_load == basis.input_size
-            make_room_new_input_el!(basis, tr)
+            make_room_new_input_el!(basis, pairset, tr)
         end
         lm = first(cofac_mons)
         lm_divm = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
@@ -359,8 +361,8 @@ function leading_monomial(basis::Basis,
     return basis_ht.exponents[first(basis.monomials[i])]
 end
 
-function gettag(tags::Tags, i::SigIndex)
-    return get(tags, i, :seq)
+function gettag(tags::Tags, i::Integer)
+    return get(tags, SigIndex(i), :seq)
 end
 
 function dont_build_pair(ind1::SigIndex, ind2::SigIndex,
@@ -431,6 +433,7 @@ function resize_syz!(basis::Basis)
 end
 
 function make_room_new_input_el!(basis::Basis,
+                                 pairset::Pairset,
                                  tr::Tracer)
 
     # this whole block just shifts the basis to the right
@@ -489,6 +492,17 @@ function make_room_new_input_el!(basis::Basis,
                 if v[2] >= old_offset
                     mat.rows[i] = (v[1], v[2] + shift)
                 end
+            end
+        end
+
+        # adjust pairset
+        for i in 1:pairset.load
+            p = pairset.elems[i]
+            if p.top_index >= old_offset
+                pairset.elems[i].top_index += shift
+            end
+            if p.bot_index >= old_offset
+                pairset.elems[i].bot_index += shift
             end
         end
     end

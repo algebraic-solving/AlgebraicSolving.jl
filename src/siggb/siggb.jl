@@ -260,6 +260,10 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1))
         else
             @info "finished component"
+            # if !_is_gb(bs, basis_ht, tgs, char)
+            #     print_sequence(bs, basis_ht, ind_ord, tgs)
+            #     error("no gb")
+            # end
             push!(result, (bs, tgs))
         end
         @info "------------------------------------------"
@@ -279,7 +283,7 @@ function siggb_for_split!(basis::Basis{N},
     tr = new_tracer()
 
     # syz queue
-    syz_queue = Tuple{Int, BitVector}[]
+    syz_queue = Int[]
     syz_finished = collect(1:basis.syz_load)
 
     # nonzero degree
@@ -314,7 +318,7 @@ function siggb_for_split!(basis::Basis{N},
         end
 
         # check to see if we can split with one of the syzygies
-        sort!(syz_queue, by = sz -> monomial(basis.sigs[first(sz)]).deg)
+        sort!(syz_queue, by = sz -> monomial(basis.sigs[sz]).deg)
         # big membership check
         does_split, cofac_coeffs, cofac_mons_hashed,
         cofac_ind = process_syz_for_split!(syz_queue, syz_finished,
@@ -428,16 +432,15 @@ function split!(basis::Basis{N},
         ps2 = init_pairset(Val(N))
         @inbounds for i in 1:basis2.input_load
             gettag(tags, SigIndex(i)) == :colins && continue
-            i == zd_ind && continue
             add_unit_pair!(basis2, ps2, i, basis2.degs[i])
         end
     end
-
+    
     return basis1, ps1, tags1, ind_ord1,
            basis2, ps2, tags2, ind_ord2
 end    
 
-function process_syz_for_split!(syz_queue::Vector{Tuple{Int, BitVector}},
+function process_syz_for_split!(syz_queue::Vector{Int},
                                 syz_finished::Vector{Int},
                                 basis_ht::MonomialHashtable,
                                 basis::Basis{N},
@@ -450,13 +453,27 @@ function process_syz_for_split!(syz_queue::Vector{Tuple{Int, BitVector}},
                                 deg_nz::Exp) where {Shift, Char, N}
     
     @info "checking known syzygies"
+    found_zd = false
+    zd_coeffs = Coeff[]
+    zd_mons = Monomial{N}[]
+    zd_mons_hashed = MonIdx[]
+    zd_ind = zero(SigIndex)
+    
     to_del = Int[]
-    @inbounds for (i, (idx, check_flags)) in enumerate(syz_queue)
+    @inbounds for (i, idx) in enumerate(syz_queue)
         syz_mask = basis.syz_masks[idx]
         syz_mon = basis.syz_sigs[idx]
         syz_ind = index(syz_mask)
+
+        # compute maximum NF degree to check
         tot_deg = syz_mon.deg + basis.degs[syz_ind]
-        if iszero(deg) || syz_mon.deg + deg_nz <= deg
+        split_inds = (SigIndex).(filter(ind -> gettag(tags, ind) == :split,
+                                        1:basis.input_load))
+        filter!(ind -> ind_order.ord[ind] <= ind_order.ord[syz_ind], split_inds) 
+        max_nf_deg = tot_deg - minimum(ind -> basis.degs[ind], split_inds)
+
+        if iszero(deg) || max_nf_deg + deg_nz <= deg
+            push!(to_del, i)
             
             # membership check with leading monomials and signature
             does_div = false
@@ -472,27 +489,14 @@ function process_syz_for_split!(syz_queue::Vector{Tuple{Int, BitVector}},
 
             # full membership check
             if does_div
-                cofac_coeffs = Coeff[]
-                cofac_mons = Monomial{N}[]
-                for (j, cf) in enumerate(check_flags)
-                    cf && continue
-                    if ind_order.ord[j] > ind_order.ord[syz_ind]
-                        check_flags[j] = true
-                        continue
-                    end
-                    cofac_deg = tot_deg - basis.degs[j]
-                    if !iszero(deg) && cofac_deg + deg_nz > deg
-                        continue
-                    end
-                    cofac_ind = SigIndex(j)
+                for cofac_ind in split_inds
                     mod_rep = construct_module((syz_ind, syz_mon), basis, tr_ind,
                                                tr, char,
                                                ind_order.max_ind,
                                                ind_order, cofac_ind)
-                    cofac_mons, cofac_coeffs = mod_rep[j][2],
-                                               mod_rep[j][1]
+                    cofac_mons, cofac_coeffs = mod_rep[cofac_ind][2],
+                                               mod_rep[cofac_ind][1]
                     if isempty(cofac_coeffs)
-                        check_flags[j] = true
                         continue
                     end
                     @info "checking normal form"
@@ -504,53 +508,49 @@ function process_syz_for_split!(syz_queue::Vector{Tuple{Int, BitVector}},
                                                           tags, shift,
                                                           char)
                     if isempty(cofac_mons)
-                        check_flags[i] = true
                         continue
                     else
-                        push!(to_del, i)
+                        found_zd = true
+                        zd_coeffs, zd_mons = cofac_coeffs, cofac_mons
+                        zd_ind = cofac_ind
                         break
                     end
                 end
-                if all(check_flags)
-                    push!(syz_finished, idx)
-                    push!(to_del, i)
-                    continue
-                end
             else
-                push!(to_del, i)
-                cofac_coeffs, cofac_mons = construct_module((syz_ind,
-                                                             syz_mon),
-                                                            basis,
-                                                            tr_ind,
-                                                            tr, char,
-                                                            ind_order.max_ind,
-                                                            ind_order,
-                                                            syz_ind)[syz_ind]
-                cofac_ind = syz_ind
+                @info "membership check passed"
+                found_zd = true
+                zd_coeffs, zd_mons = construct_module((syz_ind,
+                                                       syz_mon),
+                                                      basis,
+                                                      tr_ind,
+                                                      tr, char,
+                                                      ind_order.max_ind,
+                                                      ind_order,
+                                                      syz_ind)[syz_ind]
+                zd_ind = syz_ind
+                break
             end
-            
-            @info "membership check passed"
-
-            # normalize cofac coefficients
-            inver = inv(first(cofac_coeffs), char)
-            @inbounds for i in eachindex(cofac_coeffs)
-                if isone(i)
-                    cofac_coeffs[i] = one(Coeff)
-                    continue
-                end
-                cofac_coeffs[i] = mul(inver, cofac_coeffs[i], char)
-            end
-
-            cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon)
-                                 for mon in cofac_mons]
-            deleteat!(syz_queue, to_del)
-            return true, cofac_coeffs, cofac_mons_hashed, cofac_ind
-        else
-            return false, Coeff[], MonIdx[], zero(SigIndex)
         end
     end
     deleteat!(syz_queue, to_del)
-    return false, Coeff[], MonIdx[], zero(SigIndex)
+            
+    if found_zd
+        # normalize cofac coefficients
+        inver = inv(first(zd_coeffs), char)
+        @inbounds for i in eachindex(zd_coeffs)
+            if isone(i)
+                zd_coeffs[i] = one(Coeff)
+                continue
+            end
+            zd_coeffs[i] = mul(inver, zd_coeffs[i], char)
+        end
+
+        # hash cofac mons
+        zd_mons_hashed = [insert_in_hash_table!(basis_ht, mon)
+                          for mon in zd_mons]
+    end
+
+    return found_zd, zd_coeffs, zd_mons_hashed, zd_ind
 end
 
 #---------------- functions for setting up data structures --------------------#
@@ -784,15 +784,35 @@ function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
 end
 
 # test against msolve
-function _is_gb(gb::Vector{Tuple{Tuple{Int, P}, P}}) where {P <: MPolyRingElem}
-    gb_pols = [p[2] for p in gb]
+function _is_gb(gb::Vector{P}) where {P <: MPolyRingElem}
+    gb_pols = gb
     gb_msolve = groebner_basis(Ideal(gb_pols), complete_reduction = true)
     
     lms_gb = (Nemo.leading_monomial).(gb_pols)
     lms_msolve = (Nemo.leading_monomial).(gb_msolve)
+    println(gb)
+    println(gb_msolve)
     res1 = all(u -> any(v -> divides(u, v)[1], lms_gb), lms_msolve)
     res2 = all(u -> any(v -> divides(u, v)[1], lms_msolve), lms_gb)
     return res1 && res2
+end
+
+function _is_gb(gb::Vector{Tuple{Tuple{Int, P}, P}}) where {P <: MPolyRingElem}
+    gb_pols = [p[2] for p in gb]
+    return _is_gb(gb_pols)
+end
+
+function _is_gb(basis::Basis{N}, basis_ht::MonomialHashtable,
+                tags::Tags, char::Val{Char}) where {N, Char}
+    
+    R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
+                             ordering = :degrevlex)
+    G0 = [convert_to_pol(R, [basis_ht.exponents[midx]
+                             for midx in basis.monomials[i]],
+                         basis.coefficients[i])
+          for i in basis.basis_offset:basis.basis_load
+          if gettag(tags, index(basis.sigs[i])) != :col]
+    return _is_gb(G0)
 end
 
 # compute dimension
@@ -963,7 +983,7 @@ function print_sequence(basis::Basis{N},
         cfs = basis.coefficients[i]
         sig = basis.sigs[i]
         p = convert_to_pol(R, mns, cfs)
-        println("$(first(exponent_vectors((p)))) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i])))")
+        println("$(first(exponent_vectors((p)))) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i]))), $(basis.degs[i])")
     end
     println("----")
 end
