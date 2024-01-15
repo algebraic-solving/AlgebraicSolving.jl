@@ -84,8 +84,8 @@ function add_basis_elem!(basis::Basis{N},
     lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
     s = new_sig
 
-    # check if we're adding a power of the homogenizing variable
-    if length(row) == 1 && all(iszero, lm.exps[1:N-1])
+    # check if we're adding a unit
+    if length(row) == 1 && all(iszero, lm.exps)
         return true
     end
 
@@ -211,7 +211,7 @@ function process_syzygy!(basis::Basis{N},
         end
 
         # sig index for cofactor
-        ind = ind_order.max_ind + one(SigIndex)
+        ind = SigIndex(basis.input_load + 1)
 
         # update index order
         col_inds = findall(tag -> tag == :col, tags)

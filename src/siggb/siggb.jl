@@ -381,7 +381,7 @@ function split!(basis::Basis{N},
         basis1 = fill_basis!(sys1_mons, sys1_coeffs,
                              basis_ht)
         tags1 = copy(tags)
-        tags1[ind_ord1.max_ind] = :split
+        tags1[basis1.input_load] = :split
         ps1 = init_pairset(Val(N))
         @inbounds for i in 1:basis1.input_load
             gettag(tags, SigIndex(i)) == :colins && continue
@@ -400,19 +400,31 @@ function split!(basis::Basis{N},
         # 2nd component
         sys2_mons = copy(basis.monomials[1:basis.input_load])
         sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
+        deleteat!(sys2_mons, zd_ind)
+        deleteat!(sys2_coeffs, zd_ind)
         ind_ord2 = deepcopy(ind_order)
-        ins_index!(ind_ord2, ind_ord2.max_ind + one(SigIndex))
+        deleteat!(ind_ord2.ord, zd_ind)
 
         # append zd as nonzero condition
+        ins_index!(ind_ord2, ind_ord2.max_ind + one(SigIndex))
         push!(sys2_mons, copy(cofac_mons))
         push!(sys2_coeffs, copy(cofac_coeffs))
 
-        # build basis/pairset/tags for second new system
+        # build basis/pairset for second new system
         basis2 = fill_basis!(sys2_mons, sys2_coeffs,
                              basis_ht)
-        tags2 = copy(tags)
+
+        # new tags
+        tags2 = Tags() 
+        for k in keys(tags)
+            if k > zd_ind
+                tags2[k-1] = tags[k]
+            elseif k < zd_ind
+                tags2[k] = tags[k]
+            end
+        end
         tags2[basis2.input_load] = :col
-        
+
         ps2 = init_pairset(Val(N))
         @inbounds for i in 1:basis2.input_load
             gettag(tags, SigIndex(i)) == :colins && continue
@@ -949,11 +961,10 @@ function print_sequence(basis::Basis{N},
         mns_hsh = basis.monomials[i]
         mns = [basis_ht.exponents[m] for m in mns_hsh]
         cfs = basis.coefficients[i]
+        sig = basis.sigs[i]
         p = convert_to_pol(R, mns, cfs)
-        println("$p ------> $(gettag(tags, SigIndex(i))), $i, $(index(basis.sigs[i]))")
+        println("$(first(exponent_vectors((p)))) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i])))")
     end
-    println(basis.rewrite_nodes[1])
-    println(basis.degs)
     println("----")
 end
         

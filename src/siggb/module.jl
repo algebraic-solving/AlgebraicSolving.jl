@@ -93,9 +93,6 @@ function construct_module(sig::Sig{N},
         mul_by_coeff!(res_i_coeffs, diag_coeff, vchar)
     end
 
-    if haskey(mod_cache, sig)
-        @assert mod_cache[sig] == res
-    end
     mod_cache[sig] = res
     return res
 end

@@ -158,7 +158,8 @@ function symbolic_pp!(basis::Basis{N},
                       ht::MonomialHashtable,
                       symbol_ht::MonomialHashtable,
                       ind_order::IndOrder,
-                      tags::Tags) where N
+                      tags::Tags;
+                      forbidden_tag=:none::Symbol) where N
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
@@ -210,7 +211,18 @@ function symbolic_pp!(basis::Basis{N},
                 j += 1
                 @goto target
             end
-            # found_reducer = true
+
+            cand_sig = basis.sigs[j]
+            mul_cand_sig = (index(cand_sig),
+                            mul(monomial(mult2), monomial(cand_sig)))
+            cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
+                                    ht.ndivbits)
+
+            # dont reduce by nz conditions in NF computation
+            if gettag(tags, index(mul_cand_sig)) == forbidden_tag
+                j += 1
+                @goto target
+            end
 
             # check if new reducer sig is smaller than possible previous
             if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig, ind_order)
@@ -219,11 +231,6 @@ function symbolic_pp!(basis::Basis{N},
             end
 
             # check if reducer is rewriteable
-            cand_sig = basis.sigs[j]
-            mul_cand_sig = (index(cand_sig),
-                            mul(monomial(mult2), monomial(cand_sig)))
-            cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
-                                    ht.ndivbits)
             if rewriteable(basis, ht, j, mul_cand_sig, cand_sig_mask,
                            ind_order, tags)
                 j += 1

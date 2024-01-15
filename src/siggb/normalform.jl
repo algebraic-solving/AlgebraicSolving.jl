@@ -22,9 +22,10 @@ function normalform(exps::Vector{Monomial{N}},
     @inbounds matrix.parent_inds[1] = 0
     matrix.nrows = 1
 
-    symbolic_pp!(basis, matrix, basis_ht, symbol_ht, ind_order, tags)
-    @assert sig_ind == length(ind_order.ord) + 1
-    push!(ind_order.ord, sig_ind)
+    symbolic_pp!(basis, matrix, basis_ht, symbol_ht, ind_order, tags,
+                 forbidden_tag = :col)
+
+    push!(ind_order.ord, ind_order.max_ind + one(SigIndex))
     finalize_matrix!(matrix, symbol_ht, ind_order)
     pop!(ind_order.ord)
 
