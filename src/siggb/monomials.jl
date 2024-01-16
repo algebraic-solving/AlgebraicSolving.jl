@@ -82,6 +82,14 @@ function cmp_ind(ind1::SigIndex, ind2::SigIndex,
     return ord_ind1 <= ord_ind2
 end
 
+function are_incompat(ind1::SigIndex, ind2::SigIndex,
+                      ind_order::IndOrder)
+
+    ind1 == ind2 && return false
+    k = ind1 < ind2 ? (ind1, ind2) : (ind2, ind1)
+    return get(ind_order.incompat, k, false)
+end
+
 function lt_pot(a::Sig, b::Sig,
                 ind_order::IndOrder)
     if index(a) == index(b)

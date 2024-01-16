@@ -133,6 +133,7 @@ end
 # For Index ordering
 mutable struct IndOrder
     ord::Vector{SigIndex}
+    incompat::Dict{Tuple{SigIndex, SigIndex}, Bool}
     max_ind::SigIndex
 end
 

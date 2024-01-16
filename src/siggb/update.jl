@@ -222,9 +222,10 @@ function process_syzygy!(basis::Basis{N},
         if !isempty(col_inds)
             ord_ind, _ = findmin(col_ind -> ind_order.ord[col_ind], col_inds)
         else
-            ord_ind = ind
+            ord_ind = ind_order.max_ind + one(SigIndex)
         end
         ins_index!(ind_order, ord_ind)
+        ind_order.incompat[(new_idx, ind)] = true
 
         # update tags
         tags[ind] = :colins
@@ -233,10 +234,15 @@ function process_syzygy!(basis::Basis{N},
         if basis.input_load == basis.input_size
             make_room_new_input_el!(basis, pairset, tr)
         end
+
         lm = first(cofac_mons)
+        print_sequence(basis, basis_ht, ind_order, tags)
+        println("$(lm.exps), $(Int(new_idx))")
         lm_divm = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
         add_input_element!(basis, ind, cofac_mons_hashed,
                            cofac_coeffs, lm_divm, lm)
+        add_unit_pair!(basis, pairset, ind, lm.deg)
+        print_sequence(basis, basis_ht, ind_order, tags)
     end
 end
 
@@ -297,8 +303,7 @@ function update_pairset!(pairset::Pairset{N},
         basis_sig_idx = index(basis.sigs[i])
         # dont build some pairs if one of the elements is inserted
         # during colon ideal computation
-        dont_build_pair(new_sig_idx, basis_sig_idx, tags, ind_order) && continue
-        dont_build_pair(basis_sig_idx, new_sig_idx, tags, ind_order) && continue
+        are_incompat(new_sig_idx, basis_sig_idx, ind_order) && continue
 
         basis_lm = leading_monomial(basis, basis_ht, i)
         mult_new_elem = lcm_div(new_lm, basis_lm)
@@ -309,6 +314,11 @@ function update_pairset!(pairset::Pairset{N},
 
         new_pair_sig = (new_sig_idx, new_pair_sig_mon)
         basis_pair_sig = (basis_sig_idx, basis_pair_sig_mon)
+
+        new_sig_is_smaller = lt_pot(new_pair_sig, basis_pair_sig, ind_order)
+
+        top_idx = new_sig_is_smaller ? basis_sig_idx : new_sig_idx
+        gettag(tags, top_idx) == :colins && continue
         
         # check if S-pair is singular
         new_pair_sig == basis_pair_sig && continue
@@ -334,12 +344,12 @@ function update_pairset!(pairset::Pairset{N},
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin
-	    if lt_pot(basis_pair_sig, new_pair_sig, ind_order)
-                new_pair_sig, new_pair_sig_mask, new_basis_idx,
-                basis_pair_sig, basis_pair_sig_mask, i
-            else
+	    if new_sig_is_smaller
                 basis_pair_sig, basis_pair_sig_mask, i,
                 new_pair_sig, new_pair_sig_mask, new_basis_idx
+            else
+                new_pair_sig, new_pair_sig_mask, new_basis_idx,
+                basis_pair_sig, basis_pair_sig_mask, i
             end 
         end
         
@@ -363,23 +373,6 @@ end
 
 function gettag(tags::Tags, i::Integer)
     return get(tags, SigIndex(i), :seq)
-end
-
-function dont_build_pair(ind1::SigIndex, ind2::SigIndex,
-                         tags::Tags, ind_order::IndOrder)
-
-    tag1 = gettag(tags, ind1)
-    tag2 = gettag(tags, ind2)
-
-    tag1 == tag2 == :col && return true
-
-    if tag1 == :colins
-        ind1 == ind2 && return true
-        if cmp_ind(ind2, ind1, ind_order)
-            return true
-        end
-    end
-    return false
 end
 
 function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)

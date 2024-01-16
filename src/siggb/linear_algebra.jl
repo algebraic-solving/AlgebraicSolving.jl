@@ -1,5 +1,6 @@
 function echelonize!(matrix::MacaulayMatrix,
                      tags::Tags,
+                     ind_order::IndOrder,
                      char::Val{Char},
                      shift::Val{Shift};
                      trace::Bool=true) where {Char, Shift}
@@ -69,14 +70,8 @@ function echelonize!(matrix::MacaulayMatrix,
             if !iszero(pividx) && rev_sigorder[pividx] < i
                 row_sig_ind = index(row_sig)
                 piv_sig_ind = index(matrix.sigs[pividx])
-                row_tag = gettag(tags, row_sig_ind)
-                piv_tag = gettag(tags, piv_sig_ind)
-                if row_tag == :colins
-                    does_red = piv_tag == :colins
-                    does_red && break
-                elseif row_tag == :col
-                    does_red = piv_tag != :col
-                    does_red && break
+                if are_incompat(row_sig_ind, piv_sig_ind, ind_order)
+                    continue
                 else
                     does_red = true
                     break
