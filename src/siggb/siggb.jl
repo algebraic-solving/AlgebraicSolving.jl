@@ -183,7 +183,7 @@ function siggb!(basis::Basis{N},
     tr = new_tracer()
 
     # fake syz queue
-    syz_queue = Tuple{Int, BitVector}[]
+    syz_queue = Int[]
 
     # sum of degrees of nonzero conditions
     nz_deg = zero(Exp)
@@ -260,10 +260,10 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1))
         else
             @info "finished component"
-            # if !_is_gb(bs, basis_ht, tgs, char)
-            #     print_sequence(bs, basis_ht, ind_ord, tgs)
-            #     error("no gb")
-            # end
+            if !_is_gb(bs, basis_ht, tgs, char)
+                print_sequence(bs, basis_ht, ind_ord, tgs)
+                error("no gb")
+            end
             push!(result, (bs, tgs))
         end
         @info "------------------------------------------"
@@ -790,8 +790,8 @@ function _is_gb(gb::Vector{P}) where {P <: MPolyRingElem}
     
     lms_gb = (Nemo.leading_monomial).(gb_pols)
     lms_msolve = (Nemo.leading_monomial).(gb_msolve)
-    println(gb)
-    println(gb_msolve)
+    println(lms_gb)
+    println(lms_msolve)
     res1 = all(u -> any(v -> divides(u, v)[1], lms_gb), lms_msolve)
     res2 = all(u -> any(v -> divides(u, v)[1], lms_msolve), lms_gb)
     return res1 && res2
@@ -975,15 +975,17 @@ function print_sequence(basis::Basis{N},
                         ind_order::IndOrder,
                         tags::Tags) where {N, Char}
 
-    R, _ = polynomial_ring(QQ, ["x$i" for i in 1:N])
+    R, _ = polynomial_ring(GF(65521), ["x$i" for i in 1:N])
     inds = sort(collect(1:basis.input_load), by = i -> ind_order.ord[i])
+    seq = MPolyRingElem[]
     for i in inds
         mns_hsh = basis.monomials[i]
         mns = [basis_ht.exponents[m] for m in mns_hsh]
         cfs = basis.coefficients[i]
         sig = basis.sigs[i]
         p = convert_to_pol(R, mns, cfs)
-        println("$(first(exponent_vectors((p)))) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i]))), $(basis.degs[i])")
+        println("$(first(exponent_vectors(p))) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i]))), $(basis.degs[i])")
+        gettag(tags, index(basis.sigs[i])) != :col && push!(seq, p)
     end
     println("----")
 end
