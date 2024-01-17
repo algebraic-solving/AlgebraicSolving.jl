@@ -177,6 +177,7 @@ function siggb!(basis::Basis{N},
 
     # index order
     ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
+                         Dict{Tuple{SigIndex, SigIndex}, Bool}(),
                          SigIndex(basis.basis_offset-1))
 
     # tracer
@@ -265,7 +266,8 @@ function sig_decomp!(basis::Basis{N},
             bs2, ps2, tgs2, ind_ord2 = split!(bs, basis_ht, zd_mons,
                                               zd_coeffs, zd_ind, tgs,
                                               ind_ord,
-                                              syz_finished)
+                                              syz_finished,
+                                              char)
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2))
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1))
         else
@@ -297,8 +299,9 @@ function siggb_for_split!(basis::Basis{N},
     syz_finished = collect(1:basis.syz_load)
 
     # nonzero degree
-    deg_nz = Exp(sum([basis.degs[i] for i in 1:basis.input_load
-                      if gettag(tags, SigIndex(i)) == :col]))
+    nz_inds = findall(t -> t == :col, tags)
+    @assert length(nz_inds) in [0,1]
+    deg_nz = Exp(sum([basis.degs[i] for i in nz_inds]))
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -364,7 +367,8 @@ function split!(basis::Basis{N},
                 zd_ind::SigIndex,
                 tags::Tags,
                 ind_order::IndOrder,
-                known_syz::Vector{Int}) where N
+                known_syz::Vector{Int},
+                char::Val{Char}) where {N, Char}
 
 
     @inbounds begin
@@ -415,19 +419,30 @@ function split!(basis::Basis{N},
         sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
         ind_ord2 = deepcopy(ind_order)
 
-        # append zd as nonzero condition
-        ins_index!(ind_ord2, ind_ord2.max_ind + one(SigIndex))
-        push!(sys2_mons, copy(cofac_mons))
-        push!(sys2_coeffs, copy(cofac_coeffs))
+        # new tags
+        tags2 = copy(tags)
+
+        nz_ind = findfirst(t -> t == :col, tags2)
+        if isnothing(nz_ind)
+            push!(sys2_mons, cofac_mons)
+            push!(sys2_coeffs, cofac_coeffs)
+            tags2[length(sys2_mons)] = :col
+            ins_index!(ind_ord2, ind_ord2.max_ind + 1)
+        else
+            cofac_mons_dehash = [basis_ht.exponents[mdx] for mdx in cofac_mons]
+            nz_mons_dehash = [basis_ht.exponents[mdx] for mdx in sys2_mons[nz_ind]]
+            new_nz_mons_dehash, new_nz_coeffs = mult_pols(cofac_mons_dehash, nz_mons_dehash,
+                                                          sys2_coeffs[nz_ind],
+                                                          cofac_coeffs,
+                                                          char)
+            sys2_mons[nz_ind] = [insert_in_hash_table!(basis_ht, m) for m in new_nz_mons_dehash]
+            sys2_coeffs[nz_ind] = new_nz_coeffs
+        end
 
         # build basis/pairset for second new system
         basis2 = fill_basis!(sys2_mons, sys2_coeffs,
                              basis_ht)
         basis2.is_red[zd_ind] = true
-
-        # new tags
-        tags2 = copy(tags)
-        tags2[basis2.input_load] = :col
 
         ps2 = init_pairset(Val(N))
         @inbounds for i in 1:basis2.input_load
@@ -437,7 +452,7 @@ function split!(basis::Basis{N},
             add_unit_pair!(basis2, ps2, i, basis2.degs[i])
         end
     end
-    
+
     return basis1, ps1, tags1, ind_ord1,
            basis2, ps2, tags2, ind_ord2
 end    
@@ -501,7 +516,18 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                     if isempty(cofac_coeffs)
                         continue
                     end
-                    isz = my_iszero_normal_form(cofac_mons, cofac_coeffs,
+                    nz_ind = findfirst(t -> t == :col, tags)
+                    if isnothing(nz_ind)
+                        nz_mons = [one_monomial(Monomial{N})]
+                        nz_coeffs = [one(Coeff)]
+                    else
+                        @assert gettag(tags, index(basis.sigs[nz_ind])) == :col
+                        nz_mons = [basis_ht.exponents[midx] for midx in basis.monomials[nz_ind]]
+                        nz_coeffs = basis.coefficients[nz_ind]
+                    end
+                    to_check = mult_pols(cofac_mons, nz_mons, cofac_coeffs, nz_coeffs,
+                                         char)
+                    isz = my_iszero_normal_form(to_check...,
                                                 basis, basis_ht, tags, char)
                     # cofac_mons, cofac_coeffs = normalform(cofac_mons,
                     #                                       cofac_coeffs,
@@ -797,11 +823,16 @@ function _is_gb(gb::Vector{P}) where {P <: MPolyRingElem}
     
     lms_gb = (Nemo.leading_monomial).(gb_pols)
     lms_msolve = (Nemo.leading_monomial).(gb_msolve)
+    println(lms_msolve)
     res1 = all(u -> any(v -> divides(u, v)[1], lms_gb), lms_msolve)
+    println(res1)
+    res2 = all(u -> any(v -> divides(u, v)[1], lms_msolve), lms_gb)
+    println(res2)
     return res1 && res2
 end
 
 function _is_gb(gb::Vector{Tuple{Tuple{Int, P}, P}}) where {P <: MPolyRingElem}
+    println([(p[1], Nemo.leading_monomial(p[2])) for p in gb])
     gb_pols = [p[2] for p in gb]
     return _is_gb(gb_pols)
 end
@@ -811,9 +842,10 @@ function _is_gb(basis::Basis{N}, basis_ht::MonomialHashtable,
     
     R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
                              ordering = :degrevlex)
-    G0 = [convert_to_pol(R, [basis_ht.exponents[midx]
+    G0 = [((Int(index(basis.sigs[i])), convert_to_pol(R, [monomial(basis.sigs[i])], [one(Coeff)])),
+           convert_to_pol(R, [basis_ht.exponents[midx]
                              for midx in basis.monomials[i]],
-                         basis.coefficients[i])
+                         basis.coefficients[i]))
           for i in basis.basis_offset:basis.basis_load
           if gettag(tags, index(basis.sigs[i])) != :col]
     return _is_gb(G0)
@@ -984,15 +1016,19 @@ function print_sequence(basis::Basis{N},
     inds = sort(collect(1:basis.input_load), by = i -> ind_order.ord[i])
     seq = MPolyRingElem[]
     for i in inds
-        basis.is_red[i] && continue
+        gettag(tags, index(basis.sigs[i])) == :colins && continue
         mns_hsh = basis.monomials[i]
         mns = [basis_ht.exponents[m] for m in mns_hsh]
         cfs = basis.coefficients[i]
         sig = basis.sigs[i]
         p = convert_to_pol(R, mns, cfs)
+        push!(seq, p)
         println("$(Nemo.leading_monomial(p)) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i])))")
         gettag(tags, index(basis.sigs[i])) != :col && push!(seq, p)
     end
+    f = open("/tmp/debug.txt", "w+")
+    println(f, seq)
+    close(f)
     println("----")
 end
         

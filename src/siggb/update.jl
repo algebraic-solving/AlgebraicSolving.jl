@@ -236,13 +236,11 @@ function process_syzygy!(basis::Basis{N},
         end
 
         lm = first(cofac_mons)
-        print_sequence(basis, basis_ht, ind_order, tags)
-        println("$(lm.exps), $(Int(new_idx))")
+
         lm_divm = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
         add_input_element!(basis, ind, cofac_mons_hashed,
                            cofac_coeffs, lm_divm, lm)
         add_unit_pair!(basis, pairset, ind, lm.deg)
-        print_sequence(basis, basis_ht, ind_order, tags)
     end
 end
 
@@ -382,14 +380,14 @@ end
 
 # insert new index
 function ins_index!(ind_order::IndOrder,
-                    new_ord_ind::SigIndex)
+                    new_ord_ind::Integer)
 
     @inbounds for i in eachindex(ind_order.ord)
         if ind_order.ord[i] >= new_ord_ind
             ind_order.ord[i] += one(SigIndex)
         end
     end
-    push!(ind_order.ord, new_ord_ind)
+    push!(ind_order.ord, SigIndex(new_ord_ind))
     ind_order.max_ind += 1
 end
 

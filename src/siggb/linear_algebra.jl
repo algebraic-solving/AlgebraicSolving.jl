@@ -101,6 +101,11 @@ function echelonize!(matrix::MacaulayMatrix,
                 continue
             end
 
+            piv_sig_ind = index(matrix.sigs[pividx])
+            if are_incompat(index(row_sig), piv_sig_ind, ind_order)
+                continue
+            end
+
             n_row_subs += 1
             if trace
                 row_ops[n_row_subs] = (pividx, a)
@@ -163,6 +168,8 @@ function echelonize!(matrix::MacaulayMatrix,
     if !iszero(arit_ops)
         @info "$(arit_ops) submul's"
     end
+
+    # @assert is_triangular(matrix)
 
     return tr_mat
 end

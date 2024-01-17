@@ -39,6 +39,12 @@ function select_normal!(pairset::Pairset{N},
         # for each unique pair signature
         curr_top_sig = pair.top_sig
 
+        # TODO: are these checks needed
+        rewriteable_syz(basis, curr_top_sig, pair.top_sig_mask, tags) && continue
+        rewriteable_koszul(basis, ht,
+                           curr_top_sig, pair.top_sig_mask,
+                           ind_order, tags) && continue
+
         rewr_ind = find_canonical_rewriter(basis, pair.top_sig,
                                            pair.top_sig_mask)
 
@@ -94,6 +100,7 @@ function select_normal!(pairset::Pairset{N},
                         !lt_pot(pair2.bot_sig, curr_top_sig, ind_order) && continue
                         new_red = false
                         if !iszero(pair2.bot_index)
+                            # TODO: why only basis check here
                             rewriteable_basis(basis, pair2.bot_index,
                                               pair2.bot_sig,
                                               pair2.bot_sig_mask,
@@ -159,7 +166,7 @@ function symbolic_pp!(basis::Basis{N},
                       symbol_ht::MonomialHashtable,
                       ind_order::IndOrder,
                       tags::Tags;
-                      forbidden_tag=:none::Symbol) where N
+                      forbidden_tag=:colins::Symbol) where N
 
     i = one(MonIdx)
     mult = similar(ht.buffer)

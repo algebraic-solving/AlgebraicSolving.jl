@@ -4,9 +4,6 @@
                                  tags::Tags)
 
     ind = index(sig)
-    if gettag(tags, ind) == :colins
-        return false
-    end
 
     @inbounds for i in 1:basis.syz_load
         if index(basis.syz_masks[i]) == ind
@@ -25,9 +22,6 @@ end
                                    tags::Tags)
 
     ind = index(sig)
-    if gettag(tags, ind) == :colins
-        return false
-    end
 
     k = find_canonical_rewriter(basis, sig, sigmask)
     return k != idx
@@ -67,9 +61,6 @@ end
                                     tags::Tags)
 
     s_ind = index(sig)
-    if gettag(tags, s_ind) == :colins
-        return false
-    end
 
     @inbounds for i in basis.basis_offset:basis.basis_load
         b_ind = index(basis.sigs[i])
@@ -93,9 +84,6 @@ function rewriteable(basis::Basis,
                      tags::Tags)
 
     s_ind = index(sig)
-    if gettag(tags, s_ind) == :colins
-        return false
-    end
 
     rewriteable_syz(basis, sig, sigmask, tags) && return true
     rewriteable_basis(basis, idx, sig, sigmask, tags) && return true
