@@ -431,9 +431,14 @@ function split!(basis::Basis{N},
         else
             cofac_mons_dehash = [basis_ht.exponents[mdx] for mdx in cofac_mons]
             nz_mons_dehash = [basis_ht.exponents[mdx] for mdx in sys2_mons[nz_ind]]
+            R, _ = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N], ordering = :degrevlex)
+            p_new = convert_to_pol(R, cofac_mons_dehash, cofac_coeffs)
+            p_old = convert_to_pol(R, nz_mons_dehash, sys2_coeffs[nz_ind])
+            println(p_new)
+            println(Nemo.factor(p_old))
             new_nz_mons_dehash, new_nz_coeffs = mult_pols(cofac_mons_dehash, nz_mons_dehash,
-                                                          sys2_coeffs[nz_ind],
                                                           cofac_coeffs,
+                                                          sys2_coeffs[nz_ind],
                                                           char)
             sys2_mons[nz_ind] = [insert_in_hash_table!(basis_ht, m) for m in new_nz_mons_dehash]
             sys2_coeffs[nz_ind] = new_nz_coeffs
@@ -442,11 +447,16 @@ function split!(basis::Basis{N},
         # build basis/pairset for second new system
         basis2 = fill_basis!(sys2_mons, sys2_coeffs,
                              basis_ht)
+        println(zd_ind)
         basis2.is_red[zd_ind] = true
+        # tags2[zd_ind] = :seq
 
         ps2 = init_pairset(Val(N))
         @inbounds for i in 1:basis2.input_load
             if gettag(tags, index(basis2.sigs[i])) == :colins
+                basis2.is_red[i] = true
+            end
+            if i <= basis.input_load && basis.is_red[i]
                 basis2.is_red[i] = true
             end
             add_unit_pair!(basis2, ps2, i, basis2.degs[i])
@@ -1012,13 +1022,15 @@ function print_sequence(basis::Basis{N},
     inds = sort(collect(1:basis.input_load), by = i -> ind_order.ord[i])
     seq = MPolyRingElem[]
     for i in inds
+        basis.is_red[i] && continue
         gettag(tags, index(basis.sigs[i])) == :colins && continue
         mns_hsh = basis.monomials[i]
         mns = [basis_ht.exponents[m] for m in mns_hsh]
         cfs = basis.coefficients[i]
         sig = basis.sigs[i]
         p = convert_to_pol(R, mns, cfs)
-        println("$(Nemo.leading_monomial(p)) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i])))")
+        to_pr = length(collect(exponent_vectors(p))) < 5 ? p : Nemo.leading_monomial(p)
+        println("$(to_pr) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i])))")
         gettag(tags, index(basis.sigs[i])) != :col && push!(seq, p)
     end
     println("----")

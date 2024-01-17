@@ -100,11 +100,13 @@ function select_normal!(pairset::Pairset{N},
                         !lt_pot(pair2.bot_sig, curr_top_sig, ind_order) && continue
                         new_red = false
                         if !iszero(pair2.bot_index)
+                            rewriteable(basis, ht, pair2.bot_index, pair2.bot_sig,
+                                        pair2.bot_sig_mask, ind_order, tags) && continue
                             # TODO: why only basis check here
-                            rewriteable_basis(basis, pair2.bot_index,
-                                              pair2.bot_sig,
-                                              pair2.bot_sig_mask,
-                                              tags) && continue
+                            # rewriteable_basis(basis, pair2.bot_index,
+                            #                   pair2.bot_sig,
+                            #                   pair2.bot_sig_mask,
+                            #                   tags) && continue
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
                                           monomial(basis.sigs[ind]))
