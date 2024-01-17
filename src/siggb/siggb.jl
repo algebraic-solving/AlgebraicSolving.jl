@@ -516,18 +516,18 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                     if isempty(cofac_coeffs)
                         continue
                     end
-                    nz_ind = findfirst(t -> t == :col, tags)
-                    if isnothing(nz_ind)
-                        nz_mons = [one_monomial(Monomial{N})]
-                        nz_coeffs = [one(Coeff)]
-                    else
-                        @assert gettag(tags, index(basis.sigs[nz_ind])) == :col
-                        nz_mons = [basis_ht.exponents[midx] for midx in basis.monomials[nz_ind]]
-                        nz_coeffs = basis.coefficients[nz_ind]
-                    end
-                    to_check = mult_pols(cofac_mons, nz_mons, cofac_coeffs, nz_coeffs,
-                                         char)
-                    isz = my_iszero_normal_form(to_check...,
+                    # nz_ind = findfirst(t -> t == :col, tags)
+                    # if isnothing(nz_ind)
+                    #     nz_mons = [one_monomial(Monomial{N})]
+                    #     nz_coeffs = [one(Coeff)]
+                    # else
+                    #     @assert gettag(tags, index(basis.sigs[nz_ind])) == :col
+                    #     nz_mons = [basis_ht.exponents[midx] for midx in basis.monomials[nz_ind]]
+                    #     nz_coeffs = basis.coefficients[nz_ind]
+                    # end
+                    # to_check = mult_pols(cofac_mons, nz_mons, cofac_coeffs, nz_coeffs,
+                    #                      char)
+                    isz = my_iszero_normal_form(cofac_mons, cofac_coeffs,
                                                 basis, basis_ht, tags, char)
                     # cofac_mons, cofac_coeffs = normalform(cofac_mons,
                     #                                       cofac_coeffs,
@@ -823,16 +823,12 @@ function _is_gb(gb::Vector{P}) where {P <: MPolyRingElem}
     
     lms_gb = (Nemo.leading_monomial).(gb_pols)
     lms_msolve = (Nemo.leading_monomial).(gb_msolve)
-    println(lms_msolve)
     res1 = all(u -> any(v -> divides(u, v)[1], lms_gb), lms_msolve)
-    println(res1)
     res2 = all(u -> any(v -> divides(u, v)[1], lms_msolve), lms_gb)
-    println(res2)
     return res1 && res2
 end
 
 function _is_gb(gb::Vector{Tuple{Tuple{Int, P}, P}}) where {P <: MPolyRingElem}
-    println([(p[1], Nemo.leading_monomial(p[2])) for p in gb])
     gb_pols = [p[2] for p in gb]
     return _is_gb(gb_pols)
 end
@@ -1022,13 +1018,9 @@ function print_sequence(basis::Basis{N},
         cfs = basis.coefficients[i]
         sig = basis.sigs[i]
         p = convert_to_pol(R, mns, cfs)
-        push!(seq, p)
         println("$(Nemo.leading_monomial(p)) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i])))")
         gettag(tags, index(basis.sigs[i])) != :col && push!(seq, p)
     end
-    f = open("/tmp/debug.txt", "w+")
-    println(f, seq)
-    close(f)
     println("----")
 end
         
