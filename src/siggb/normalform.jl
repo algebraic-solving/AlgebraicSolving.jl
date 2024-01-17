@@ -90,8 +90,8 @@ function my_iszero_normal_form(mons::Vector{Monomial{N}},
                          basis.coefficients[i])
           for i in basis.basis_offset:basis.basis_load
           if gettag(tags, index(basis.sigs[i])) != :col]
-    # G = groebner_basis(Ideal(G0), complete_reduction = true)
-    G = G0
+    G = groebner_basis(Ideal(G0), complete_reduction = true)
+    # G = G0
 
     tbr_nr_gens = length(F)
     bs_nr_gens  = length(G)

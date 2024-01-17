@@ -78,6 +78,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         add_unit_pair!(basis, pairset, i, basis.degs[i])
         tags[SigIndex(i)] = :seq
     end
+    tags[basis.input_load] = :col
 
     sysl = length(sys)
     # compute divmasks
@@ -92,11 +93,14 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
                degbound = degbound)
     end
 
+    @assert _is_gb(basis, basis_ht, tags, char)
+
     # output
     R = parent(first(sys))
     eltp = typeof(first(sys))
     outp = Tuple{Tuple{Int, eltp}, eltp}[]
     @inbounds for i in basis.basis_offset:basis.basis_load
+        gettag(tags, index(basis.sigs[i])) == :col && continue
         pol = convert_to_pol(R,
                              [basis_ht.exponents[m] for m in basis.monomials[i]],
                              basis.coefficients[i])
@@ -272,10 +276,10 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1))
         else
             @info "finished component"
-            if !_is_gb(bs, basis_ht, tgs, char)
-                print_sequence(bs, basis_ht, ind_ord, tgs)
-                error("no gb")
-            end
+            # if !_is_gb(bs, basis_ht, tgs, char)
+            #     print_sequence(bs, basis_ht, ind_ord, tgs)
+            #     error("no gb")
+            # end
             push!(result, (bs, tgs))
         end
         @info "------------------------------------------"
@@ -375,7 +379,6 @@ function split!(basis::Basis{N},
         # 1st component
         sys1_mons = copy(basis.monomials[1:basis.input_load])
         sys1_coeffs = copy(basis.coefficients[1:basis.input_load])
-        sys1l = length(sys1_mons)
         
         # find out where to insert zero divisor
         zd_deg = basis_ht.exponents[first(cofac_mons)].deg
@@ -402,17 +405,14 @@ function split!(basis::Basis{N},
         tags1[basis1.input_load] = :split
         ps1 = init_pairset(Val(N))
         @inbounds for i in 1:basis1.input_load
+            if gettag(tags, index(basis1.sigs[i])) == :colins
+                basis1.is_red[i] = true
+            end
+            if i <= basis.input_load && basis.is_red[i]
+                basis1.is_red[i] = true
+            end
             add_unit_pair!(basis1, ps1, i, basis1.degs[i])
         end
-        
-        # add trivializing syzygies
-        # for i in known_syz
-        #     resize_syz!(basis1)
-        #     l = basis1.syz_load
-        #     basis1.syz_sigs[l+1] = basis.syz_sigs[i]
-        #     basis1.syz_masks[l+1] = basis.syz_masks[i]
-        #     basis1.syz_load += 1
-        # end
 
         # 2nd component
         sys2_mons = copy(basis.monomials[1:basis.input_load])
@@ -462,6 +462,11 @@ function split!(basis::Basis{N},
             add_unit_pair!(basis2, ps2, i, basis2.degs[i])
         end
     end
+
+    # print_sequence(basis, basis_ht, ind_order, tags)
+    # print_sequence(basis1, basis_ht, ind_ord1, tags1)
+    # print_sequence(basis2, basis_ht, ind_ord2, tags2)
+    # sleep(0.2)
 
     return basis1, ps1, tags1, ind_ord1,
            basis2, ps2, tags2, ind_ord2
@@ -1029,10 +1034,13 @@ function print_sequence(basis::Basis{N},
         cfs = basis.coefficients[i]
         sig = basis.sigs[i]
         p = convert_to_pol(R, mns, cfs)
+        push!(seq, p)
         to_pr = length(collect(exponent_vectors(p))) < 5 ? p : Nemo.leading_monomial(p)
         println("$(to_pr) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i])))")
-        gettag(tags, index(basis.sigs[i])) != :col && push!(seq, p)
     end
+    f = open("/tmp/badexample.txt", "w+")
+    println(f, seq)
+    close(f)
     println("----")
 end
         
