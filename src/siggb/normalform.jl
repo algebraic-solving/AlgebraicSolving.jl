@@ -72,26 +72,16 @@ end
 # *without* computing a GB for the corresponding ideal
 function my_iszero_normal_form(mons::Vector{Monomial{N}},
                                coeffs::Vector{Coeff},
-                               basis::Basis,
-                               basis_ht::MonomialHashtable,
-                               tags::Tags,
-                               char::Val{Char}) where {N, Char}
+                               gb::Vector{<:MPolyRingElem}) where N
     
 
-    R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
-                             ordering = :degrevlex)
+    R = parent(first(gb))
     f = convert_to_pol(R, mons, coeffs)
     F = [f]
     nr_vars     = nvars(R)
     field_char  = Int(characteristic(R))
 
-    #= first get a degree reverse lexicographical Gröbner basis for I =#
-    G0 = [convert_to_pol(R, [basis_ht.exponents[midx] for midx in basis.monomials[i]],
-                         basis.coefficients[i])
-          for i in basis.basis_offset:basis.basis_load
-          if gettag(tags, index(basis.sigs[i])) != :col]
-    G = groebner_basis(Ideal(G0), complete_reduction = true)
-    # G = G0
+    G = gb
 
     tbr_nr_gens = length(F)
     bs_nr_gens  = length(G)
@@ -130,4 +120,34 @@ function my_iszero_normal_form(mons::Vector{Monomial{N}},
           cglobal(:jl_free), nf_len, nf_exp, nf_cf, jl_ld, field_char)
 
     return iszero(first(res))
+end
+
+# compute normal forms with msolve
+@inline function _convert_to_msolve(exps::Vector{<:Monomial},
+                                    cfs::Vector{Coeff})
+
+    len = length(exps)
+    @inbounds ms_cfs = [Int32(cfs[i]) for i in 1:len]
+    @inbounds ms_exps = vcat([convert(Vector{Int32}, exps[i].exps) for i in 1:len]...)
+    return [Int32(len)], ms_cfs, ms_exps
+end
+
+function _convert_basis_to_msolve(basis::Basis,
+                                  basis_ht::MonomialHashtable)
+
+    l = basis.basis_load - basis.basis_offset + 1
+    lens = Vector{Int32}(undef, l)
+    ms_cfs = Int32[]
+    ms_exps = Int32[]
+
+    @inbounds for i in basis.basis_offset:basis.basis_load
+        exps = [basis_ht.exponents[eidx] for eidx in basis.monomials[i]]
+        cfs = basis.coefficients[i]
+        plen, pms_cfs, pms_exps = _convert_to_msolve(exps, cfs)
+        append!(lens, plen)
+        append!(ms_cfs, pms_cfs)
+        append!(ms_exps, pms_exps)
+    end
+
+    return lens, ms_cfs, ms_exps
 end

@@ -141,7 +141,13 @@ end
 const Tags = Dict{SigIndex, Symbol}
 
 # For output of decomp (at the moment)
-struct LocClosedSet{T<:MPolyRingElem}
+mutable struct LocClosedSet{T<:MPolyRingElem}
     eqns::Vector{T}
     ineqns::Vector{T}
+    gb::Vector{T}
+
+    function LocClosedSet{T}(eqns::Vector{T}, ineqns::Vector{T}) where {T<:MPolyRingElem}
+        gb = saturate(eqns, ineqns)
+        return new(eqns, ineqns, gb)
+    end
 end
