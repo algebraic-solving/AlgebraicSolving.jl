@@ -2,29 +2,30 @@ function construct_module(basis::Basis{N},
                           basis_index::Int,
                           tr::Tracer,
                           vchar::Val{Char},
-                          mod_dim::SigIndex,
                           ind_order::IndOrder,
-                          mod_cache::Dict{Sig, Vector{Polynomial{N}}}=Dict{Sig, Vector{Polynomial{N}}}(),
-                          just_index::SigIndex=SigIndex(0)) where {N, Char}
+                          idx::SigIndex,
+                          mod_cache::ModCache{N}) where {N, Char}
 
     @inbounds sig = basis.sigs[basis_index]
+    if haskey(mod_cache, (sig, idx))
+        return mod_cache[(sig, idx)]
+    end
 
     if basis_index >= basis.basis_offset
         @inbounds mat_ind = tr.basis_ind_to_mat[basis_index]
-        return construct_module(sig, basis, mat_ind, tr,
-                                vchar, 
-                                mod_dim, ind_order,
-                                just_index,
-                                mod_cache)
+        res = construct_module(sig, basis, mat_ind, tr,
+                               vchar, 
+                               ind_order, idx,
+                               mod_cache)
+        return res
     else
         # if it was an input element we just take the signature
-        res = [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
-        if iszero(just_index) || index(sig) == just_index
-            res[index(sig)] = ([one(Coeff)], [monomial(sig)])
+        if index(sig) == idx
+            return ([one(Coeff)], [monomial(sig)])
+        else
+            return (Coeff[], Monomial{N}[])
         end
-        return res
     end
-        
 end
 
 # construct a module representation out of a given sig
@@ -33,19 +34,16 @@ function construct_module(sig::Sig{N},
                           mat_index::Int,
                           tr::Tracer,
                           vchar::Val{Char},
-                          mod_dim::SigIndex,
                           ind_ord::IndOrder,
-                          just_index::SigIndex=SigIndex(0),
-                          mod_cache::Dict{Sig, Vector{Polynomial{N}}}=Dict{Sig, Vector{Polynomial{N}}}()) where {N, Char}
+                          idx::SigIndex,
+                          mod_cache::ModCache{N}) where {N, Char}
 
-    if haskey(mod_cache, sig)
-        return mod_cache[sig]
+    if haskey(mod_cache, (sig, idx))
+        return mod_cache[(sig, idx)]
     end
 
-    if !iszero(just_index)
-        if ind_ord.ord[index(sig)] < ind_ord.ord[just_index]
-            return [(Coeff[], Monomial{N}[]) for _ in 1:mod_dim]
-        end
+    if ind_ord.ord[index(sig)] < idx
+        return Coeff[], Monomial{N}[]
     end
 
     tr_mat = tr.mats[mat_index]
@@ -54,46 +52,35 @@ function construct_module(sig::Sig{N},
 
     # construct module representation of canonical rewriter
     rewr_mod = construct_module(basis, rewr_basis_ind, tr, vchar,
-                                mod_dim, ind_ord, mod_cache,
-                                just_index)
+                                ind_ord, idx, mod_cache)
 
     # multiply by monomial
     rewr_sig = basis.sigs[rewr_basis_ind]
     mult = divide(monomial(sig), monomial(rewr_sig))
     isone = all(iszero, mult.exps)
-    res = Vector{Polynomial{N}}(undef, mod_dim)
-    @inbounds for i in 1:mod_dim
-        res[i] = (copy(rewr_mod[i][1]), isone ? copy(rewr_mod[i][2]) : mul_by_mon(rewr_mod[i][2], mult))
-    end
+    res = (copy(rewr_mod[1]), isone ? copy(rewr_mod[2]) : mul_by_mon(rewr_mod[2], mult))
 
     # construct module rep of all reducers
     @inbounds row_ops = tr_mat.col_inds_and_coeffs[row_ind]
     @inbounds for (j, coeff)  in row_ops
         j_sig = tr_mat.row_ind_to_sig[j]
+        if ind_ord.ord[index(j_sig)] < ind_ord.ord[idx]
+            continue
+        end
         j_sig_mod = construct_module(j_sig, basis, mat_index,
                                      tr, vchar,
-                                     mod_dim, ind_ord,
-                                     just_index, mod_cache)
-        for i in 1:mod_dim
-            !iszero(just_index) && i != just_index && continue
-            res_i_coeffs = res[i][1]
-            res_i_mons = res[i][2]
-            j_mod_coeffs = j_sig_mod[i][1]
-            mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar), vchar)
-            j_mod_mons = j_sig_mod[i][2]
-            res[i] = add_pols_2(res_i_mons, j_mod_mons,
-                                res_i_coeffs, mul_j_mod_coeffs,
-                                vchar)
-        end
+                                     ind_ord,
+                                     idx, mod_cache)
+        j_mod_coeffs = j_sig_mod[1]
+        mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar), vchar)
+        j_mod_mons = j_sig_mod[2]
+        res = add_pols_2(res..., mul_j_mod_coeffs, j_mod_mons, vchar)
     end
 
     diag_coeff = tr_mat.diagonal[row_ind]
-    @inbounds for i in 1:mod_dim
-        res_i_coeffs = res[i][1]
-        mul_by_coeff!(res_i_coeffs, diag_coeff, vchar)
-    end
+    mul_by_coeff!(res[1], diag_coeff, vchar)
 
-    mod_cache[sig] = res
+    mod_cache[(sig, idx)] = res
     return res
 end
 
@@ -184,10 +171,10 @@ function add_pols(mons1::Vector{M},
 end
 
 
-function add_pols_2(exps1::Vector{Monomial{N}},
-                    exps2::Vector{Monomial{N}},
-                    cfs1::Vector{Coeff},
+function add_pols_2(cfs1::Vector{Coeff},
+                    exps1::Vector{Monomial{N}},
                     cfs2::Vector{Coeff},
+                    exps2::Vector{Monomial{N}},
                     char::Val{Char}) where {N, Char}
 
     R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],

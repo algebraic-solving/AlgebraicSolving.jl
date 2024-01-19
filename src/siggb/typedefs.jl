@@ -24,6 +24,7 @@ const Sig{N} = Tuple{SigIndex, Monomial{N}}
 const MaskSig = Tuple{SigIndex, DivMask}
 
 const Polynomial{N} = Tuple{Vector{Coeff}, Vector{Monomial{N}}}
+const ModCache{N} = Dict{Tuple{Sig{N}, SigIndex}, Polynomial{N}}
 
 mutable struct Basis{N}
     sigs::Vector{Sig{N}}

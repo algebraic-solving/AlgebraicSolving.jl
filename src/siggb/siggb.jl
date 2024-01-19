@@ -78,7 +78,6 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         add_unit_pair!(basis, pairset, i, basis.degs[i])
         tags[SigIndex(i)] = :seq
     end
-    tags[basis.input_load] = :col
 
     sysl = length(sys)
     # compute divmasks
@@ -223,14 +222,26 @@ function sig_decomp!(basis::Basis{N},
             for i in 1:basis.input_load]
     X = LocClosedSet{eltype(eqns)}(eqns, eltype(eqns)[])
     
-    queue = [(basis, pairset, tags, ind_order, X)]
+    queue = [(basis, pairset, tags, ind_order, X, Int(basis.input_load))]
     result = LocClosedSet[]
 
     while !isempty(queue)
-        bs, ps, tgs, ind_ord, lc_set = popfirst!(queue)
-        @info "starting component"
+        bs, ps, tgs, ind_ord, lc_set, c = popfirst!(queue)
+        superf = findall(bs.is_red[1:bs.input_load])
+        neqns = bs.input_load - length(superf)
+        @info "starting component, $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
-            @info "empty/superflous component"
+            @info "empty component"
+            @info "------------------------------------------"
+            continue
+        elseif codim(lc_set) > c
+            @info "superflous component"
+            @info "------------------------------------------"
+            continue
+        elseif codim(lc_set) == neqns
+            @info "finished component codim $c"
+            deleteat!(lc_set.eqns, superf)
+            push!(result, lc_set)
             @info "------------------------------------------"
             continue
         end
@@ -243,12 +254,19 @@ function sig_decomp!(basis::Basis{N},
             @info "splitting component"
             bs1, ps1, tgs1, ind_ord1, lc_set1,
             bs2, ps2, tgs2, ind_ord2, lc_set2 = split!(bs, basis_ht, zd_mons,
-                                                       zd_coeffs, zd_ind, tags,
+                                                       zd_coeffs, zd_ind, tgs,
                                                        ind_ord, lc_set)
-            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2))
-            pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1, lc_set1))
+            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1)))
+            pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1, lc_set1, c))
         else
-            @info "finished component"
+            superf = findall(bs.is_red[1:bs.input_load])
+            neqns = bs.input_load - length(superf)
+            println(lc_set.eqns)
+            deleteat!(lc_set.eqns, superf)
+            @info "finished component $(neqns), $(codim(lc_set))"
+            println((Int).(ind_ord.ord))
+            @assert _is_gb(basis, basis_ht, tgs, char)
+            @assert codim(lc_set) == neqns
             push!(result, lc_set)
         end
         @info "------------------------------------------"
@@ -271,6 +289,9 @@ function siggb_for_split!(basis::Basis{N},
     # syz queue
     syz_queue = Int[]
     syz_finished = collect(1:basis.syz_load)
+
+    # module cache
+    mod_cache = ModCache{N}()
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -297,7 +318,8 @@ function siggb_for_split!(basis::Basis{N},
         sort!(syz_queue, by = sz -> monomial(basis.sigs[sz]).deg)
         does_split, cofac_coeffs, cofac_mons,
         cofac_ind = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
-                                           basis, tr, ind_order, char, lc_set)
+                                           basis, tr, ind_order, char, lc_set,
+                                           mod_cache)
 
         if does_split
             return true, false, cofac_coeffs,
@@ -308,7 +330,8 @@ function siggb_for_split!(basis::Basis{N},
     end
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
-                                       basis, tr, ind_order, char, lc_set)
+                                       basis, tr, ind_order, char, lc_set,
+                                       mod_cache)
 
     if does_split
         return true, false, cofac_coeffs, cofac_mons,
@@ -409,7 +432,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 tr::Tracer,
                                 ind_order::IndOrder,
                                 char::Val{Char},
-                                lc_set::LocClosedSet) where {Shift, Char, N}
+                                lc_set::LocClosedSet,
+                                mod_cache::ModCache{N}) where {Char, N}
     
     @info "checking known syzygies"
     found_zd = false
@@ -419,8 +443,10 @@ function process_syz_for_split!(syz_queue::Vector{Int},
     
     to_del = Int[]
 
-    sorted_inds = (tpl -> tpl[2]).(sort([(basis.degs[i], index(basis.sigs[i])) for i in 1:basis.input_load],
-                                        by = tpl -> tpl[1], rev = true))
+    ind_info = [(basis.degs[i], index(basis.sigs[i]), basis.is_red[i]) for i in 1:basis.input_load]
+    filter!(tpl -> !tpl[3], ind_info)
+    sort!(ind_info, by = tpl -> tpl[1], rev = true)
+    sorted_inds = (tpl -> tpl[2]).(ind_info)
     
     @inbounds for (i, idx) in enumerate(syz_queue)
         syz_mask = basis.syz_masks[idx]
@@ -429,12 +455,11 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         tr_ind = tr.syz_ind_to_mat[idx]
 
         for cofac_ind in sorted_inds
-            mod_rep = construct_module((syz_ind, syz_mon), basis, tr_ind,
-                                       tr, char,
-                                       ind_order.max_ind,
-                                       ind_order, cofac_ind)
-            cofac_mons, cofac_coeffs = mod_rep[cofac_ind][2],
-            mod_rep[cofac_ind][1]
+            @info "constructing module"
+            cofac_coeffs, cofac_mons = construct_module((syz_ind, syz_mon), basis, tr_ind,
+                                                        tr, char,
+                                                        ind_order, cofac_ind,
+                                                        mod_cache)
             if isempty(cofac_coeffs)
                 continue
             end
@@ -447,10 +472,13 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                 zd_ind = cofac_ind
                 break
             end
+            push!(syz_finished, idx)
         end
 
-        push!(syz_finished, idx)
+        push!(to_del, i)
     end
+
+    deleteat!(syz_queue, to_del)
             
     if found_zd
         # normalize cofac coefficients
@@ -727,6 +755,11 @@ function ring(X::LocClosedSet)
     return parent(first(X.eqns))
 end
 
+function codim(X::LocClosedSet)
+    mis = first(max_ind_sets(X.gb))
+    return length(findall(b -> !b, mis))
+end
+
 function is_empty_set(X::LocClosedSet)
     R = ring(X)
     return one(R) in X.gb
@@ -789,6 +822,37 @@ function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
         end
         res[i] = finish(ctx)
     end
+    return res
+end
+
+function max_ind_sets(gb::Vector{P}) where {P <: MPolyRingElem}
+    R = parent(first(gb))
+    res = [trues(ngens(R))]
+
+    lms = (Nemo.leading_monomial).(gb)
+    for lm in lms
+        to_del = Int[]
+        new_miss = BitVector[]
+        for (i, mis) in enumerate(res)
+            nz_exps_inds = findall(e -> !iszero(e),
+                                   first(Nemo.exponent_vectors(lm)))
+            ind_var_inds = findall(mis)
+            if issubset(nz_exps_inds, ind_var_inds)
+                for j in nz_exps_inds
+                    new_mis = copy(mis)
+                    new_mis[j] = false
+                    push!(new_miss, new_mis)
+                end
+                push!(to_del, i)
+            end
+        end
+        deleteat!(res, to_del)
+        append!(res, new_miss)
+        unique!(res)
+    end
+
+    max_length = maximum(mis -> length(all(mis)), res)
+    filter!(mis -> length(mis) != max_length, res)
     return res
 end
     
