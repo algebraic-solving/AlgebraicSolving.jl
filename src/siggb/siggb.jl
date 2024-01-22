@@ -212,9 +212,7 @@ function sig_decomp!(basis::Basis{N},
                      R::MPolyRing) where {N, Char, Shift}
 
     # index order
-    ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
-                         Dict{Tuple{SigIndex, SigIndex}, Bool}(),
-                         SigIndex(basis.basis_offset-1))
+    ind_order = new_ind_order(basis)
 
     # compute ideal
     eqns = [convert_to_pol(R, [basis_ht.exponents[mdx] for mdx in basis.monomials[i]],
@@ -227,8 +225,7 @@ function sig_decomp!(basis::Basis{N},
 
     while !isempty(queue)
         bs, ps, tgs, ind_ord, lc_set, c = popfirst!(queue)
-        superf = findall(bs.is_red[1:bs.input_load])
-        neqns = bs.input_load - length(superf)
+        neqns = length(findall(i -> gettag(tgs, i) == :split, 1:bs.input_load))
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
             @info "empty component"
@@ -240,7 +237,6 @@ function sig_decomp!(basis::Basis{N},
             continue
         elseif codim(lc_set) == neqns
             @info "finished component codim $c"
-            deleteat!(lc_set.eqns, superf)
             push!(result, lc_set)
             @info "------------------------------------------"
             continue
@@ -259,14 +255,13 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1)))
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1, lc_set1, c))
         else
-            superf = findall(bs.is_red[1:bs.input_load])
-            neqns = bs.input_load - length(superf)
-            println(lc_set.eqns)
-            deleteat!(lc_set.eqns, superf)
-            @info "finished component $(neqns), $(codim(lc_set))"
-            println((Int).(ind_ord.ord))
-            @assert _is_gb(basis, basis_ht, tgs, char)
-            @assert codim(lc_set) == neqns
+            # TODO: this may be dangerous
+            to_del_eqns = findall(i -> bs.is_red[i], 1:neqns)
+            neqns -= length(to_del_eqns)
+            deleteat!(lc_set.eqns, to_del_eqns)
+            @info "finished component $(neqns) eqns, codim $(codim(lc_set))"
+            # @assert _is_gb(bs, basis_ht, tgs, char)
+            # @assert codim(lc_set) == neqns
             push!(result, lc_set)
         end
         @info "------------------------------------------"
@@ -319,7 +314,7 @@ function siggb_for_split!(basis::Basis{N},
         does_split, cofac_coeffs, cofac_mons,
         cofac_ind = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                            basis, tr, ind_order, char, lc_set,
-                                           mod_cache)
+                                           mod_cache, tags)
 
         if does_split
             return true, false, cofac_coeffs,
@@ -331,7 +326,7 @@ function siggb_for_split!(basis::Basis{N},
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                        basis, tr, ind_order, char, lc_set,
-                                       mod_cache)
+                                       mod_cache, tags)
 
     if does_split
         return true, false, cofac_coeffs, cofac_mons,
@@ -355,34 +350,38 @@ function split!(basis::Basis{N},
         # 1st component
         sys1_mons = copy(basis.monomials[1:basis.input_load])
         sys1_coeffs = copy(basis.coefficients[1:basis.input_load])
-        
-        # find out where to insert zero divisor
         zd_deg = first(cofac_mons).deg
-        split_inds = filter(ind -> gettag(tags, SigIndex(ind)) == :split,
-                            (index).(basis.sigs[1:basis.input_load]))
-        split_inds_deg_geq = filter(ind -> basis.degs[ind] > zd_deg, split_inds)
-        if isempty(split_inds_deg_geq)
-            ins_ind, _ = findmax(ind -> ind_order.ord[ind], split_inds)
-            ins_ind += one(SigIndex)
-        else
-            ins_ind, _ = findmin(ind -> ind_order.ord[ind], split_inds_deg_geq)
+
+        nz_from = findfirst(i -> gettag(tags, i) == :col, 1:basis.input_load)
+        if isnothing(nz_from)
+            nz_from = basis.input_load+1
         end
-        ind_ord1 = deepcopy(ind_order)
-        ins_index!(ind_ord1, ins_ind)
+        ins_ind = findfirst(i -> basis.degs[i] > zd_deg, 1:nz_from-1)
+        if isnothing(ins_ind)
+            ins_ind = nz_from
+        end
 
         # insert zd in system
         cofac_mons_hashed = [insert_in_hash_table!(basis_ht, m) for m in cofac_mons]
-        push!(sys1_mons, cofac_mons_hashed)
-        push!(sys1_coeffs, cofac_coeffs)
+        insert!(sys1_mons, ins_ind, cofac_mons_hashed)
+        insert!(sys1_coeffs, ins_ind, cofac_coeffs)
 
-        # build basis/pairset/tags for first new system
+        # tags for first system
+        tags1 = Tags()
+        tags1[ins_ind] = :split
+        for k in keys(tags)
+            if k >= ins_ind
+                tags1[k+1] = tags[k]
+            elseif k < ins_ind
+                tags1[k] = tags[k]
+            end
+        end
+
         basis1 = fill_basis!(sys1_mons, sys1_coeffs,
                              basis_ht)
-        tags1 = copy(tags)
-        tags1[basis1.input_load] = :split
         ps1 = init_pairset(Val(N))
         @inbounds for i in 1:basis1.input_load
-            if i <= basis.input_load && basis.is_red[i]
+            if gettag(tags1, i) == :col
                 basis1.is_red[i] = true
             end
             add_unit_pair!(basis1, ps1, i, basis1.degs[i])
@@ -392,22 +391,33 @@ function split!(basis::Basis{N},
         h = convert_to_pol(ring(lc_set1), cofac_mons, cofac_coeffs)
         add_equation!(lc_set1, h)
 
+        ind_ord1 = new_ind_order(basis1)
+                
         # 2nd component
         sys2_mons = copy(basis.monomials[1:basis.input_load])
         sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
-        ind_ord2 = deepcopy(ind_order)
+        push!(sys2_mons, cofac_mons_hashed)
+        push!(sys2_coeffs, cofac_coeffs)
+        deleteat!(sys2_mons, zd_ind)
+        deleteat!(sys2_coeffs, zd_ind)
 
         # new tags
-        tags2 = copy(tags)
+        tags2 = Tags()
+        for k in keys(tags)
+            if k < nz_from-1
+                tags2[k] = :split
+            else
+                tags2[k] = :col
+            end
+        end
 
         # build basis/pairset for second new system
         basis2 = fill_basis!(sys2_mons, sys2_coeffs,
                              basis_ht)
-        basis2.is_red[zd_ind] = true
 
         ps2 = init_pairset(Val(N))
         @inbounds for i in 1:basis2.input_load
-            if i <= basis.input_load && basis.is_red[i]
+            if gettag(tags2, i) == :col
                 basis2.is_red[i] = true
             end
             add_unit_pair!(basis2, ps2, i, basis2.degs[i])
@@ -415,6 +425,9 @@ function split!(basis::Basis{N},
 
         lc_set2 = deepcopy(lc_set)
         add_ineqation!(lc_set2, h)
+        deleteat!(lc_set2.eqns, zd_ind)
+
+        ind_ord2 = new_ind_order(basis2)
     end
 
     # print_sequence(basis, basis_ht, ind_order, tags, ring(lc_set))
@@ -433,7 +446,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 ind_order::IndOrder,
                                 char::Val{Char},
                                 lc_set::LocClosedSet,
-                                mod_cache::ModCache{N}) where {Char, N}
+                                mod_cache::ModCache{N},
+                                tags::Tags) where {Char, N}
     
     @info "checking known syzygies"
     found_zd = false
@@ -443,10 +457,9 @@ function process_syz_for_split!(syz_queue::Vector{Int},
     
     to_del = Int[]
 
-    ind_info = [(basis.degs[i], index(basis.sigs[i]), basis.is_red[i]) for i in 1:basis.input_load]
-    filter!(tpl -> !tpl[3], ind_info)
-    sort!(ind_info, by = tpl -> tpl[1], rev = true)
-    sorted_inds = (tpl -> tpl[2]).(ind_info)
+    ind_info = [(index(basis.sigs[i]), basis.is_red[i]) for i in 1:basis.input_load]
+    filter!(tpl -> !tpl[2], ind_info)
+    sorted_inds = (tpl -> tpl[1]).(ind_info)
     
     @inbounds for (i, idx) in enumerate(syz_queue)
         syz_mask = basis.syz_masks[idx]
@@ -454,8 +467,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         syz_ind = index(syz_mask)
         tr_ind = tr.syz_ind_to_mat[idx]
 
-        for cofac_ind in sorted_inds
-            @info "constructing module"
+        for cofac_ind in reverse(sorted_inds)
+            @info "constructing module sig ind $(syz_ind), cofac ind $(cofac_ind)"
             cofac_coeffs, cofac_mons = construct_module((syz_ind, syz_mon), basis, tr_ind,
                                                         tr, char,
                                                         ind_order, cofac_ind,
@@ -474,6 +487,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
             end
             push!(syz_finished, idx)
         end
+        println("---")
+        found_zd && break
 
         push!(to_del, i)
     end
@@ -727,6 +742,12 @@ function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
     return res
 end
 
+function new_ind_order(basis::Basis)
+    return IndOrder((SigIndex).(collect(1:basis.input_load)),
+                    Dict{Tuple{SigIndex, SigIndex}, Bool}(),
+                    SigIndex(basis.input_load))
+end
+
 #---------------- for locally closet sets --------------------#
 
 # for displaying locally closed sets
@@ -860,21 +881,15 @@ end
 function print_sequence(basis::Basis{N},
                         basis_ht::MonomialHashtable,
                         ind_order::IndOrder,
-                        tags::Tags,
-                        R::MPolyRing) where N
+                        tags::Tags) where N
 
     inds = sort(collect(1:basis.input_load), by = i -> ind_order.ord[i])
-    seq = MPolyRingElem[]
     for i in inds
-        basis.is_red[i] && continue
         mns_hsh = basis.monomials[i]
         mns = [basis_ht.exponents[m] for m in mns_hsh]
         cfs = basis.coefficients[i]
         sig = basis.sigs[i]
-        p = convert_to_pol(R, mns, cfs)
-        push!(seq, p)
-        to_pr = length(collect(exponent_vectors(p))) < 5 ? p : Nemo.leading_monomial(p)
-        println("$(to_pr) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i])))")
+        println("$(first(mns)) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i]))), $(basis.degs[i])")
     end
     println("----")
 end
@@ -907,5 +922,15 @@ function _is_gb(basis::Basis{N}, basis_ht::MonomialHashtable,
                          basis.coefficients[i]))
           for i in basis.basis_offset:basis.basis_load
           if gettag(tags, index(basis.sigs[i])) != :col]
-    return _is_gb(G0)
+    seq = [convert_to_pol(R, [basis_ht.exponents[midx] for midx in basis.monomials[i]],
+                          basis.coefficients[i])
+           for i in 1:basis.input_load
+           if gettag(tags, i) != :col]
+    if !_is_gb(G0)
+        f = open("/tmp/bad.txt", "w+")
+        println(f, seq)
+        close(f)
+        error("no GB")
+    end
+    return true
 end

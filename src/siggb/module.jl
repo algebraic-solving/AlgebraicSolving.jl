@@ -74,7 +74,7 @@ function construct_module(sig::Sig{N},
         j_mod_coeffs = j_sig_mod[1]
         mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar), vchar)
         j_mod_mons = j_sig_mod[2]
-        res = add_pols_2(res..., mul_j_mod_coeffs, j_mod_mons, vchar)
+        res = add_pols(res..., mul_j_mod_coeffs, j_mod_mons, vchar)
     end
 
     diag_coeff = tr_mat.diagonal[row_ind]
@@ -115,10 +115,10 @@ function mul_by_coeff!(coeffs::Vector{Coeff},
     end
 end
 
-function add_pols(mons1::Vector{M},
-                  mons2::Vector{M},
-                  coeffs1::Vector{Coeff},
+function add_pols(coeffs1::Vector{Coeff},
+                  mons1::Vector{M},
                   coeffs2::Vector{Coeff},
+                  mons2::Vector{M},
                   vch::Val{Char}) where {M <: Monomial, Char}
 
     l1 = length(mons1)
@@ -163,9 +163,12 @@ function add_pols(mons1::Vector{M},
         ind2 += 1
     end
 
-    
     resize!(mons_res, new_l)
     resize!(coeffs_res, new_l)
+
+    zero_cfs_inds = findall(c -> iszero(c), coeffs_res)
+    deleteat!(mons_res, zero_cfs_inds)
+    deleteat!(coeffs_res, zero_cfs_inds)
 
     return coeffs_res, mons_res
 end
