@@ -214,7 +214,7 @@ function add_pols_2(cfs1::Vector{Coeff},
     res_cfs = Vector{Coeff}(undef, lp)
     @inbounds for (i, (cf, evec)) in enumerate(zip(cfs, exps)) 
         m = monomial(SVector{N}((Exp).(evec)))
-        cff = cf.data
+        cff = Int(lift(ZZ, cf))
         res_exps[i] = m
         res_cfs[i] = cff
     end
