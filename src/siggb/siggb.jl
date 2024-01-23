@@ -390,6 +390,7 @@ function split!(basis::Basis{N},
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         lc_set1 = deepcopy(lc_set)
         h = convert_to_pol(ring(lc_set1), cofac_mons, cofac_coeffs)
+        println(h)
         add_equation!(lc_set1, h)
 
         ind_ord1 = new_ind_order(basis1)
