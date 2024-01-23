@@ -106,7 +106,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
 
         s = basis.sigs[i]
         ctx = MPolyBuildCtx(R)
-        push_term!(ctx, 1, Vector{Int}(monomial(s).exps))
+        push_term!(ctx, base_ring(R)(1), Vector{Int}(monomial(s).exps))
         sig = (Int(index(s)), finish(ctx))
 
         push!(outp, (sig, pol))
@@ -260,8 +260,6 @@ function sig_decomp!(basis::Basis{N},
             neqns -= length(to_del_eqns)
             deleteat!(lc_set.eqns, to_del_eqns)
             @info "finished component $(neqns) eqns, codim $(codim(lc_set))"
-            # @assert _is_gb(bs, basis_ht, tgs, char)
-            # @assert codim(lc_set) == neqns
             push!(result, lc_set)
         end
         @info "------------------------------------------"
@@ -278,6 +276,7 @@ function siggb_for_split!(basis::Basis{N},
                           shift::Val{Shift},
                           lc_set::LocClosedSet) where {N, Char, Shift}
 
+    print_sequence(basis, basis_ht, ind_order, tags)
     # tracer
     tr = new_tracer()
 
@@ -337,8 +336,8 @@ function siggb_for_split!(basis::Basis{N},
 end
 
 function split!(basis::Basis{N},
-                basis_ht::MonomialHashtable,
-                cofac_mons::Vector{Monomial{N}},
+                basis_ht::MonomialHashtable{N},
+                cofac_mons_hsh::Vector{MonIdx},
                 cofac_coeffs::Vector{Coeff},
                 zd_ind::SigIndex,
                 tags::Tags,
@@ -350,7 +349,9 @@ function split!(basis::Basis{N},
         # 1st component
         sys1_mons = copy(basis.monomials[1:basis.input_load])
         sys1_coeffs = copy(basis.coefficients[1:basis.input_load])
-        zd_deg = first(cofac_mons).deg
+        sort!(cofac_mons_hsh, by = midx -> basis_ht.exponents[midx],
+              lt = lt_drl, rev = true)
+        zd_deg = basis_ht.exponents[first(cofac_mons_hsh)].deg
 
         nz_from = findfirst(i -> gettag(tags, i) == :col, 1:basis.input_load)
         if isnothing(nz_from)
@@ -362,8 +363,7 @@ function split!(basis::Basis{N},
         end
 
         # insert zd in system
-        cofac_mons_hashed = [insert_in_hash_table!(basis_ht, m) for m in cofac_mons]
-        insert!(sys1_mons, ins_ind, cofac_mons_hashed)
+        insert!(sys1_mons, ins_ind, cofac_mons_hsh)
         insert!(sys1_coeffs, ins_ind, cofac_coeffs)
 
         # tags for first system
@@ -387,6 +387,7 @@ function split!(basis::Basis{N},
             add_unit_pair!(basis1, ps1, i, basis1.degs[i])
         end
 
+        cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         lc_set1 = deepcopy(lc_set)
         h = convert_to_pol(ring(lc_set1), cofac_mons, cofac_coeffs)
         add_equation!(lc_set1, h)
@@ -396,7 +397,7 @@ function split!(basis::Basis{N},
         # 2nd component
         sys2_mons = copy(basis.monomials[1:basis.input_load])
         sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
-        push!(sys2_mons, cofac_mons_hashed)
+        push!(sys2_mons, cofac_mons_hsh)
         push!(sys2_coeffs, cofac_coeffs)
         deleteat!(sys2_mons, zd_ind)
         deleteat!(sys2_coeffs, zd_ind)
@@ -450,9 +451,11 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 tags::Tags) where {Char, N}
     
     @info "checking known syzygies"
+    max_t_length = maximum(ts -> length(ts), basis.monomials[basis.basis_offset:basis.basis_load])
+    @info "max term length in basis $(max_t_length)"
     found_zd = false
     zd_coeffs = Coeff[]
-    zd_mons = Monomial{N}[]
+    zd_mons_hsh = MonIdx[]
     zd_ind = zero(SigIndex)
     
     to_del = Int[]
@@ -469,19 +472,23 @@ function process_syz_for_split!(syz_queue::Vector{Int},
 
         for cofac_ind in reverse(sorted_inds)
             @info "constructing module sig ind $(syz_ind), cofac ind $(cofac_ind)"
-            cofac_coeffs, cofac_mons = construct_module((syz_ind, syz_mon), basis, tr_ind,
-                                                        tr, char,
-                                                        ind_order, cofac_ind,
-                                                        mod_cache)
+            cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
+                                                            basis_ht,
+                                                            tr_ind,
+                                                            tr, char,
+                                                            ind_order, cofac_ind,
+                                                            mod_cache)
+            println("$(length(cofac_mons_hsh)) terms")
             if isempty(cofac_coeffs)
                 continue
             end
-            isz = my_iszero_normal_form(cofac_mons, cofac_coeffs, lc_set.gb)
+            isz = my_iszero_normal_form(cofac_mons_hsh, cofac_coeffs,
+                                        basis_ht, lc_set.gb)
             if isz
                 continue
             else
                 found_zd = true
-                zd_coeffs, zd_mons = cofac_coeffs, cofac_mons
+                zd_coeffs, zd_mons_hsh = cofac_coeffs, cofac_mons_hsh
                 zd_ind = cofac_ind
                 break
             end
@@ -507,7 +514,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         end
     end
 
-    return found_zd, zd_coeffs, zd_mons, zd_ind
+    return found_zd, zd_coeffs, zd_mons_hsh, zd_ind
 end
 
 #---------------- functions for setting up data structures --------------------#
@@ -566,9 +573,9 @@ function input_setup(sys::Vector{<:MPolyRingElem})
             m = monomial(SVector{nv}((Exp).(exps[j])))
             eidx = insert_in_hash_table!(basis_ht, m)
             if isone(j)
-                inver = inv(Coeff(cfs[1].data), char)
+                inver = inv(Coeff(lift(ZZ, cfs[1]).d), char)
             end
-            cf = isone(j) ? one(Coeff) : mul(inver, Coeff(cfs[j].data), char)
+            cf = isone(j) ? one(Coeff) : mul(inver, Coeff(lift(ZZ, cfs[j]).d), char)
             mons[j] = eidx
             coeffs[j] = cf
         end
@@ -612,7 +619,7 @@ function convert_to_pol(R::MPolyRing,
 
     ctx = MPolyBuildCtx(R)
     for (e, c) in zip(exps, coeffs)
-        push_term!(ctx, c, Vector{Int}(e.exps))
+        push_term!(ctx, base_ring(R)(c), Vector{Int}(e.exps))
     end
     return finish(ctx)
 end

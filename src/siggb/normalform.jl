@@ -70,12 +70,14 @@ end
 
 # compute normal form with respect to basis
 # *without* computing a GB for the corresponding ideal
-function my_iszero_normal_form(mons::Vector{Monomial{N}},
+function my_iszero_normal_form(mons::Vector{MonIdx},
                                coeffs::Vector{Coeff},
+                               ht::MonomialHashtable{N},
                                gb::Vector{<:MPolyRingElem}) where N
     
 
     R = parent(first(gb))
+    @inbounds mons = [ht.exponents[midx] for midx in mons]
     f = convert_to_pol(R, mons, coeffs)
     F = [f]
     nr_vars     = nvars(R)

@@ -14,7 +14,7 @@ function _convert_to_msolve(
     
     nr_vars    = nvars(R)
     nr_gens    = length(F)
-    lens       = Int32[F[i].length for i in 1:nr_gens]
+    lens       = Int32[length(F[i]) for i in 1:nr_gens]
     nr_terms   = sum(lens)
     field_char = characteristic(R)
 
@@ -37,7 +37,8 @@ function _convert_to_msolve(
     else
         for i in 1:nr_gens
             for cf in coefficients(F[i])
-                push!(cfs, Int32(data(prime_field(base_ring(R))(cf))))
+                cf_int = lift(ZZ, cf).d
+                push!(cfs, Int32(cf_int))
             end
         end
     end

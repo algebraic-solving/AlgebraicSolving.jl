@@ -1,4 +1,5 @@
 function construct_module(basis::Basis{N},
+                          basis_ht::MonomialHashtable{N},
                           basis_index::Int,
                           tr::Tracer,
                           vchar::Val{Char},
@@ -13,7 +14,8 @@ function construct_module(basis::Basis{N},
 
     if basis_index >= basis.basis_offset
         @inbounds mat_ind = tr.basis_ind_to_mat[basis_index]
-        res = construct_module(sig, basis, mat_ind, tr,
+        res = construct_module(sig, basis, basis_ht,
+                               mat_ind, tr,
                                vchar, 
                                ind_order, idx,
                                mod_cache)
@@ -21,9 +23,10 @@ function construct_module(basis::Basis{N},
     else
         # if it was an input element we just take the signature
         if index(sig) == idx
-            return ([one(Coeff)], [monomial(sig)])
+            mon_hsh_idx = insert_in_hash_table!(basis_ht, monomial(sig))
+            return ([one(Coeff)], [mon_hsh_idx])
         else
-            return (Coeff[], Monomial{N}[])
+            return (Coeff[], MonIdx[])
         end
     end
 end
@@ -31,6 +34,7 @@ end
 # construct a module representation out of a given sig
 function construct_module(sig::Sig{N},
                           basis::Basis{N},
+                          basis_ht::MonomialHashtable{N},
                           mat_index::Int,
                           tr::Tracer,
                           vchar::Val{Char},
@@ -51,14 +55,27 @@ function construct_module(sig::Sig{N},
     row_ind, rewr_basis_ind = tr_mat.rows[sig]
 
     # construct module representation of canonical rewriter
-    rewr_mod = construct_module(basis, rewr_basis_ind, tr, vchar,
-                                ind_ord, idx, mod_cache)
+    rewr_mod_cfs, rewr_mod_mns = construct_module(basis, basis_ht, rewr_basis_ind,
+                                                  tr, vchar,
+                                                  ind_ord, idx, mod_cache)
 
     # multiply by monomial
     rewr_sig = basis.sigs[rewr_basis_ind]
     mult = divide(monomial(sig), monomial(rewr_sig))
-    isone = all(iszero, mult.exps)
-    res = (copy(rewr_mod[1]), isone ? copy(rewr_mod[2]) : mul_by_mon(rewr_mod[2], mult))
+    plength = length(rewr_mod_cfs)
+    res_mod_cfs, res_mod_mns = copy(rewr_mod_cfs), Vector{MonIdx}(undef, plength)
+    if all(iszero, mult.exps)
+        @inbounds for i in 1:plength
+            res_mod_mns[i] = rewr_mod_mns[i]
+        end
+    else
+        hsh = Base.hash(mult)
+        insert_multiplied_poly_in_hash_table!(res_mod_mns, hsh, mult, rewr_mod_mns,
+                                              basis_ht, basis_ht)
+        s = sortperm(res_mod_mns)
+        res_mod_cfs = res_mod_cfs[s]
+        res_mod_mns = res_mod_mns[s]
+    end
 
     # construct module rep of all reducers
     @inbounds row_ops = tr_mat.col_inds_and_coeffs[row_ind]
@@ -67,21 +84,23 @@ function construct_module(sig::Sig{N},
         if ind_ord.ord[index(j_sig)] < ind_ord.ord[idx]
             continue
         end
-        j_sig_mod = construct_module(j_sig, basis, mat_index,
+        j_sig_mod = construct_module(j_sig, basis, basis_ht,
+                                     mat_index,
                                      tr, vchar,
                                      ind_ord,
                                      idx, mod_cache)
         j_mod_coeffs = j_sig_mod[1]
         mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar), vchar)
         j_mod_mons = j_sig_mod[2]
-        res = add_pols(res..., mul_j_mod_coeffs, j_mod_mons, vchar)
+        res_mod_cfs, res_mod_mns = add_pols(res_mod_cfs, res_mod_mns,
+                                            mul_j_mod_coeffs, j_mod_mons, vchar)
     end
 
     diag_coeff = tr_mat.diagonal[row_ind]
-    mul_by_coeff!(res[1], diag_coeff, vchar)
+    mul_by_coeff!(res_mod_cfs, diag_coeff, vchar)
 
-    mod_cache[(sig, idx)] = res
-    return res
+    mod_cache[(sig, idx)] = res_mod_cfs, res_mod_mns
+    return res_mod_cfs, res_mod_mns
 end
 
 # functions for polynomials
@@ -115,15 +134,16 @@ function mul_by_coeff!(coeffs::Vector{Coeff},
     end
 end
 
+# assumes mons are sorted ascendingly
 function add_pols(coeffs1::Vector{Coeff},
-                  mons1::Vector{M},
+                  mons1::Vector{MonIdx},
                   coeffs2::Vector{Coeff},
-                  mons2::Vector{M},
-                  vch::Val{Char}) where {M <: Monomial, Char}
+                  mons2::Vector{MonIdx},
+                  vch::Val{Char}) where {Char}
 
     l1 = length(mons1)
     l2 = length(mons2)
-    mons_res = Vector{M}(undef, l1 + l2)
+    mons_res = Vector{MonIdx}(undef, l1 + l2)
     coeffs_res = Vector{Coeff}(undef, l1 + l2)
     
     ind1 = 1
@@ -138,7 +158,7 @@ function add_pols(coeffs1::Vector{Coeff},
             coeffs_res[new_l] = add(coeffs1[ind1], coeffs2[ind2], vch)
             ind1 += 1
             ind2 += 1
-        elseif lt_drl(m2, m1)
+        elseif m1 < m2
             mons_res[new_l] = m1
             coeffs_res[new_l] = coeffs1[ind1]
             ind1 += 1
