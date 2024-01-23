@@ -349,8 +349,6 @@ function split!(basis::Basis{N},
         # 1st component
         sys1_mons = copy(basis.monomials[1:basis.input_load])
         sys1_coeffs = copy(basis.coefficients[1:basis.input_load])
-        sort!(cofac_mons_hsh, by = midx -> basis_ht.exponents[midx],
-              lt = lt_drl, rev = true)
         zd_deg = basis_ht.exponents[first(cofac_mons_hsh)].deg
 
         nz_from = findfirst(i -> gettag(tags, i) == :col, 1:basis.input_load)
@@ -390,7 +388,6 @@ function split!(basis::Basis{N},
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         lc_set1 = deepcopy(lc_set)
         h = convert_to_pol(ring(lc_set1), cofac_mons, cofac_coeffs)
-        println(h)
         add_equation!(lc_set1, h)
 
         ind_ord1 = new_ind_order(basis1)
@@ -504,6 +501,10 @@ function process_syz_for_split!(syz_queue::Vector{Int},
     deleteat!(syz_queue, to_del)
             
     if found_zd
+        s = sortperm(zd_mons_hsh, by = midx -> basis_ht.exponents[midx],
+                     lt = lt_drl, rev = true)
+        zd_mons_hsh = zd_mons_hsh[s]
+        zd_coeffs = zd_coeffs[s]
         # normalize cofac coefficients
         inver = inv(first(zd_coeffs), char)
         @inbounds for i in eachindex(zd_coeffs)
