@@ -251,7 +251,8 @@ function sig_decomp!(basis::Basis{N},
             bs1, ps1, tgs1, ind_ord1, lc_set1,
             bs2, ps2, tgs2, ind_ord2, lc_set2 = split!(bs, basis_ht, zd_mons,
                                                        zd_coeffs, zd_ind, tgs,
-                                                       ind_ord, lc_set)
+                                                       ind_ord, syz_finished,
+                                                       lc_set)
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1)))
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1, lc_set1, c))
         else
@@ -276,7 +277,6 @@ function siggb_for_split!(basis::Basis{N},
                           shift::Val{Shift},
                           lc_set::LocClosedSet) where {N, Char, Shift}
 
-    print_sequence(basis, basis_ht, ind_order, tags)
     # tracer
     tr = new_tracer()
 
@@ -342,6 +342,7 @@ function split!(basis::Basis{N},
                 zd_ind::SigIndex,
                 tags::Tags,
                 ind_order::IndOrder,
+                syz_finished::Vector{Int},
                 lc_set::LocClosedSet) where N
 
 
@@ -383,6 +384,18 @@ function split!(basis::Basis{N},
                 basis1.is_red[i] = true
             end
             add_unit_pair!(basis1, ps1, i, basis1.degs[i])
+        end
+
+        for idx in syz_finished
+            syz_sig_mon = basis.syz_sigs[idx]
+            syz_msk = basis.syz_masks[idx]
+            syz_sig_idx = index(syz_msk)
+            new_syz_idx = syz_sig_idx >= ins_ind ? syz_sig_idx+1 : syz_sig_idx
+            resize_syz!(basis1)
+            l = basis1.syz_load
+            basis1.syz_sigs[l+1] = syz_sig_mon
+            basis1.syz_masks[l+1] = (new_syz_idx, mask(syz_msk))
+            basis1.syz_load += 1
         end
 
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
@@ -449,8 +462,6 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 tags::Tags) where {Char, N}
     
     @info "checking known syzygies"
-    max_t_length = maximum(ts -> length(ts), basis.monomials[basis.basis_offset:basis.basis_load])
-    @info "max term length in basis $(max_t_length)"
     found_zd = false
     zd_coeffs = Coeff[]
     zd_mons_hsh = MonIdx[]
@@ -469,14 +480,12 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         tr_ind = tr.syz_ind_to_mat[idx]
 
         for cofac_ind in reverse(sorted_inds)
-            @info "constructing module sig ind $(syz_ind), cofac ind $(cofac_ind)"
             cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
                                                             basis_ht,
                                                             tr_ind,
                                                             tr, char,
                                                             ind_order, cofac_ind,
                                                             mod_cache)
-            println("$(length(cofac_mons_hsh)) terms")
             if isempty(cofac_coeffs)
                 continue
             end
@@ -492,7 +501,6 @@ function process_syz_for_split!(syz_queue::Vector{Int},
             end
             push!(syz_finished, idx)
         end
-        println("---")
         found_zd && break
 
         push!(to_del, i)
