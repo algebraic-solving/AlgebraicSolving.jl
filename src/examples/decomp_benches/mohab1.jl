@@ -1,3 +1,4 @@
+using Pkg; Pkg.activate("../../../")
 using AlgebraicSolving
 P, (u,v,w,x) = polynomial_ring(GF(1119649), ["u", "v", "w", "x"]);
 

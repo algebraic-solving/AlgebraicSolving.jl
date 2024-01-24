@@ -1,3 +1,4 @@
+using Pkg; Pkg.activate("../../../")
 using AlgebraicSolving
 P, (z2,z3,z4,z5,z6) = polynomial_ring(GF(1652237), ["z$(i)" for i in 2:6])
 
