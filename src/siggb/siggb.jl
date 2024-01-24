@@ -140,7 +140,9 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     result = with_logger(logger) do
         R = parent(first(sys))
-        lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift, tags, R)
+        timer = Timings(0.0, 0.0, 0.0, 0.0, 0.0)
+        lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift, tags, R, timer)
+        @info timer
         return lc_sets
     end
 end
@@ -209,7 +211,8 @@ function sig_decomp!(basis::Basis{N},
                      char::Val{Char},
                      shift::Val{Shift},
                      tags::Tags,
-                     R::MPolyRing) where {N, Char, Shift}
+                     R::MPolyRing,
+                     timer::Timings) where {N, Char, Shift}
 
     # index order
     ind_order = new_ind_order(basis)
@@ -245,14 +248,15 @@ function sig_decomp!(basis::Basis{N},
         zd_mons, zd_ind, syz_finished = siggb_for_split!(bs, ps,
                                                          tgs, ind_ord,
                                                          basis_ht, char,
-                                                         shift, lc_set)
+                                                         shift, lc_set,
+                                                         timer)
         if found_zd
             @info "splitting component"
             bs1, ps1, tgs1, ind_ord1, lc_set1,
             bs2, ps2, tgs2, ind_ord2, lc_set2 = split!(bs, basis_ht, zd_mons,
                                                        zd_coeffs, zd_ind, tgs,
                                                        ind_ord, syz_finished,
-                                                       lc_set)
+                                                       lc_set, timer)
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1)))
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1, lc_set1, c))
         else
@@ -275,7 +279,8 @@ function siggb_for_split!(basis::Basis{N},
                           basis_ht::MonomialHashtable,
                           char::Val{Char},
                           shift::Val{Shift},
-                          lc_set::LocClosedSet) where {N, Char, Shift}
+                          lc_set::LocClosedSet,
+                          timer::Timings) where {N, Char, Shift}
 
     # tracer
     tr = new_tracer()
@@ -293,14 +298,18 @@ function siggb_for_split!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        deg = select_normal!(pairset, basis, matrix,
-                             basis_ht, symbol_ht, ind_order, tags)
-        symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
-                     ind_order, tags)
+        tim = @elapsed deg = select_normal!(pairset, basis, matrix,
+                                            basis_ht, symbol_ht, ind_order, tags)
+        timer.select_time += tim
+        tim = @elapsed symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+                                    ind_order, tags)
+        timer.sym_pp_time += tim
 
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tr_mat = echelonize!(matrix, tags, ind_order, char, shift)
+        tim = @elapsed tr_mat = echelonize!(matrix, tags, ind_order, char, shift)
+        timer.lin_alg_time += tim
+
         push!(tr.mats, tr_mat)
 
         update_siggb!(basis, matrix, pairset,
@@ -313,7 +322,7 @@ function siggb_for_split!(basis::Basis{N},
         does_split, cofac_coeffs, cofac_mons,
         cofac_ind = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                            basis, tr, ind_order, char, lc_set,
-                                           mod_cache, tags)
+                                           mod_cache, tags, timer)
 
         if does_split
             return true, false, cofac_coeffs,
@@ -325,7 +334,7 @@ function siggb_for_split!(basis::Basis{N},
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                        basis, tr, ind_order, char, lc_set,
-                                       mod_cache, tags)
+                                       mod_cache, tags, timer)
 
     if does_split
         return true, false, cofac_coeffs, cofac_mons,
@@ -343,7 +352,8 @@ function split!(basis::Basis{N},
                 tags::Tags,
                 ind_order::IndOrder,
                 syz_finished::Vector{Int},
-                lc_set::LocClosedSet) where N
+                lc_set::LocClosedSet,
+                timer::Timings) where N
 
 
     @inbounds begin
@@ -401,7 +411,8 @@ function split!(basis::Basis{N},
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         lc_set1 = deepcopy(lc_set)
         h = convert_to_pol(ring(lc_set1), cofac_mons, cofac_coeffs)
-        add_equation!(lc_set1, h)
+        tim = @elapsed add_equation!(lc_set1, h)
+        timer.comp_lc_time += tim
 
         ind_ord1 = new_ind_order(basis1)
                 
@@ -436,15 +447,12 @@ function split!(basis::Basis{N},
         end
 
         lc_set2 = deepcopy(lc_set)
-        add_ineqation!(lc_set2, h)
+        tim = @elapsed add_ineqation!(lc_set2, h)
+        timer.comp_lc_time += tim
         deleteat!(lc_set2.eqns, zd_ind)
 
         ind_ord2 = new_ind_order(basis2)
     end
-
-    # print_sequence(basis, basis_ht, ind_order, tags, ring(lc_set))
-    # print_sequence(basis1, basis_ht, ind_ord1, tags1, ring(lc_set1))
-    # print_sequence(basis2, basis_ht, ind_ord2, tags2, ring(lc_set2))
 
     return basis1, ps1, tags1, ind_ord1, lc_set1,
            basis2, ps2, tags2, ind_ord2, lc_set2
@@ -459,7 +467,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 char::Val{Char},
                                 lc_set::LocClosedSet,
                                 mod_cache::ModCache{N},
-                                tags::Tags) where {Char, N}
+                                tags::Tags,
+                                timer::Timings) where {Char, N}
     
     @info "checking known syzygies"
     found_zd = false
@@ -480,12 +489,13 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         tr_ind = tr.syz_ind_to_mat[idx]
 
         for cofac_ind in reverse(sorted_inds)
-            cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
-                                                            basis_ht,
-                                                            tr_ind,
-                                                            tr, char,
-                                                            ind_order, cofac_ind,
-                                                            mod_cache)
+            tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
+                                                                           basis_ht,
+                                                                           tr_ind,
+                                                                           tr, char,
+                                                                           ind_order, cofac_ind,
+                                                                           mod_cache)
+            timer.module_time += tim
             if isempty(cofac_coeffs)
                 continue
             end
@@ -950,4 +960,13 @@ function _is_gb(basis::Basis{N}, basis_ht::MonomialHashtable,
         error("no GB")
     end
     return true
+end
+
+function Base.show(io::IO, timer::Timings)
+    @printf io "\n"
+    @printf io "symbolic pp:         %.2f\n" timer.sym_pp_time
+    @printf io "linear algebra:      %.2f\n" timer.lin_alg_time
+    @printf io "select:              %.2f\n" timer.select_time
+    @printf io "module construction: %.2f\n" timer.module_time
+    @printf io "ideal computation:   %.2f\n" timer.comp_lc_time
 end

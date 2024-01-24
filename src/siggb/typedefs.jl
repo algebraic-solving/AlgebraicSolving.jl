@@ -152,3 +152,12 @@ mutable struct LocClosedSet{T<:MPolyRingElem}
         return new(eqns, ineqns, gb)
     end
 end
+
+# for benchmarking
+mutable struct Timings
+    sym_pp_time::Float32
+    lin_alg_time::Float32
+    select_time::Float32
+    module_time::Float32
+    comp_lc_time::Float32
+end
