@@ -140,7 +140,7 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     result = with_logger(logger) do
         R = parent(first(sys))
-        timer = Timings(0.0, 0.0, 0.0, 0.0, 0.0)
+        timer = Timings(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift, tags, R, timer)
         @info timer
         return lc_sets
@@ -312,10 +312,11 @@ function siggb_for_split!(basis::Basis{N},
 
         push!(tr.mats, tr_mat)
 
-        update_siggb!(basis, matrix, pairset,
-                      symbol_ht, basis_ht,
-                      ind_order, tags,
-                      tr, char, syz_queue)
+        time = @elapsed update_siggb!(basis, matrix, pairset,
+                                      symbol_ht, basis_ht,
+                                      ind_order, tags,
+                                      tr, char, syz_queue)
+        timer.update_time += tim
 
         # check to see if we can split with one of the syzygies
         sort!(syz_queue, by = sz -> monomial(basis.sigs[sz]).deg)
@@ -810,7 +811,14 @@ end
 
 function is_empty_set(X::LocClosedSet)
     R = ring(X)
-    return one(R) in X.gb
+    if one(R) in X.gb
+        return true
+    else
+        println(last(gens(R)))
+        gb2 = saturate(X.gb, last(gens(R)))
+        return one(R) in gb2
+    end
+    return false
 end
 
 function add_equation!(X::LocClosedSet, f::MPolyRingElem)
@@ -967,6 +975,7 @@ function Base.show(io::IO, timer::Timings)
     @printf io "symbolic pp:         %.2f\n" timer.sym_pp_time
     @printf io "linear algebra:      %.2f\n" timer.lin_alg_time
     @printf io "select:              %.2f\n" timer.select_time
+    @printf io "update:              %.2f\n" timer.update_time
     @printf io "module construction: %.2f\n" timer.module_time
     @printf io "ideal computation:   %.2f\n" timer.comp_lc_time
 end
