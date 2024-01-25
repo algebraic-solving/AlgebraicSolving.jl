@@ -73,6 +73,9 @@ function hull(X::LocClosedSet, g::MPolyRingElem)
     H = my_normal_form(sat_gb, gb)
     filter!(h -> !iszero(h), H)
     sort!(H, by = h -> total_degree(h))
+    if one(ring(X)) in H
+        return [X]
+    end
     return remove(X, H)
 end
 

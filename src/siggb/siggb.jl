@@ -334,9 +334,13 @@ function sig_kalk_decomp!(basis::Basis{N},
         bs, ps, tgs, ind_ord, lc_sets, syz_queue, tr = popfirst!(queue)
         isempty(lc_sets) && continue
         neqns = length(findall(i -> gettag(tgs, i) == :split, 1:bs.input_load))
-        @info "starting set of components, $(length(queue)) remaining, $(neqns) equations"
+        @info "starting set of components, $(length(queue)) remaining, $(neqns) equations, $(length(lc_sets)) components"
         @info "checking for empty components"
         filter!(!is_empty_set, lc_sets)
+        if isempty(lc_sets)
+            @info "------------------------------------------"
+            continue
+        end
         @info "checking for equidimensional components"
         equidim_inds = findall(X -> codim(X) == length(X.eqns), lc_sets)
         @info "$(length(equidim_inds)) components already equidimensional"
@@ -661,6 +665,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         syz_ind = index(syz_mask)
         tr_ind = tr.syz_ind_to_mat[idx]
 
+        push!(to_del, i)
         for cofac_ind in reverse(sorted_inds)
             tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
                                                                            basis_ht,
@@ -687,7 +692,6 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         end
         found_zd && break
 
-        push!(to_del, i)
     end
 
     deleteat!(syz_queue, to_del)
