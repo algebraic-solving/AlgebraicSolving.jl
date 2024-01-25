@@ -148,6 +148,38 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
     end
 end
 
+function sig_kalk_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
+
+    # data structure setup/conversion
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
+    
+    # fill basis, pairset, tags
+    basis = fill_basis!(sys_mons, sys_coeffs, basis_ht)
+    nv = ngens(parent(first(sys)))
+    pairset = init_pairset(Val(nv))
+    tags = Tags()
+    @inbounds for i in 1:basis.input_load
+        add_unit_pair!(basis, pairset, i, basis.degs[i])
+        tags[SigIndex(i)] = :split
+    end
+
+    sysl = length(sys)
+    # compute divmasks
+    fill_divmask!(basis_ht)
+    @inbounds for i in 1:sysl
+        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
+    end
+
+    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    result = with_logger(logger) do
+        R = parent(first(sys))
+        timer = Timings(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        lc_sets = sig_kalk_decomp!(basis, pairset, basis_ht, char, shift, tags, R, timer)
+        @info timer
+        return lc_sets
+    end
+end
+
 #---------------- function for sig_groebner_basis --------------------#
 
 function siggb!(basis::Basis{N},
@@ -245,19 +277,22 @@ function sig_decomp!(basis::Basis{N},
             @info "------------------------------------------"
             continue
         end
+        syz_queue = Int[]
+        tr = new_tracer()
         found_zd, isempty, zd_coeffs,
         zd_mons, zd_ind, _, syz_finished = siggb_for_split!(bs, ps,
                                                             tgs, ind_ord,
-                                                            basis_ht, char,
-                                                            shift, lc_set,
+                                                            basis_ht, tr, syz_queue,
+                                                            char, shift, [lc_set],
                                                             timer)
         if found_zd
             @info "splitting component"
-            bs1, ps1, tgs1, ind_ord1, lc_set1,
-            bs2, ps2, tgs2, ind_ord2, lc_set2 = split!(bs, basis_ht, zd_mons,
-                                                       zd_coeffs, zd_ind, tgs,
-                                                       ind_ord, syz_finished,
-                                                       lc_set, timer)
+            tim = @elapsed bs1, ps1, tgs1, ind_ord1, lc_set1,
+                           bs2, ps2, tgs2, ind_ord2, lc_set2 = split!(bs, basis_ht, zd_mons,
+                                                                      zd_coeffs, zd_ind, tgs,
+                                                                      ind_ord, syz_finished,
+                                                                      lc_set)
+            timer.comp_lc_time += tim
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1)))
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1, lc_set1, c))
         else
@@ -273,21 +308,92 @@ function sig_decomp!(basis::Basis{N},
     return result
 end
 
+function sig_kalk_decomp!(basis::Basis{N},
+                          pairset::Pairset,
+                          basis_ht::MonomialHashtable,
+                          char::Val{Char},
+                          shift::Val{Shift},
+                          tags::Tags,
+                          R::MPolyRing,
+                          timer::Timings) where {N, Char, Shift}
+
+    # index order
+    ind_order = new_ind_order(basis)
+
+    # compute ideal
+    eqns = [convert_to_pol(R, [basis_ht.exponents[mdx] for mdx in basis.monomials[i]],
+                           basis.coefficients[i])
+            for i in 1:basis.input_load]
+    X = LocClosedSet{eltype(eqns)}(eqns, eltype(eqns)[])
+    tracer = new_tracer()
+    
+    queue = [(basis, pairset, tags, ind_order, [X], Int[], tracer)]
+    result = LocClosedSet[]
+
+    while !isempty(queue)
+        bs, ps, tgs, ind_ord, lc_sets, syz_queue, tr = popfirst!(queue)
+        isempty(lc_sets) && continue
+        neqns = length(findall(i -> gettag(tgs, i) == :split, 1:bs.input_load))
+        @info "starting set of components, $(length(queue)) remaining, $(neqns) equations"
+        @info "checking for empty components"
+        filter!(!is_empty_set, lc_sets)
+        @info "checking for equidimensional components"
+        equidim_inds = findall(X -> codim(X) == length(X.eqns), lc_sets)
+        @info "$(length(equidim_inds)) components already equidimensional"
+        append!(result, lc_sets[equidim_inds])
+        # what syntax!
+        if !isempty(equidim_inds)
+            lc_sets = lc_sets[1:end .∉ equidim_inds]
+            if isempty(lc_sets)
+                @info "------------------------------------------"
+                continue
+            end
+        end
+        
+        found_zd, isemptyset, zd_coeffs,
+        zd_mons, zd_ind, nz_nf_inds, _ = siggb_for_split!(bs, ps,
+                                                          tgs, ind_ord,
+                                                          basis_ht, tr, syz_queue,
+                                                          char, shift, lc_sets,
+                                                          timer)
+        if found_zd
+            @info "splitting components"
+            tim = @elapsed new_lc_sets1, bs2, ps2, tgs2,
+                           ind_ord2, new_lc_sets2 = kalksplit!(bs, basis_ht,
+                                                               zd_mons, zd_coeffs,
+                                                               zd_ind, nz_nf_inds,
+                                                               tags, ind_ord,
+                                                               lc_sets)
+            timer.comp_lc_time += tim
+            lc_sets1 = vcat(lc_sets[1:end .∉ nz_nf_inds], new_lc_sets1)
+            lc_sets2 = new_lc_sets2
+            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_sets2, Int[], new_tracer()))
+            pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_sets1, syz_queue, tr))
+        else
+            to_del_eqns = findall(i -> bs.is_red[i], 1:neqns)
+            neqns -= length(to_del_eqns)
+            [deleteat!(X.eqns, to_del_eqns) for X in lc_sets]
+            @info "finished components $(neqns) eqns"
+            append!(result, lc_sets)
+        end
+        @info "------------------------------------------"
+    end
+    return result
+end
+
 function siggb_for_split!(basis::Basis{N},
                           pairset::Pairset,
                           tags::Tags,
                           ind_order::IndOrder,
                           basis_ht::MonomialHashtable,
+                          tr::Tracer,
+                          syz_queue::Vector{Int},
                           char::Val{Char},
                           shift::Val{Shift},
-                          lc_set::LocClosedSet,
-                          timer::Timings) where {N, Char, Shift}
-
-    # tracer
-    tr = new_tracer()
+                          lc_sets::Vector{LocClosedSet{T}},
+                          timer::Timings) where {N, Char, Shift, T <: MPolyRingElem}
 
     # syz queue
-    syz_queue = Int[]
     syz_finished = collect(1:basis.syz_load)
 
     # module cache
@@ -323,7 +429,7 @@ function siggb_for_split!(basis::Basis{N},
         sort!(syz_queue, by = sz -> monomial(basis.sigs[sz]).deg)
         does_split, cofac_coeffs, cofac_mons,
         cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
-                                                       basis, tr, ind_order, char, [lc_set],
+                                                       basis, tr, ind_order, char, lc_sets,
                                                        mod_cache, tags, timer)
 
         if does_split
@@ -336,7 +442,7 @@ function siggb_for_split!(basis::Basis{N},
     end
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
-                                                   basis, tr, ind_order, char, [lc_set],
+                                                   basis, tr, ind_order, char, lc_sets,
                                                    mod_cache, tags, timer)
 
     if does_split
@@ -355,8 +461,7 @@ function split!(basis::Basis{N},
                 tags::Tags,
                 ind_order::IndOrder,
                 syz_finished::Vector{Int},
-                lc_set::LocClosedSet,
-                timer::Timings) where N
+                lc_set::LocClosedSet) where N
 
 
     @inbounds begin
@@ -414,8 +519,7 @@ function split!(basis::Basis{N},
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         lc_set1 = deepcopy(lc_set)
         h = convert_to_pol(ring(lc_set1), cofac_mons, cofac_coeffs)
-        tim = @elapsed add_equation!(lc_set1, h)
-        timer.comp_lc_time += tim
+        add_equation!(lc_set1, h)
 
         ind_ord1 = new_ind_order(basis1)
                 
@@ -450,8 +554,7 @@ function split!(basis::Basis{N},
         end
 
         lc_set2 = deepcopy(lc_set)
-        tim = @elapsed add_inequation!(lc_set2, h)
-        timer.comp_lc_time += tim
+        add_inequation!(lc_set2, h)
         deleteat!(lc_set2.eqns, zd_ind)
 
         ind_ord2 = new_ind_order(basis2)
@@ -459,6 +562,72 @@ function split!(basis::Basis{N},
 
     return basis1, ps1, tags1, ind_ord1, lc_set1,
            basis2, ps2, tags2, ind_ord2, lc_set2
+end    
+
+function kalksplit!(basis::Basis{N},
+                    basis_ht::MonomialHashtable{N},
+                    cofac_mons_hsh::Vector{MonIdx},
+                    cofac_coeffs::Vector{Coeff},
+                    zd_ind::SigIndex,
+                    nz_nf_inds::Vector{Int},
+                    tags::Tags,
+                    ind_order::IndOrder,
+                    lc_sets::Vector{LocClosedSet{T}}) where {N, T <: MPolyRingElem}
+
+
+    @inbounds begin
+        cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
+        h = convert_to_pol(ring(first(lc_sets)), cofac_mons, cofac_coeffs)
+
+        # compute hull(X, h) for relevant X
+        lc_sets_new1 = LocClosedSet{T}[]
+        for X in lc_sets[nz_nf_inds]
+            append!(lc_sets_new1, hull(X, h))
+        end
+                
+        # 2nd kind of component
+        sys2_mons = copy(basis.monomials[1:basis.input_load])
+        sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
+        push!(sys2_mons, cofac_mons_hsh)
+        push!(sys2_coeffs, cofac_coeffs)
+        deleteat!(sys2_mons, zd_ind)
+        deleteat!(sys2_coeffs, zd_ind)
+
+        nz_from = findfirst(i -> gettag(tags, i) == :col, 1:basis.input_load)
+        if isnothing(nz_from)
+            nz_from = basis.input_load+1
+        end
+        # new tags
+        tags2 = Tags()
+        for k in keys(tags)
+            if k < nz_from-1
+                tags2[k] = :split
+            else
+                tags2[k] = :col
+            end
+        end
+
+        # build basis/pairset for second new system
+        basis2 = fill_basis!(sys2_mons, sys2_coeffs,
+                             basis_ht)
+
+        ps2 = init_pairset(Val(N))
+        @inbounds for i in 1:basis2.input_load
+            if gettag(tags2, i) == :col
+                basis2.is_red[i] = true
+            end
+            add_unit_pair!(basis2, ps2, i, basis2.degs[i])
+        end
+
+        lc_sets_new2 = [h in X.ineqns ? X : add_inequation(X, h) for X in lc_sets[nz_nf_inds]]
+        for X in lc_sets_new2
+            deleteat!(X.eqns, zd_ind)
+        end
+
+        ind_ord2 = new_ind_order(basis2)
+    end
+
+    return lc_sets_new1, basis2, ps2, tags2, ind_ord2, lc_sets_new2
 end    
 
 function process_syz_for_split!(syz_queue::Vector{Int},
@@ -846,5 +1015,5 @@ function Base.show(io::IO, timer::Timings)
     @printf io "select:              %.2f\n" timer.select_time
     @printf io "update:              %.2f\n" timer.update_time
     @printf io "module construction: %.2f\n" timer.module_time
-    @printf io "ideal computation:   %.2f\n" timer.comp_lc_time
+    @printf io "splitting:           %.2f\n" timer.comp_lc_time
 end
