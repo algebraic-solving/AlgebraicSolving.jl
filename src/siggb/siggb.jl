@@ -246,11 +246,11 @@ function sig_decomp!(basis::Basis{N},
             continue
         end
         found_zd, isempty, zd_coeffs,
-        zd_mons, zd_ind, syz_finished = siggb_for_split!(bs, ps,
-                                                         tgs, ind_ord,
-                                                         basis_ht, char,
-                                                         shift, lc_set,
-                                                         timer)
+        zd_mons, zd_ind, _, syz_finished = siggb_for_split!(bs, ps,
+                                                            tgs, ind_ord,
+                                                            basis_ht, char,
+                                                            shift, lc_set,
+                                                            timer)
         if found_zd
             @info "splitting component"
             bs1, ps1, tgs1, ind_ord1, lc_set1,
@@ -322,28 +322,29 @@ function siggb_for_split!(basis::Basis{N},
         # check to see if we can split with one of the syzygies
         sort!(syz_queue, by = sz -> monomial(basis.sigs[sz]).deg)
         does_split, cofac_coeffs, cofac_mons,
-        cofac_ind = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
-                                           basis, tr, ind_order, char, lc_set,
-                                           mod_cache, tags, timer)
+        cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
+                                                       basis, tr, ind_order, char, [lc_set],
+                                                       mod_cache, tags, timer)
 
         if does_split
             return true, false, cofac_coeffs,
-                   cofac_mons, cofac_ind, syz_finished
+                   cofac_mons, cofac_ind, nz_nf_inds,
+                   syz_finished
         end
 
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
     does_split, cofac_coeffs, cofac_mons,
-    cofac_ind = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
-                                       basis, tr, ind_order, char, lc_set,
-                                       mod_cache, tags, timer)
+    cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
+                                                   basis, tr, ind_order, char, [lc_set],
+                                                   mod_cache, tags, timer)
 
     if does_split
         return true, false, cofac_coeffs, cofac_mons,
-               cofac_ind, syz_finished
+               cofac_ind, nz_nf_inds, syz_finished
     end
 
-    return false, false, Coeff[], Monomial{N}[], zero(SigIndex), syz_finished
+    return false, false, Coeff[], Monomial{N}[], zero(SigIndex), Int[], syz_finished
 end
 
 function split!(basis::Basis{N},
@@ -467,16 +468,17 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 tr::Tracer,
                                 ind_order::IndOrder,
                                 char::Val{Char},
-                                lc_set::LocClosedSet,
+                                lc_sets::Vector{LocClosedSet{T}},
                                 mod_cache::ModCache{N},
                                 tags::Tags,
-                                timer::Timings) where {Char, N}
+                                timer::Timings) where {Char, N, T <: MPolyRingElem}
     
     @info "checking known syzygies"
     found_zd = false
     zd_coeffs = Coeff[]
     zd_mons_hsh = MonIdx[]
     zd_ind = zero(SigIndex)
+    nz_nf_inds = Int[]
     
     to_del = Int[]
 
@@ -501,14 +503,15 @@ function process_syz_for_split!(syz_queue::Vector{Int},
             if isempty(cofac_coeffs)
                 continue
             end
-            isz = my_iszero_normal_form(cofac_mons_hsh, cofac_coeffs,
-                                        basis_ht, lc_set.gb)
-            if isz
+            iszs = [my_iszero_normal_form(cofac_mons_hsh, cofac_coeffs,
+                                          basis_ht, lc_set.gb) for lc_set in lc_sets]
+            if all(iszs)
                 continue
             else
                 found_zd = true
                 zd_coeffs, zd_mons_hsh = cofac_coeffs, cofac_mons_hsh
                 zd_ind = cofac_ind
+                nz_nf_inds = findall(b -> !b, iszs)
                 break
             end
             push!(syz_finished, idx)
@@ -536,7 +539,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         end
     end
 
-    return found_zd, zd_coeffs, zd_mons_hsh, zd_ind
+    return found_zd, zd_coeffs, zd_mons_hsh, zd_ind, nz_nf_inds
 end
 
 #---------------- functions for setting up data structures --------------------#

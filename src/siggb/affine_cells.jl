@@ -40,7 +40,6 @@ function is_empty_set(X::LocClosedSet)
     if one(R) in X.gb
         return true
     else
-        println(last(gens(R)))
         gb2 = saturate(X.gb, last(gens(R)))
         return one(R) in gb2
     end
