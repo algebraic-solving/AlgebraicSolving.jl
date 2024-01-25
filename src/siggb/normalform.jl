@@ -124,6 +124,64 @@ function my_iszero_normal_form(mons::Vector{MonIdx},
     return iszero(first(res))
 end
 
+function my_normal_form(F::Vector{T},
+                        gb::Vector{T};
+                        nr_thrds::Int=1,
+                        info_level::Int=0) where T <: MPolyRingElem
+
+    if (length(F) == 0 || length(gb) == 0)
+        error("Input data not valid.")
+    end
+
+    R = first(F).parent
+    nr_vars     = nvars(R)
+    field_char  = Int(characteristic(R))
+
+    if !(is_probable_prime(field_char))
+        error("At the moment we only supports finite fields.")
+    end
+
+    G = gb
+
+    tbr_nr_gens = length(F)
+    bs_nr_gens  = length(G)
+    is_gb       = 1
+
+    # convert ideal to flattened arrays of ints
+    tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve(F)
+    bs_lens, bs_cfs, bs_exps    = _convert_to_msolve(G)
+
+    nf_ld  = Ref(Cint(0))
+    nf_len = Ref(Ptr{Cint}(0))
+    nf_exp = Ref(Ptr{Cint}(0))
+    nf_cf  = Ref(Ptr{Cvoid}(0))
+
+    nr_terms  = ccall((:export_nf, libneogb), Int,
+        (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
+        Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid},
+        Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+        cglobal(:jl_malloc), nf_ld, nf_len, nf_exp, nf_cf, tbr_nr_gens, tbr_lens, tbr_exps,
+        tbr_cfs, bs_nr_gens, bs_lens, bs_exps, bs_cfs, field_char, 0, 0, nr_vars, is_gb,
+        nr_thrds, info_level)
+
+    # convert to julia array, also give memory management to julia
+    jl_ld   = nf_ld[]
+    jl_len  = Base.unsafe_wrap(Array, nf_len[], jl_ld)
+    jl_exp  = Base.unsafe_wrap(Array, nf_exp[], nr_terms*nr_vars)
+    ptr     = reinterpret(Ptr{Int32}, nf_cf[])
+    jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
+
+    basis = _convert_finite_field_array_to_abstract_algebra(
+                jl_ld, jl_len, jl_cf, jl_exp, R, 0)
+
+    ccall((:free_f4_julia_result_data, libneogb), Nothing ,
+          (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
+           Ptr{Ptr{Cvoid}}, Int, Int),
+          cglobal(:jl_free), nf_len, nf_exp, nf_cf, jl_ld, field_char)
+
+    return basis
+end
+
 # compute normal forms with msolve
 @inline function _convert_to_msolve(exps::Vector{<:Monomial},
                                     cfs::Vector{Coeff})

@@ -14,6 +14,7 @@ include("symbolic_pp.jl")
 include("linear_algebra.jl")
 include("module.jl")
 include("normalform.jl")
+include("affine_cells.jl")
 
 
 #---------------- user functions --------------------#
@@ -448,7 +449,7 @@ function split!(basis::Basis{N},
         end
 
         lc_set2 = deepcopy(lc_set)
-        tim = @elapsed add_ineqation!(lc_set2, h)
+        tim = @elapsed add_inequation!(lc_set2, h)
         timer.comp_lc_time += tim
         deleteat!(lc_set2.eqns, zd_ind)
 
@@ -776,142 +777,7 @@ function new_ind_order(basis::Basis)
                     SigIndex(basis.input_load))
 end
 
-#---------------- for locally closet sets --------------------#
 
-# for displaying locally closed sets
-function Base.show(io::IO, lc::LocClosedSet)
-    string_rep = "V("
-    for (i, f) in enumerate(lc.eqns)
-        if i != length(lc.eqns)
-            string_rep *= "$f, "
-        else
-            string_rep *= "$(f)) \\ "
-        end
-    end
-    string_rep *= "V("
-    for (i, f) in enumerate(lc.ineqns)
-        if i != length(lc.ineqns)
-            string_rep *= "($f)*"
-        else
-            string_rep *= "($f)"
-        end
-    end
-    string_rep *= ")"
-    print(io, string_rep)
-end
-
-function ring(X::LocClosedSet)
-    return parent(first(X.eqns))
-end
-
-function codim(X::LocClosedSet)
-    mis = first(max_ind_sets(X.gb))
-    return length(findall(b -> !b, mis))
-end
-
-function is_empty_set(X::LocClosedSet)
-    R = ring(X)
-    if one(R) in X.gb
-        return true
-    else
-        println(last(gens(R)))
-        gb2 = saturate(X.gb, last(gens(R)))
-        return one(R) in gb2
-    end
-    return false
-end
-
-function add_equation!(X::LocClosedSet, f::MPolyRingElem)
-    @info "adding equation"
-    push!(X.eqns, f)
-    X.gb = saturate(push!(X.gb, f), X.ineqns)
-end
-
-function add_ineqation!(X::LocClosedSet, h::MPolyRingElem)
-    @info "adding inequation"
-    push!(X.ineqns, h)
-    X.gb = saturate(X.gb, h)
-end
-
-function saturate(F::Vector{P}, nzs::Vector{P}) where {P <: MPolyRingElem}
-    res = F
-    if isempty(nzs)
-        res = groebner_basis(Ideal(res), complete_reduction = true)
-    else
-        for h in nzs
-            res = saturate(res, h)
-        end
-    end
-    return res
-end
-
-function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
-    R = parent(first(F))
-    S, vars = polynomial_ring(base_ring(R), pushfirst!(["x$i" for i in 1:nvars(R)], "t"),
-                             ordering = :degrevlex)
-    Fconv = typeof(first(F))[]
-    for f in F
-        ctx = MPolyBuildCtx(S)
-        for (e, c) in zip(exponent_vectors(f), coefficients(f))
-            enew = pushfirst!(e, 0)
-            push_term!(ctx, c, e)
-        end
-        push!(Fconv, finish(ctx))
-    end
-
-    ctx = MPolyBuildCtx(S)
-    for (e, c) in zip(exponent_vectors(nz), coefficients(nz))
-        enew = pushfirst!(e, 0)
-        push_term!(ctx, c, e)
-    end
-    push!(Fconv, first(vars)*finish(ctx) - 1)
-
-    gb = groebner_basis(Ideal(Fconv), complete_reduction = true, eliminate = 1)
-
-    # convert back to original ring
-    res = Vector{P}(undef, length(gb))
-
-    for (i, p) in enumerate(gb)
-        ctx = MPolyBuildCtx(R)
-        for (e, c) in zip(exponent_vectors(p), coefficients(p))
-            push_term!(ctx, c, e[2:end])
-        end
-        res[i] = finish(ctx)
-    end
-    return res
-end
-
-function max_ind_sets(gb::Vector{P}) where {P <: MPolyRingElem}
-    R = parent(first(gb))
-    res = [trues(ngens(R))]
-
-    lms = (Nemo.leading_monomial).(gb)
-    for lm in lms
-        to_del = Int[]
-        new_miss = BitVector[]
-        for (i, mis) in enumerate(res)
-            nz_exps_inds = findall(e -> !iszero(e),
-                                   first(Nemo.exponent_vectors(lm)))
-            ind_var_inds = findall(mis)
-            if issubset(nz_exps_inds, ind_var_inds)
-                for j in nz_exps_inds
-                    new_mis = copy(mis)
-                    new_mis[j] = false
-                    push!(new_miss, new_mis)
-                end
-                push!(to_del, i)
-            end
-        end
-        deleteat!(res, to_del)
-        append!(res, new_miss)
-        unique!(res)
-    end
-
-    max_length = maximum(mis -> length(all(mis)), res)
-    filter!(mis -> length(mis) != max_length, res)
-    return res
-end
-    
 #---------------- for debugging --------------------#
 function print_sequence(basis::Basis{N},
                         basis_ht::MonomialHashtable,
