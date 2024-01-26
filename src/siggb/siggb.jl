@@ -338,6 +338,7 @@ function sig_kalk_decomp!(basis::Basis{N},
         @info "checking for empty components"
         filter!(!is_empty_set, lc_sets)
         if isempty(lc_sets)
+            @info "all components empty"
             @info "------------------------------------------"
             continue
         end
@@ -592,8 +593,6 @@ function kalksplit!(basis::Basis{N},
         # 2nd kind of component
         sys2_mons = copy(basis.monomials[1:basis.input_load])
         sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
-        push!(sys2_mons, cofac_mons_hsh)
-        push!(sys2_coeffs, cofac_coeffs)
         deleteat!(sys2_mons, zd_ind)
         deleteat!(sys2_coeffs, zd_ind)
 
@@ -623,7 +622,7 @@ function kalksplit!(basis::Basis{N},
             add_unit_pair!(basis2, ps2, i, basis2.degs[i])
         end
 
-        lc_sets_new2 = [h in X.ineqns ? X : add_inequation(X, h) for X in lc_sets[nz_nf_inds]]
+        lc_sets_new2 = [add_inequation(X, h) for X in lc_sets[nz_nf_inds]]
         for X in lc_sets_new2
             deleteat!(X.eqns, zd_ind)
         end
