@@ -26,6 +26,7 @@ function construct_module(basis::Basis{N},
     else
         # if it was an input element we just take the signature
         if index(sig) == idx
+            check_enlarge_hashtable!(basis_ht, 1)
             mon_hsh_idx = insert_in_hash_table!(basis_ht, monomial(sig))
             return ([one(Coeff)], [mon_hsh_idx])
         else
@@ -76,6 +77,7 @@ function construct_module(sig::Sig{N},
         end
     elseif !maintain_nf
         hsh = Base.hash(mult)
+        check_enlarge_hashtable!(basis_ht, plength)
         insert_multiplied_poly_in_hash_table!(res_mod_mns, hsh, mult,
                                               rewr_mod_mns,
                                               basis_ht, basis_ht)

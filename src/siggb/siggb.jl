@@ -284,7 +284,7 @@ function sig_decomp!(basis::Basis{N},
                                                             tgs, ind_ord,
                                                             basis_ht, tr, syz_queue,
                                                             char, shift, [lc_set],
-                                                            timer)
+                                                            timer, maintain_nf=true)
         if found_zd
             @info "splitting component"
             tim = @elapsed bs1, ps1, tgs1, ind_ord1, lc_set1,
@@ -396,7 +396,8 @@ function siggb_for_split!(basis::Basis{N},
                           char::Val{Char},
                           shift::Val{Shift},
                           lc_sets::Vector{LocClosedSet{T}},
-                          timer::Timings) where {N, Char, Shift, T <: MPolyRingElem}
+                          timer::Timings;
+                          maintain_nf::Bool=false) where {N, Char, Shift, T <: MPolyRingElem}
 
     # syz queue
     syz_finished = collect(1:basis.syz_load)
@@ -435,7 +436,8 @@ function siggb_for_split!(basis::Basis{N},
         does_split, cofac_coeffs, cofac_mons,
         cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                        basis, tr, ind_order, char, lc_sets,
-                                                       mod_cache, tags, timer, maintain_nf = true)
+                                                       mod_cache, tags, timer,
+                                                       maintain_nf = maintain_nf)
 
         if does_split
             return true, false, cofac_coeffs,
@@ -448,7 +450,8 @@ function siggb_for_split!(basis::Basis{N},
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                    basis, tr, ind_order, char, lc_sets,
-                                                   mod_cache, tags, timer, maintain_nf = true)
+                                                   mod_cache, tags, timer,
+                                                   maintain_nf = maintain_nf)
 
     if does_split
         return true, false, cofac_coeffs, cofac_mons,
@@ -585,6 +588,7 @@ function kalksplit!(basis::Basis{N},
         h = convert_to_pol(ring(first(lc_sets)), cofac_mons, cofac_coeffs)
 
         # compute hull(X, h) for relevant X
+        @info "taking hull"
         lc_sets_new1 = LocClosedSet{T}[]
         for X in lc_sets[nz_nf_inds]
             append!(lc_sets_new1, hull(X, h))
@@ -622,6 +626,7 @@ function kalksplit!(basis::Basis{N},
             add_unit_pair!(basis2, ps2, i, basis2.degs[i])
         end
 
+        @info "adding inequation"
         lc_sets_new2 = [add_inequation(X, h) for X in lc_sets[nz_nf_inds]]
         for X in lc_sets_new2
             deleteat!(X.eqns, zd_ind)
@@ -828,6 +833,7 @@ function convert_to_ht(f::MPolyRingElem,
     mons = Vector{MonIdx}(undef, lf)
     coeffs = Vector{Coeff}(undef, lf)
     inver = one(Coeff)
+    check_enlarge_hashtable!(ht, lf)
     @inbounds for j in 1:lf
         m = monomial(SVector{N}((Exp).(exps[j])))
         eidx = insert_in_hash_table!(ht, m)

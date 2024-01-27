@@ -53,7 +53,7 @@ function add_equation!(X::LocClosedSet, f::MPolyRingElem)
 end
 
 function add_inequation!(X::LocClosedSet, h::MPolyRingElem)
-    @info "adding inequation"
+    @info "adding inequation of degree $(total_degree(h))"
     push!(X.ineqns, h)
     X.gb = saturate(X.gb, h)
 end
@@ -73,6 +73,7 @@ function hull(X::LocClosedSet, g::MPolyRingElem)
     H = my_normal_form(sat_gb, gb)
     filter!(h -> !iszero(h), H)
     sort!(H, by = h -> total_degree(h))
+    # TODO: what to do if one(ring(X)) in H here?
     if one(ring(X)) in H
         return [X]
     end
