@@ -643,7 +643,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 lc_sets::Vector{LocClosedSet{T}},
                                 mod_cache::ModCache{N},
                                 tags::Tags,
-                                timer::Timings) where {Char, N, T <: MPolyRingElem}
+                                timer::Timings;
+                                maintain_nf::Bool=false) where {Char, N, T <: MPolyRingElem}
     
     @info "checking known syzygies"
     found_zd = false
@@ -657,6 +658,14 @@ function process_syz_for_split!(syz_queue::Vector{Int},
     ind_info = [(index(basis.sigs[i]), basis.is_red[i]) for i in 1:basis.input_load]
     filter!(tpl -> !tpl[2], ind_info)
     sorted_inds = (tpl -> tpl[1]).(ind_info)
+
+    if maintain_nf
+        @assert isone(length(lc_sets))
+        gb = first(lc_sets).gb
+    else
+        R = ring(first(lc_sets))
+        gb = [zero(R)]
+    end
     
     @inbounds for (i, idx) in enumerate(syz_queue)
         syz_mask = basis.syz_masks[idx]
@@ -671,7 +680,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                                                            tr_ind,
                                                                            tr, char,
                                                                            ind_order, cofac_ind,
-                                                                           mod_cache)
+                                                                           mod_cache, gb,
+                                                                           maintain_nf=maintain_nf)
             timer.module_time += tim
             if isempty(cofac_coeffs)
                 continue

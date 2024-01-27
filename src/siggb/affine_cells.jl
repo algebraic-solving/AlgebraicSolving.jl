@@ -90,9 +90,10 @@ function remove(X::LocClosedSet,
         return cells
     else
         Y = add_inequation(X, h)
+        G = Y.gb
         push!(res, Y)
         for Z in cells
-            cells2 = hull(Z, h)
+            cells2 = remove(Z, G)
             append!(res, cells2)
         end
         return res

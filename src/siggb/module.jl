@@ -5,7 +5,9 @@ function construct_module(basis::Basis{N},
                           vchar::Val{Char},
                           ind_order::IndOrder,
                           idx::SigIndex,
-                          mod_cache::ModCache{N}) where {N, Char}
+                          mod_cache::ModCache{N},
+                          gb::Vector{T};
+                          maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
 
     @inbounds sig = basis.sigs[basis_index]
     if haskey(mod_cache, (sig, idx))
@@ -18,7 +20,8 @@ function construct_module(basis::Basis{N},
                                mat_ind, tr,
                                vchar, 
                                ind_order, idx,
-                               mod_cache)
+                               mod_cache, gb,
+                               maintain_nf=maintain_nf)
         return res
     else
         # if it was an input element we just take the signature
@@ -40,7 +43,9 @@ function construct_module(sig::Sig{N},
                           vchar::Val{Char},
                           ind_ord::IndOrder,
                           idx::SigIndex,
-                          mod_cache::ModCache{N}) where {N, Char}
+                          mod_cache::ModCache{N},
+                          gb::Vector{T};
+                          maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
 
     if haskey(mod_cache, (sig, idx))
         return mod_cache[(sig, idx)]
@@ -57,7 +62,8 @@ function construct_module(sig::Sig{N},
     # construct module representation of canonical rewriter
     rewr_mod_cfs, rewr_mod_mns = construct_module(basis, basis_ht, rewr_basis_ind,
                                                   tr, vchar,
-                                                  ind_ord, idx, mod_cache)
+                                                  ind_ord, idx, mod_cache, gb,
+                                                  maintain_nf=maintain_nf)
 
     # multiply by monomial
     rewr_sig = basis.sigs[rewr_basis_ind]
@@ -88,7 +94,8 @@ function construct_module(sig::Sig{N},
                                      mat_index,
                                      tr, vchar,
                                      ind_ord,
-                                     idx, mod_cache)
+                                     idx, mod_cache,
+                                     gb, maintain_nf=maintain_nf)
         j_mod_coeffs = j_sig_mod[1]
         mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar), vchar)
         j_mod_mons = j_sig_mod[2]
