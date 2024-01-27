@@ -74,13 +74,21 @@ function construct_module(sig::Sig{N},
         @inbounds for i in 1:plength
             res_mod_mns[i] = rewr_mod_mns[i]
         end
-    else
+    elseif !maintain_nf
         hsh = Base.hash(mult)
-        insert_multiplied_poly_in_hash_table!(res_mod_mns, hsh, mult, rewr_mod_mns,
+        insert_multiplied_poly_in_hash_table!(res_mod_mns, hsh, mult,
+                                              rewr_mod_mns,
                                               basis_ht, basis_ht)
         s = sortperm(res_mod_mns)
         res_mod_cfs = res_mod_cfs[s]
         res_mod_mns = res_mod_mns[s]
+    else
+        R = parent(first(gb))
+        m = convert_to_pol(R, [mult], [one(Coeff)])
+        f = convert_to_pol(R, [basis_ht.exponents[midx] for midx in rewr_mod_mns],
+                           rewr_mod_cfs)
+        mf_nf = first(my_normal_form([m*f], gb))
+        res_mod_cfs, res_mod_mns = convert_to_ht(mf_nf, basis_ht, vchar)
     end
 
     # construct module rep of all reducers

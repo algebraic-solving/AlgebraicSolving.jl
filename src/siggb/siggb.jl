@@ -435,7 +435,7 @@ function siggb_for_split!(basis::Basis{N},
         does_split, cofac_coeffs, cofac_mons,
         cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                        basis, tr, ind_order, char, lc_sets,
-                                                       mod_cache, tags, timer)
+                                                       mod_cache, tags, timer, maintain_nf = true)
 
         if does_split
             return true, false, cofac_coeffs,
@@ -448,7 +448,7 @@ function siggb_for_split!(basis::Basis{N},
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                    basis, tr, ind_order, char, lc_sets,
-                                                   mod_cache, tags, timer)
+                                                   mod_cache, tags, timer, maintain_nf = true)
 
     if does_split
         return true, false, cofac_coeffs, cofac_mons,
@@ -531,8 +531,8 @@ function split!(basis::Basis{N},
         # 2nd component
         sys2_mons = copy(basis.monomials[1:basis.input_load])
         sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
-        push!(sys2_mons, cofac_mons_hsh)
-        push!(sys2_coeffs, cofac_coeffs)
+        # push!(sys2_mons, cofac_mons_hsh)
+        # push!(sys2_coeffs, cofac_coeffs)
         deleteat!(sys2_mons, zd_ind)
         deleteat!(sys2_coeffs, zd_ind)
 
@@ -771,25 +771,9 @@ function input_setup(sys::Vector{<:MPolyRingElem})
         lf = length(f)
 
         # gather up monomials and coeffs
-        exps = collect(exponent_vectors(f))
-        cfs = collect(coefficients(f))
-        mons = Vector{MonIdx}(undef, lf)
-        coeffs = Vector{Coeff}(undef, lf)
-        inver = one(Coeff)
-        @inbounds for j in 1:lf
-            m = monomial(SVector{nv}((Exp).(exps[j])))
-            eidx = insert_in_hash_table!(basis_ht, m)
-            if isone(j)
-                inver = inv(Coeff(lift(ZZ, cfs[1]).d), char)
-            end
-            cf = isone(j) ? one(Coeff) : mul(inver, Coeff(lift(ZZ, cfs[j]).d), char)
-            mons[j] = eidx
-            coeffs[j] = cf
-        end
-        s = sortperm(mons, by = eidx -> basis_ht.exponents[eidx],
-                     lt = lt_drl, rev = true)
-        mons = mons[s]
-        coeffs = coeffs[s]
+        coeffs, mons = convert_to_ht(f, basis_ht, char,
+                                     by = eidx -> basis_ht.exponents[eidx],
+                                     lt = lt_drl, rev = true)
         sys_mons[i] = copy(mons)
         sys_coeffs[i] = copy(coeffs)
     end
@@ -829,6 +813,36 @@ function convert_to_pol(R::MPolyRing,
         push_term!(ctx, base_ring(R)(c), Vector{Int}(e.exps))
     end
     return finish(ctx)
+end
+
+function convert_to_ht(f::MPolyRingElem,
+                       ht::MonomialHashtable{N},
+                       char::Val{Char};
+                       kwargs...) where {N, Char}
+
+    lf = length(f)
+
+    # gather up monomials and coeffs
+    exps = collect(exponent_vectors(f))
+    cfs = collect(coefficients(f))
+    mons = Vector{MonIdx}(undef, lf)
+    coeffs = Vector{Coeff}(undef, lf)
+    inver = one(Coeff)
+    @inbounds for j in 1:lf
+        m = monomial(SVector{N}((Exp).(exps[j])))
+        eidx = insert_in_hash_table!(ht, m)
+        if isone(j)
+            inver = inv(Coeff(lift(ZZ, cfs[1]).d), char)
+        end
+        cf = isone(j) ? one(Coeff) : mul(inver, Coeff(lift(ZZ, cfs[j]).d),
+                                         char)
+        mons[j] = eidx
+        coeffs[j] = cf
+    end
+    s = sortperm(mons; kwargs...)
+    mons = mons[s]
+    coeffs = coeffs[s]
+    return coeffs, mons
 end
 
 function new_basis(basis_size, syz_size,
