@@ -139,6 +139,9 @@ function my_normal_form(mns::Vector{MonIdx},
     bs_nr_gens = length(bs_lens)
     is_gb = 1
 
+    nr_thrds = 1
+    info_level = 0
+
     tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve([mul(mult, basis_ht.exponents[midx]) for midx in mns], cfs)
                         
     nf_ld  = Ref(Cint(0))
@@ -161,7 +164,7 @@ function my_normal_form(mns::Vector{MonIdx},
     ptr     = reinterpret(Ptr{Int32}, nf_cf[])
     jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
 
-    coeffs_res, mns_res = convert_ms_to_ht(jf_ld, jf_len, jl_cf,
+    coeffs_res, mns_res = convert_ms_to_ht(jl_ld, jl_len, jl_cf,
                                            jl_exp,
                                            basis_ht)
 

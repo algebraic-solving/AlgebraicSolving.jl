@@ -9,8 +9,7 @@ function construct_module(basis::Basis{N},
                           gb_lens::Vector{Int32},
                           gb_cfs::Vector{Int32},
                           gb_exps::Vector{Int32};
-                          maintain_nf::Bool=false) where {N, Char,
-                                                          T <: MPolyRingElem}
+                          maintain_nf::Bool=false) where {N, Char}
 
     @inbounds sig = basis.sigs[basis_index]
     if haskey(mod_cache, (sig, idx))
@@ -52,7 +51,7 @@ function construct_module(sig::Sig{N},
                           gb_lens::Vector{Int32},
                           gb_cfs::Vector{Int32},
                           gb_exps::Vector{Int32};
-                          maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
+                          maintain_nf::Bool=false) where {N, Char}
 
     if haskey(mod_cache, (sig, idx))
         return mod_cache[(sig, idx)]
@@ -93,7 +92,6 @@ function construct_module(sig::Sig{N},
         res_mod_cfs = res_mod_cfs[s]
         res_mod_mns = res_mod_mns[s]
     else
-        mf_nf = first(my_normal_form([m*f], gb))
         res_mod_cfs, res_mod_mns = my_normal_form(rewr_mod_mns,
                                                   rewr_mod_cfs,
                                                   mult,
