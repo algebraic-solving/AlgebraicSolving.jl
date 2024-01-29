@@ -124,6 +124,55 @@ function my_iszero_normal_form(mons::Vector{MonIdx},
     return iszero(first(res))
 end
 
+function my_normal_form(mns::Vector{MonIdx},
+                        cfs::Vector{Coeff},
+                        mult::Monomial{N},
+                        bs_lens::Vector{Int32},
+                        bs_cfs::Vector{Int32},
+                        bs_exps::Vector{Int32},
+                        basis_ht::MonomialHashtable{N},
+                        char::Val{Char}) where {N, Char}
+
+    nr_vars = N
+    field_char = Int(Char)
+    tbr_nr_gens = 1
+    bs_nr_gens = length(bs_lens)
+    is_gb = 1
+
+    tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve([mul(mult, basis_ht.exponents[midx]) for midx in mns], cfs)
+                        
+    nf_ld  = Ref(Cint(0))
+    nf_len = Ref(Ptr{Cint}(0))
+    nf_exp = Ref(Ptr{Cint}(0))
+    nf_cf  = Ref(Ptr{Cvoid}(0))
+
+    nr_terms  = ccall((:export_nf, libneogb), Int,
+        (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
+        Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid},
+        Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+        cglobal(:jl_malloc), nf_ld, nf_len, nf_exp, nf_cf, tbr_nr_gens, tbr_lens, tbr_exps,
+        tbr_cfs, bs_nr_gens, bs_lens, bs_exps, bs_cfs, field_char, 0, 0, nr_vars, is_gb,
+        nr_thrds, info_level)
+
+    # convert to julia array, also give memory management to julia
+    jl_ld   = nf_ld[]
+    jl_len  = Base.unsafe_wrap(Array, nf_len[], jl_ld)
+    jl_exp  = Base.unsafe_wrap(Array, nf_exp[], nr_terms*nr_vars)
+    ptr     = reinterpret(Ptr{Int32}, nf_cf[])
+    jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
+
+    coeffs_res, mns_res = convert_ms_to_ht(jf_ld, jf_len, jl_cf,
+                                           jl_exp,
+                                           basis_ht)
+
+    ccall((:free_f4_julia_result_data, libneogb), Nothing ,
+          (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
+           Ptr{Ptr{Cvoid}}, Int, Int),
+          cglobal(:jl_free), nf_len, nf_exp, nf_cf, jl_ld, field_char)
+
+    return first(coeffs_res), first(mns_res)
+end
+
 function my_normal_form(F::Vector{T},
                         gb::Vector{T};
                         nr_thrds::Int=1,
@@ -190,6 +239,41 @@ end
     @inbounds ms_cfs = [Int32(cfs[i]) for i in 1:len]
     @inbounds ms_exps = vcat([convert(Vector{Int32}, exps[i].exps) for i in 1:len]...)
     return [Int32(len)], ms_cfs, ms_exps
+end
+
+function convert_ms_to_ht(bld::Int32,
+                          blen::Vector{Int32},
+                          bcf::Vector{Int32},
+                          bexp::Vector{Int32},
+                          ht::MonomialHashtable{N}) where N
+
+    nr_gens = bld
+
+    coeffs_res = Vector{Vector{Coeff}}(undef, nr_gens)
+    mns_res = Vector{Vector{MonIdx}}(undef, nr_gens)
+
+    len = 0
+    for i in 1:nr_gens
+        cfs_i = Vector{Coeff}(undef, blen[i])
+        mns_i = Vector{MonIdx}(undef, blen[i])
+        coeffs_res[i] = cfs_i
+        mns_res[i] = mns_i
+        if bcf[len+1] == 0
+            resize!(cfs_i, 0)
+            resize!(mns_i, 0)
+            continue
+        else
+            for j in 1:blen[i]
+                cfs_i[j] = Coeff(bcf[len+j]) 
+                @assert !iszero(cfs_i[j])
+                exp_v = SVector{N, Exp}(bexp[(len+j-1)*N+1:(len+j)*N])
+                mns_i[j] = insert_in_hash_table!(ht, monomial(exp_v))
+            end
+        end
+        len += blen[i]
+    end
+
+    return coeffs_res, mns_res
 end
 
 function _convert_basis_to_msolve(basis::Basis,

@@ -6,8 +6,11 @@ function construct_module(basis::Basis{N},
                           ind_order::IndOrder,
                           idx::SigIndex,
                           mod_cache::ModCache{N},
-                          gb::Vector{T};
-                          maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
+                          gb_lens::Vector{Int32},
+                          gb_cfs::Vector{Int32},
+                          gb_exps::Vector{Int32};
+                          maintain_nf::Bool=false) where {N, Char,
+                                                          T <: MPolyRingElem}
 
     @inbounds sig = basis.sigs[basis_index]
     if haskey(mod_cache, (sig, idx))
@@ -20,7 +23,8 @@ function construct_module(basis::Basis{N},
                                mat_ind, tr,
                                vchar, 
                                ind_order, idx,
-                               mod_cache, gb,
+                               mod_cache,
+                               gb_lens, gb_cfs, gb_exps,
                                maintain_nf=maintain_nf)
         return res
     else
@@ -45,7 +49,9 @@ function construct_module(sig::Sig{N},
                           ind_ord::IndOrder,
                           idx::SigIndex,
                           mod_cache::ModCache{N},
-                          gb::Vector{T};
+                          gb_lens::Vector{Int32},
+                          gb_cfs::Vector{Int32},
+                          gb_exps::Vector{Int32};
                           maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
 
     if haskey(mod_cache, (sig, idx))
@@ -61,9 +67,11 @@ function construct_module(sig::Sig{N},
     row_ind, rewr_basis_ind = tr_mat.rows[sig]
 
     # construct module representation of canonical rewriter
-    rewr_mod_cfs, rewr_mod_mns = construct_module(basis, basis_ht, rewr_basis_ind,
+    rewr_mod_cfs, rewr_mod_mns = construct_module(basis, basis_ht,
+                                                  rewr_basis_ind,
                                                   tr, vchar,
-                                                  ind_ord, idx, mod_cache, gb,
+                                                  ind_ord, idx, mod_cache,
+                                                  gb_lens, gb_cfs, gb_exps,
                                                   maintain_nf=maintain_nf)
 
     # multiply by monomial
@@ -85,12 +93,12 @@ function construct_module(sig::Sig{N},
         res_mod_cfs = res_mod_cfs[s]
         res_mod_mns = res_mod_mns[s]
     else
-        R = parent(first(gb))
-        m = convert_to_pol(R, [mult], [one(Coeff)])
-        f = convert_to_pol(R, [basis_ht.exponents[midx] for midx in rewr_mod_mns],
-                           rewr_mod_cfs)
         mf_nf = first(my_normal_form([m*f], gb))
-        res_mod_cfs, res_mod_mns = convert_to_ht(mf_nf, basis_ht, vchar)
+        res_mod_cfs, res_mod_mns = my_normal_form(rewr_mod_mns,
+                                                  rewr_mod_cfs,
+                                                  mult,
+                                                  gb_lens, gb_cfs, gb_exps,
+                                                  basis_ht, vchar)
     end
 
     # construct module rep of all reducers
@@ -105,7 +113,8 @@ function construct_module(sig::Sig{N},
                                      tr, vchar,
                                      ind_ord,
                                      idx, mod_cache,
-                                     gb, maintain_nf=maintain_nf)
+                                     gb_lens, gb_cfs, gb_exps,
+                                     maintain_nf=maintain_nf)
         j_mod_coeffs = j_sig_mod[1]
         mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar), vchar)
         j_mod_mons = j_sig_mod[2]
