@@ -284,7 +284,7 @@ function sig_decomp!(basis::Basis{N},
                                                             tgs, ind_ord,
                                                             basis_ht, tr, syz_queue,
                                                             char, shift, [lc_set],
-                                                            timer, maintain_nf=true)
+                                                            timer, maintain_nf=false)
         if found_zd
             @info "splitting component"
             tim = @elapsed bs1, ps1, tgs1, ind_ord1, lc_set1,

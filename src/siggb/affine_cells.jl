@@ -69,11 +69,10 @@ end
 
 function hull(X::LocClosedSet, g::MPolyRingElem)
     gb = X.gb
-    sat_gb = saturate(gb, g)
-    H = my_normal_form(sat_gb, gb)
+    col_gb = quotient(gb, g)
+    H = my_normal_form(col_gb, gb)
     filter!(h -> !iszero(h), H)
     sort!(H, by = h -> total_degree(h))
-    # TODO: what to do if one(ring(X)) in H here?
     if one(ring(X)) in H
         return [X]
     end
@@ -122,20 +121,10 @@ function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
                              ordering = :degrevlex)
     Fconv = typeof(first(F))[]
     for f in F
-        ctx = MPolyBuildCtx(S)
-        for (e, c) in zip(exponent_vectors(f), coefficients(f))
-            enew = pushfirst!(e, 0)
-            push_term!(ctx, c, e)
-        end
-        push!(Fconv, finish(ctx))
+        push!(Fconv, convert_poly_to_t_ring(f, S))
     end
 
-    ctx = MPolyBuildCtx(S)
-    for (e, c) in zip(exponent_vectors(nz), coefficients(nz))
-        enew = pushfirst!(e, 0)
-        push_term!(ctx, c, e)
-    end
-    push!(Fconv, first(vars)*finish(ctx) - 1)
+    push!(Fconv, first(vars)*convert_poly_to_t_ring(nz, S) - 1)
 
     gb = groebner_basis(Ideal(Fconv), complete_reduction = true, eliminate = 1)
 
@@ -143,13 +132,50 @@ function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
     res = Vector{P}(undef, length(gb))
 
     for (i, p) in enumerate(gb)
-        ctx = MPolyBuildCtx(R)
-        for (e, c) in zip(exponent_vectors(p), coefficients(p))
-            push_term!(ctx, c, e[2:end])
-        end
-        res[i] = finish(ctx)
+        res[i] = convert_to_orig_ring(p, R)
     end
     return res
+end
+
+function quotient(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
+    R = parent(first(F))
+    S, vars = polynomial_ring(base_ring(R), pushfirst!(["x$i" for i in 1:nvars(R)], "t"),
+                             ordering = :degrevlex)
+    Fconv = typeof(first(F))[]
+    t = vars[1]
+    for f in F
+        push!(Fconv, t*convert_poly_to_t_ring(f, S))
+    end
+
+    push!(Fconv, (t-1)*convert_poly_to_t_ring(nz, S))
+
+    gb = groebner_basis(Ideal(Fconv), complete_reduction = true,
+                        eliminate = 1)
+
+    # convert back to original ring
+    res = Vector{P}(undef, length(gb))
+
+    for (i, p) in enumerate(gb)
+        res[i] = divides(convert_to_orig_ring(p, R), nz)[2]
+    end
+    return res
+end
+
+function convert_poly_to_t_ring(f::P, S::MPolyRing) where {P <: MPolyRingElem}
+    ctx = MPolyBuildCtx(S)
+    for (e, c) in zip(exponent_vectors(f), coefficients(f))
+        enew = pushfirst!(e, 0)
+        push_term!(ctx, c, e)
+    end
+    return finish(ctx)
+end
+
+function convert_to_orig_ring(f::P, R::MPolyRing) where {P <: MPolyRingElem}
+    ctx = MPolyBuildCtx(R)
+    for (e, c) in zip(exponent_vectors(f), coefficients(f))
+        push_term!(ctx, c, e[2:end])
+    end
+    return finish(ctx)
 end
 
 function max_ind_sets(gb::Vector{P}) where {P <: MPolyRingElem}
