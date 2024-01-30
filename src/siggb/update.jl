@@ -76,9 +76,7 @@ function add_basis_elem!(basis::Basis{N},
 
 
     # make sure we have enough space
-    if basis.basis_load == basis.basis_size
-        resize_basis!(basis)
-    end
+    resize_basis!(basis)
     
     # add to basis hashtable
     insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
@@ -405,20 +403,26 @@ function remove_red_pairs!(pairset::Pairset)
     pairset.load = j 
 end
 
+#---------------- resize functions --------------------#
+
 function resize_basis!(basis::Basis)
-    basis.basis_size *= 2
-    resize!(basis.sigs, basis.basis_size)
-    resize!(basis.sigmasks, basis.basis_size)
-    resize!(basis.sigratios, basis.basis_size)
-    resize!(basis.rewrite_nodes, basis.basis_size)
-    resize!(basis.lm_masks, basis.basis_size)
-    resize!(basis.monomials, basis.basis_size)
-    resize!(basis.coefficients, basis.basis_size)
-    resize!(basis.is_red, basis.basis_size)
+    if basis.basis_load >= basis.basis_size
+        basis.basis_size *= 2
+        resize!(basis.sigs, basis.basis_size)
+        resize!(basis.sigmasks, basis.basis_size)
+        resize!(basis.sigratios, basis.basis_size)
+        resize!(basis.rewrite_nodes, basis.basis_size)
+        resize!(basis.lm_masks, basis.basis_size)
+        resize!(basis.monomials, basis.basis_size)
+        resize!(basis.coefficients, basis.basis_size)
+        resize!(basis.is_red, basis.basis_size)
+        resize!(basis.mod_rep_known, basis.basis_size)
+        resize!(basis.mod_reps, basis.basis_size)
+    end
 end
 
 function resize_syz!(basis::Basis)
-    if basis.syz_load == basis.syz_size
+    if basis.syz_load >= basis.syz_size
         basis.syz_size *= 2
         resize!(basis.syz_sigs, basis.syz_size)
         resize!(basis.syz_masks, basis.syz_size)
@@ -438,9 +442,7 @@ function make_room_new_input_el!(basis::Basis,
         old_offset = basis.basis_offset
         basis.basis_offset += shift
         basis.basis_load += shift
-        if basis.basis_load >= basis.basis_size
-            resize_basis!(basis)
-        end
+        resize_basis!(basis)
 
         if tr.load + shift >= tr.size
             tr.size *= 2

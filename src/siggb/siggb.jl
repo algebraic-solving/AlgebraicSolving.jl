@@ -403,9 +403,6 @@ function siggb_for_split!(basis::Basis{N},
     # syz queue
     syz_finished = collect(1:basis.syz_load)
 
-    # module cache
-    mod_cache = ModCache{N}()
-
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
     while !iszero(pairset.load)
@@ -437,7 +434,7 @@ function siggb_for_split!(basis::Basis{N},
         does_split, cofac_coeffs, cofac_mons,
         cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                        basis, tr, ind_order, char, lc_sets,
-                                                       mod_cache, tags, timer,
+                                                       tags, timer,
                                                        maintain_nf = maintain_nf)
 
         if does_split
@@ -451,7 +448,7 @@ function siggb_for_split!(basis::Basis{N},
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                    basis, tr, ind_order, char, lc_sets,
-                                                   mod_cache, tags, timer,
+                                                   tags, timer,
                                                    maintain_nf = maintain_nf)
 
     if does_split
@@ -647,7 +644,6 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 ind_order::IndOrder,
                                 char::Val{Char},
                                 lc_sets::Vector{LocClosedSet{T}},
-                                mod_cache::ModCache{N},
                                 tags::Tags,
                                 timer::Timings;
                                 maintain_nf::Bool=false) where {Char, N, T <: MPolyRingElem}
@@ -667,9 +663,9 @@ function process_syz_for_split!(syz_queue::Vector{Int},
 
     if maintain_nf
         @assert isone(length(lc_sets))
-        gb_lens, gb_cfs, gb_exps = _convert_to_msolve(first(lc_sets).gb)
+        gb = first(lc_sets).gb
     else
-        gb_lens, gb_cfs, gb_exps = Int32[], Int32[], Int32[]
+        gb = T[]
     end
     
     @inbounds for (i, idx) in enumerate(syz_queue)
@@ -685,8 +681,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                                                            tr_ind,
                                                                            tr, char,
                                                                            ind_order, cofac_ind,
-                                                                           mod_cache,
-                                                                           gb_lens, gb_cfs, gb_exps,
+                                                                           gb,
                                                                            maintain_nf=maintain_nf)
             timer.module_time += tim
             if isempty(cofac_coeffs)

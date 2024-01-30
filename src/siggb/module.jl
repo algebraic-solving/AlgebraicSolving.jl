@@ -5,26 +5,33 @@ function construct_module(basis::Basis{N},
                           vchar::Val{Char},
                           ind_order::IndOrder,
                           idx::SigIndex,
-                          mod_cache::ModCache{N},
-                          gb_lens::Vector{Int32},
-                          gb_cfs::Vector{Int32},
-                          gb_exps::Vector{Int32};
-                          maintain_nf::Bool=false) where {N, Char}
+                          gb::Vector{T};
+                          maintain_nf::Bool=false) where {N, Char,
+                                                          T <: MPolyRingElem}
 
     @inbounds sig = basis.sigs[basis_index]
-    if haskey(mod_cache, (sig, idx))
-        return mod_cache[(sig, idx)]
-    end
 
     if basis_index >= basis.basis_offset
+        if isassigned(basis.mod_rep_known, basis_index) 
+            ik = basis.mod_rep_known[basis_index]
+            if ik[idx]
+                return basis.mod_reps[basis_index][idx]
+            end
+        else
+            basis.mod_rep_known[basis_index] = falses(ind_order.max_ind)
+            basis.mod_reps[basis_index] =
+                Vector{Polynomial}(undef, ind_order.max_ind)
+        end
+
         @inbounds mat_ind = tr.basis_ind_to_mat[basis_index]
         res = construct_module(sig, basis, basis_ht,
                                mat_ind, tr,
                                vchar, 
                                ind_order, idx,
-                               mod_cache,
-                               gb_lens, gb_cfs, gb_exps,
+                               gb,
                                maintain_nf=maintain_nf)
+        basis.mod_rep_known[basis_index][idx] = true
+        basis.mod_reps[basis_index][idx] = res
         return res
     else
         # if it was an input element we just take the signature
@@ -38,7 +45,6 @@ function construct_module(basis::Basis{N},
     end
 end
 
-# construct a module representation out of a given sig
 function construct_module(sig::Sig{N},
                           basis::Basis{N},
                           basis_ht::MonomialHashtable{N},
@@ -47,16 +53,9 @@ function construct_module(sig::Sig{N},
                           vchar::Val{Char},
                           ind_ord::IndOrder,
                           idx::SigIndex,
-                          mod_cache::ModCache{N},
-                          gb_lens::Vector{Int32},
-                          gb_cfs::Vector{Int32},
-                          gb_exps::Vector{Int32};
-                          maintain_nf::Bool=false) where {N, Char}
-
-    if haskey(mod_cache, (sig, idx))
-        return mod_cache[(sig, idx)]
-    end
-
+                          gb::Vector{T};
+                          maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
+    
     if ind_ord.ord[index(sig)] < idx
         return Coeff[], Monomial{N}[]
     end
@@ -69,8 +68,7 @@ function construct_module(sig::Sig{N},
     rewr_mod_cfs, rewr_mod_mns = construct_module(basis, basis_ht,
                                                   rewr_basis_ind,
                                                   tr, vchar,
-                                                  ind_ord, idx, mod_cache,
-                                                  gb_lens, gb_cfs, gb_exps,
+                                                  ind_ord, idx, gb,
                                                   maintain_nf=maintain_nf)
 
     # multiply by monomial
@@ -82,7 +80,7 @@ function construct_module(sig::Sig{N},
         @inbounds for i in 1:plength
             res_mod_mns[i] = rewr_mod_mns[i]
         end
-    elseif !maintain_nf
+    else
         hsh = Base.hash(mult)
         check_enlarge_hashtable!(basis_ht, plength)
         insert_multiplied_poly_in_hash_table!(res_mod_mns, hsh, mult,
@@ -91,12 +89,6 @@ function construct_module(sig::Sig{N},
         s = sortperm(res_mod_mns)
         res_mod_cfs = res_mod_cfs[s]
         res_mod_mns = res_mod_mns[s]
-    else
-        res_mod_cfs, res_mod_mns = my_normal_form(rewr_mod_mns,
-                                                  rewr_mod_cfs,
-                                                  mult,
-                                                  gb_lens, gb_cfs, gb_exps,
-                                                  basis_ht, vchar)
     end
 
     # construct module rep of all reducers
@@ -110,20 +102,20 @@ function construct_module(sig::Sig{N},
                                      mat_index,
                                      tr, vchar,
                                      ind_ord,
-                                     idx, mod_cache,
-                                     gb_lens, gb_cfs, gb_exps,
+                                     idx, gb,
                                      maintain_nf=maintain_nf)
         j_mod_coeffs = j_sig_mod[1]
-        mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar), vchar)
+        mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar),
+                                        vchar)
         j_mod_mons = j_sig_mod[2]
         res_mod_cfs, res_mod_mns = add_pols(res_mod_cfs, res_mod_mns,
-                                            mul_j_mod_coeffs, j_mod_mons, vchar)
+                                            mul_j_mod_coeffs, j_mod_mons,
+                                            vchar)
     end
 
     diag_coeff = tr_mat.diagonal[row_ind]
     mul_by_coeff!(res_mod_cfs, diag_coeff, vchar)
 
-    mod_cache[(sig, idx)] = res_mod_cfs, res_mod_mns
     return res_mod_cfs, res_mod_mns
 end
 

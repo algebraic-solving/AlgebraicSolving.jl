@@ -46,6 +46,9 @@ mutable struct Basis{N}
 
     is_red::Vector{Bool}
 
+    mod_rep_known::Vector{Vector{Bool}}
+    mod_reps::Vector{Vector{Polynomial}}
+
     syz_sigs::Vector{Monomial{N}}
     syz_masks::Vector{MaskSig}
 

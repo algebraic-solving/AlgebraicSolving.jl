@@ -129,10 +129,13 @@ function new_basis(basis_size, syz_size,
     monomials = Vector{Vector{MonIdx}}(undef, basis_size)
     coeffs = Vector{Vector{Coeff}}(undef, basis_size)
     is_red = Vector{Bool}(undef, basis_size)
+    mod_rep_known = Vector{Vector{Bool}}(undef, basis_size)
+    mod_reps = Vector{Vector{Polynomial}}(undef, basis_size)
     syz_sigs = Vector{Monomial{N}}(undef, syz_size)
     syz_masks = Vector{MaskSig}(undef, syz_size)
     basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
                   lm_masks, monomials, coeffs, is_red,
+                  mod_rep_known, mod_reps,
                   syz_sigs, syz_masks, Exp[],
                   input_length,
                   init_basis_size, 0, input_length,
