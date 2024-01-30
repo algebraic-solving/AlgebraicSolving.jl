@@ -118,9 +118,10 @@ end
 
 # struct to remember the row reductions we did
 mutable struct TracerMatrix
-    # TODO: could make this Dict{Sig, Tuple{Int, Int}}
     # first index row index, second one rewr ind
     rows::Dict{Sig, Tuple{Int, Int}}
+    # if row i has been added to basis
+    is_basis_row::Dict{Int, Int}
     row_ind_to_sig::Dict{Int, Sig}
     diagonal::Vector{Coeff}
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}

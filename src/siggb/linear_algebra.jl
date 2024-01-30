@@ -25,7 +25,8 @@ function echelonize!(matrix::MacaulayMatrix,
         Vector{Tuple{Int, Coeff}}[]
     end
 
-    tr_mat = TracerMatrix(Dict{Sig, Tuple{Int, Int}}(),
+    tr_mat = TracerMatrix(Dict{Sig, Tuple{Int, Int, Bool}}(),
+                          Dict{Int, Int}(),
                           Dict{Int, Sig}(),
                           tr_diagonal,
                           tr_mat_data)
@@ -55,29 +56,22 @@ function echelonize!(matrix::MacaulayMatrix,
             tr_mat.diagonal[row_ind] = one(Coeff)
         end
 
+        does_red = false
         row_cols = matrix.rows[row_ind]
         l_col_idx = hash2col[first(row_cols)]
         if pivots[l_col_idx] == row_ind
             trace && resize!(row_ops, 0)
             continue
-        end
-
-        # check if the row can be reduced
-        does_red = false
-        for (j, m_idx) in enumerate(row_cols)
-            colidx = hash2col[m_idx]
-            pividx = pivots[colidx]
-            if !iszero(pividx) && rev_sigorder[pividx] < i
-                row_sig_ind = index(row_sig)
-                piv_sig_ind = index(matrix.sigs[pividx])
-                if are_incompat(row_sig_ind, piv_sig_ind, ind_order)
-                    continue
-                else
-                    does_red = true
-                    break
-                end
+        # check if the row can be top reduced
+        elseif !iszero(pivots[l_col_idx]) && rev_sigorder[pivots[l_col_idx]] < i
+            pividx = pivots[l_col_idx]
+            row_sig_ind = index(row_sig)
+            piv_sig_ind = index(matrix.sigs[pividx])
+            if !are_incompat(row_sig_ind, piv_sig_ind, ind_order)
+                does_red = true
             end
         end
+
         if !does_red
             pivots[l_col_idx] = row_ind
             trace && resize!(row_ops, 0)

@@ -128,9 +128,11 @@ function add_basis_elem!(basis::Basis{N},
     # update tracer info
     if tr.load >= tr.size
         tr.size *= 2
-        resize!(tr.mats, tr.size)
         resize!(tr.basis_ind_to_mat, tr.size)
     end
+    tr_mat = last(tr.mats)
+    row_ind, _ = tr_mat.rows[new_sig]
+    tr_mat.is_basis_row[row_ind] = l
     @inbounds tr.basis_ind_to_mat[l] = length(tr.mats)
     tr.load += 1
 
@@ -446,7 +448,6 @@ function make_room_new_input_el!(basis::Basis,
 
         if tr.load + shift >= tr.size
             tr.size *= 2
-            resize!(tr.mats, tr.size)
             resize!(tr.basis_ind_to_mat, tr.size)
         end
 

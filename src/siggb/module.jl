@@ -24,13 +24,22 @@ function construct_module(basis::Basis{N},
         end
 
         @inbounds mat_ind = tr.basis_ind_to_mat[basis_index]
-        res = construct_module(sig, basis, basis_ht,
-                               mat_ind, tr,
-                               vchar, 
-                               ind_order, idx,
-                               gb,
-                               maintain_nf=maintain_nf)
+        res = construct_module_core(sig, basis, basis_ht,
+                                    mat_ind, tr,
+                                    vchar, 
+                                    ind_order, idx,
+                                    gb,
+                                    maintain_nf=maintain_nf)
         basis.mod_rep_known[basis_index][idx] = true
+
+        if maintain_nf
+            res_pol = convert_to_pol(parent(first(gb)),
+                                     [basis_ht.exponents[midx] for midx in res[2]],
+                                     res[1])
+            res_pol_nf = my_normal_form([res_pol], gb)[1]
+            res = convert_to_ht(res_pol_nf, basis_ht, vchar)
+        end
+
         basis.mod_reps[basis_index][idx] = res
         return res
     else
@@ -56,6 +65,38 @@ function construct_module(sig::Sig{N},
                           gb::Vector{T};
                           maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
     
+    if ind_ord.ord[index(sig)] < idx
+        return Coeff[], Monomial{N}[]
+    end
+
+    tr_mat = tr.mats[mat_index]
+
+    row_ind, rewr_basis_ind = tr_mat.rows[sig]
+
+    basis_ind = get(tr_mat.is_basis_row, row_ind, 0)
+    if !iszero(basis_ind)
+        return construct_module(basis, basis_ht, basis_ind,
+                                tr, vchar, ind_ord, idx, gb,
+                                maintain_nf = maintain_nf)
+    end
+
+    return construct_module_core(sig, basis, basis_ht, mat_index,
+                                 tr, vchar, ind_ord, idx, gb,
+                                 maintain_nf = maintain_nf)
+end
+
+function construct_module_core(sig::Sig{N},
+                               basis::Basis{N},
+                               basis_ht::MonomialHashtable{N},
+                               mat_index::Int,
+                               tr::Tracer,
+                               vchar::Val{Char},
+                               ind_ord::IndOrder,
+                               idx::SigIndex,
+                               gb::Vector{T};
+                               maintain_nf::Bool=false) where {N, Char,
+                                                               T <: MPolyRingElem}
+
     if ind_ord.ord[index(sig)] < idx
         return Coeff[], Monomial{N}[]
     end
