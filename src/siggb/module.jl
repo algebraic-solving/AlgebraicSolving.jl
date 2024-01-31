@@ -30,16 +30,15 @@ function construct_module(basis::Basis{N},
                                     ind_order, idx,
                                     gb,
                                     maintain_nf=maintain_nf)
-        basis.mod_rep_known[basis_index][idx] = true
 
         if maintain_nf
             res_pol = convert_to_pol(parent(first(gb)),
                                      [basis_ht.exponents[midx] for midx in res[2]],
                                      res[1])
             res_pol_nf = my_normal_form([res_pol], gb)[1]
-            res = convert_to_ht(res_pol_nf, basis_ht, vchar)
+            res = convert_to_ht(res_pol_nf, basis_ht, vchar, normalise=false)
         end
-
+        basis.mod_rep_known[basis_index][idx] = true
         basis.mod_reps[basis_index][idx] = res
         return res
     else
@@ -75,6 +74,7 @@ function construct_module(sig::Sig{N},
 
     basis_ind = get(tr_mat.is_basis_row, row_ind, 0)
     if !iszero(basis_ind)
+        @assert basis.sigs[basis_ind] == sig
         return construct_module(basis, basis_ht, basis_ind,
                                 tr, vchar, ind_ord, idx, gb,
                                 maintain_nf = maintain_nf)

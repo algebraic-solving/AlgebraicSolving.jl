@@ -283,16 +283,19 @@ function sig_decomp!(basis::Basis{N},
         found_zd, isempty, zd_coeffs,
         zd_mons, zd_ind, _, syz_finished = siggb_for_split!(bs, ps,
                                                             tgs, ind_ord,
-                                                            basis_ht, tr, syz_queue,
+                                                            basis_ht, tr,
+                                                            syz_queue,
                                                             char, shift, [lc_set],
-                                                            timer, maintain_nf=false)
+                                                            timer,
+                                                            maintain_nf=true)
         if found_zd
             @info "splitting component"
             tim = @elapsed bs1, ps1, tgs1, ind_ord1, lc_set1,
-                           bs2, ps2, tgs2, ind_ord2, lc_set2 = split!(bs, basis_ht, zd_mons,
-                                                                      zd_coeffs, zd_ind, tgs,
-                                                                      ind_ord, syz_finished,
-                                                                      lc_set)
+            bs2, ps2, tgs2, ind_ord2, lc_set2 = split!(bs,
+                                                       basis_ht, zd_mons,
+                                                       zd_coeffs, zd_ind, tgs,
+                                                       ind_ord, syz_finished,
+                                                       lc_set)
             timer.comp_lc_time += tim
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1)))
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1, lc_set1, c))
@@ -646,7 +649,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 lc_sets::Vector{LocClosedSet{T}},
                                 tags::Tags,
                                 timer::Timings;
-                                maintain_nf::Bool=false) where {Char, N, T <: MPolyRingElem}
+                                maintain_nf::Bool=false) where {Char, N,
+                                                                T <: MPolyRingElem}
     
     @info "checking known syzygies"
     found_zd = false
@@ -694,7 +698,13 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                 continue
             else
                 found_zd = true
-                zd_coeffs, zd_mons_hsh = cofac_coeffs, cofac_mons_hsh
+                gb = first(lc_sets).gb
+                p = convert_to_pol(parent(first(gb)),
+                                   [basis_ht.exponents[mdx] for mdx in cofac_mons_hsh],
+                                   cofac_coeffs)
+                p_nf = my_normal_form([p], gb)[1]
+                zd_coeffs, zd_mons_hsh = convert_to_ht(p_nf, basis_ht, char)
+                # zd_coeffs, zd_mons_hsh = cofac_coeffs, cofac_mons_hsh
                 zd_ind = cofac_ind
                 nz_nf_inds = findall(b -> !b, iszs)
                 break

@@ -90,6 +90,7 @@ end
 function convert_to_ht(f::MPolyRingElem,
                        ht::MonomialHashtable{N},
                        char::Val{Char};
+                       normalise::Bool=true,
                        kwargs...) where {N, Char}
 
     lf = length(f)
@@ -104,17 +105,20 @@ function convert_to_ht(f::MPolyRingElem,
     @inbounds for j in 1:lf
         m = monomial(SVector{N}((Exp).(exps[j])))
         eidx = insert_in_hash_table!(ht, m)
-        if isone(j)
-            inver = inv(Coeff(lift(ZZ, cfs[1]).d), char)
-        end
-        cf = isone(j) ? one(Coeff) : mul(inver, Coeff(lift(ZZ, cfs[j]).d),
-                                         char)
+        cf = Coeff(lift(ZZ, cfs[j]).d)
         mons[j] = eidx
         coeffs[j] = cf
     end
     s = sortperm(mons; kwargs...)
     mons = mons[s]
     coeffs = coeffs[s]
+    if normalise
+        inver = inv(coeffs[1], char)
+        coeffs[1] = one(Coeff)
+        for i in 2:lf
+            coeffs[i] = mul(inver, coeffs[i], char)
+        end
+    end
     return coeffs, mons
 end
 
