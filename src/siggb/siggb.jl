@@ -440,7 +440,7 @@ function siggb_for_split!(basis::Basis{N},
         does_split, cofac_coeffs, cofac_mons,
         cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                        basis, tr, ind_order, char, lc_sets,
-                                                       tags, timer, lfile,
+                                                       tags, timer, 
                                                        maintain_nf = maintain_nf)
 
         if does_split
@@ -455,7 +455,7 @@ function siggb_for_split!(basis::Basis{N},
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                    basis, tr, ind_order, char, lc_sets,
-                                                   tags, timer, lfile,
+                                                   tags, timer, 
                                                    maintain_nf = maintain_nf)
 
     if does_split
@@ -654,8 +654,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 char::Val{Char},
                                 lc_sets::Vector{LocClosedSet{T}},
                                 tags::Tags,
-                                timer::Timings,
-                                file_handle;
+                                timer::Timings;
                                 maintain_nf::Bool=false) where {Char, N,
                                                                 T <: MPolyRingElem}
     
@@ -693,7 +692,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                                                            tr_ind,
                                                                            tr, char,
                                                                            ind_order, cofac_ind,
-                                                                           gb, file_handle,
+                                                                           gb, 
                                                                            maintain_nf=maintain_nf)
             timer.module_time += tim
             if isempty(cofac_coeffs)
