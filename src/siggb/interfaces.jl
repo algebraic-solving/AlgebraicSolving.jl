@@ -191,6 +191,81 @@ function add_input_element!(basis::Basis{N},
     end
 end
 
+function make_room_new_input_el!(basis::Basis,
+                                 pairset::Pairset,
+                                 tr::Tracer)
+
+    # this whole block just shifts the basis to the right
+    # to make room for new input elements
+    @inbounds if basis.input_size >= basis.input_load
+        basis.input_size *= 2
+        
+        shift = basis.input_size
+        old_offset = basis.basis_offset
+        basis.basis_offset += shift
+        basis.basis_load += shift
+        resize_basis!(basis)
+
+        if tr.load + shift >= tr.size
+            tr.size *= 2
+            resize!(tr.basis_ind_to_mat, tr.size)
+        end
+
+        # adjusts rewrite nodes at the start
+        for i in 1:basis.input_load
+            if basis.rewrite_nodes[i+1][1] >= 0
+                basis.rewrite_nodes[i+1][3] += shift
+            end
+        end
+
+        for i in basis.basis_load:-1:basis.basis_offset
+            basis.sigs[i] = basis.sigs[i-shift]
+            basis.sigmasks[i] = basis.sigmasks[i-shift]
+            basis.sigratios[i] = basis.sigratios[i-shift]
+            basis.lm_masks[i] = basis.lm_masks[i-shift]
+            basis.monomials[i] = basis.monomials[i-shift]
+            basis.coefficients[i] = basis.coefficients[i-shift]
+            basis.is_red[i] = basis.is_red[i-shift]
+
+            # adjust tracer
+            tr.basis_ind_to_mat[i] = tr.basis_ind_to_mat[i-shift]
+            
+            # adjust rewrite tree
+            rnodes = basis.rewrite_nodes[i-shift+1]
+            if rnodes[2] >= old_offset + 1
+                rnodes[2] += shift
+            end
+            for j in 3:3+rnodes[1]
+                rnodes[j] += shift
+            end
+            basis.rewrite_nodes[i+1] = rnodes
+        end
+
+        # adjust tracer
+        for mat in tr.mats
+            for i in keys(mat.rows)
+                v = mat.rows[i]
+                if v[2] >= old_offset
+                    mat.rows[i] = (v[1], v[2] + shift)
+                end
+            end
+        end
+
+        # adjust pairset
+        for i in 1:pairset.load
+            p = pairset.elems[i]
+            if p.top_index >= old_offset
+                pairset.elems[i].top_index += shift
+            end
+            if p.bot_index >= old_offset
+                pairset.elems[i].bot_index += shift
+            end
+        end
+    end
+end
+
+
+
 function add_unit_pair!(basis::Basis{N},
                         pairset::Pairset{N},
                         ind::Integer,
