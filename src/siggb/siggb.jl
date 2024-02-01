@@ -411,6 +411,7 @@ function siggb_for_split!(basis::Basis{N},
     rm("./nf_log.txt")
     lfile = open("./nf_log.txt", "a+")
     println(lfile, "gb: $(first(lc_sets).gb)")
+    close(lfile)
 
     while !iszero(pairset.load)
 	matrix = initialize_matrix(Val(N))
@@ -445,7 +446,6 @@ function siggb_for_split!(basis::Basis{N},
                                                        maintain_nf = maintain_nf)
 
         if does_split
-            close(lfile)
             return true, false, cofac_coeffs,
                    cofac_mons, cofac_ind, nz_nf_inds,
                    syz_finished
@@ -460,12 +460,10 @@ function siggb_for_split!(basis::Basis{N},
                                                    maintain_nf = maintain_nf)
 
     if does_split
-        close(lfile)
         return true, false, cofac_coeffs, cofac_mons,
                cofac_ind, nz_nf_inds, syz_finished
     end
 
-    close(lfile)
     return false, false, Coeff[], Monomial{N}[], zero(SigIndex), Int[], syz_finished
 end
 
