@@ -5,7 +5,8 @@ function construct_module(basis::Basis{N},
                           vchar::Val{Char},
                           ind_order::IndOrder,
                           idx::SigIndex,
-                          gb::Vector{T};
+                          gb::Vector{T},
+                          file_handle;
                           maintain_nf::Bool=false) where {N, Char,
                                                           T <: MPolyRingElem}
 
@@ -28,13 +29,14 @@ function construct_module(basis::Basis{N},
                                     mat_ind, tr,
                                     vchar, 
                                     ind_order, idx,
-                                    gb,
+                                    gb, file_handle,
                                     maintain_nf=maintain_nf)
 
         if maintain_nf
             res_pol = convert_to_pol(parent(first(gb)),
                                      [basis_ht.exponents[midx] for midx in res[2]],
                                      res[1])
+            println(file_handle, res_pol)
             res_pol_nf = my_normal_form([res_pol], gb)[1]
             res = convert_to_ht(res_pol_nf, basis_ht, vchar, normalise=false)
         end
@@ -61,7 +63,8 @@ function construct_module(sig::Sig{N},
                           vchar::Val{Char},
                           ind_ord::IndOrder,
                           idx::SigIndex,
-                          gb::Vector{T};
+                          gb::Vector{T},
+                          file_handle;
                           maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
     
     if ind_ord.ord[index(sig)] < idx
@@ -77,11 +80,13 @@ function construct_module(sig::Sig{N},
         @assert basis.sigs[basis_ind] == sig
         return construct_module(basis, basis_ht, basis_ind,
                                 tr, vchar, ind_ord, idx, gb,
+                                file_handle,
                                 maintain_nf = maintain_nf)
     end
 
     return construct_module_core(sig, basis, basis_ht, mat_index,
                                  tr, vchar, ind_ord, idx, gb,
+                                 file_handle,
                                  maintain_nf = maintain_nf)
 end
 
@@ -93,7 +98,8 @@ function construct_module_core(sig::Sig{N},
                                vchar::Val{Char},
                                ind_ord::IndOrder,
                                idx::SigIndex,
-                               gb::Vector{T};
+                               gb::Vector{T},
+                               file_handle;
                                maintain_nf::Bool=false) where {N, Char,
                                                                T <: MPolyRingElem}
 
@@ -110,6 +116,7 @@ function construct_module_core(sig::Sig{N},
                                                   rewr_basis_ind,
                                                   tr, vchar,
                                                   ind_ord, idx, gb,
+                                                  file_handle,
                                                   maintain_nf=maintain_nf)
 
     # multiply by monomial
@@ -144,6 +151,7 @@ function construct_module_core(sig::Sig{N},
                                      tr, vchar,
                                      ind_ord,
                                      idx, gb,
+                                     file_handle,
                                      maintain_nf=maintain_nf)
         j_mod_coeffs = j_sig_mod[1]
         mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar),

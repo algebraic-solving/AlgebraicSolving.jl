@@ -408,6 +408,9 @@ function siggb_for_split!(basis::Basis{N},
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
+    lfile = open("./nf_log.txt", "w+")
+    println(lfile, first(lc_sets).gb)
+
     while !iszero(pairset.load)
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
@@ -437,10 +440,11 @@ function siggb_for_split!(basis::Basis{N},
         does_split, cofac_coeffs, cofac_mons,
         cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                        basis, tr, ind_order, char, lc_sets,
-                                                       tags, timer,
+                                                       tags, timer, lfile,
                                                        maintain_nf = maintain_nf)
 
         if does_split
+            close(lfile)
             return true, false, cofac_coeffs,
                    cofac_mons, cofac_ind, nz_nf_inds,
                    syz_finished
@@ -451,14 +455,16 @@ function siggb_for_split!(basis::Basis{N},
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
                                                    basis, tr, ind_order, char, lc_sets,
-                                                   tags, timer,
+                                                   tags, timer, lfile,
                                                    maintain_nf = maintain_nf)
 
     if does_split
+        close(lfile)
         return true, false, cofac_coeffs, cofac_mons,
                cofac_ind, nz_nf_inds, syz_finished
     end
 
+    close(lfile)
     return false, false, Coeff[], Monomial{N}[], zero(SigIndex), Int[], syz_finished
 end
 
@@ -648,7 +654,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 char::Val{Char},
                                 lc_sets::Vector{LocClosedSet{T}},
                                 tags::Tags,
-                                timer::Timings;
+                                timer::Timings,
+                                file_handle;
                                 maintain_nf::Bool=false) where {Char, N,
                                                                 T <: MPolyRingElem}
     
@@ -686,7 +693,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                                                            tr_ind,
                                                                            tr, char,
                                                                            ind_order, cofac_ind,
-                                                                           gb,
+                                                                           gb, file_handle,
                                                                            maintain_nf=maintain_nf)
             timer.module_time += tim
             if isempty(cofac_coeffs)
