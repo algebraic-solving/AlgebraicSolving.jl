@@ -159,7 +159,6 @@ function init_pairset(::Val{N}) where N
 end
 
 function add_input_element!(basis::Basis{N},
-                            ind::SigIndex,
                             mons::Vector{MonIdx},
                             coeffs::Vector{Coeff},
                             lm_divm::DivMask,
@@ -168,14 +167,14 @@ function add_input_element!(basis::Basis{N},
     @inbounds begin
         one_mon = one_monomial(Monomial{N})
 
-        # signature
-        sig = (ind, one_mon)
-
         l = basis.input_load + 1
+
+        # signature
+        sig = (SigIndex(l), one_mon)
 
         # store stuff in basis
         basis.sigs[l] = sig
-        basis.sigmasks[l] = (ind, zero(DivMask))
+        basis.sigmasks[l] = (SigIndex(l), zero(DivMask))
         basis.sigratios[l] = lm
         basis.rewrite_nodes[l+1] = [-1, 1]
         basis.monomials[l] = mons
@@ -188,7 +187,39 @@ function add_input_element!(basis::Basis{N},
         # add child to rewrite root
         push!(basis.rewrite_nodes[1], l+1)
         basis.rewrite_nodes[1][1] += 1
+
+        return index(sig)
     end
+end
+
+function add_new_sequence_element!(basis::Basis{N},
+                                   basis_ht::MonomialHashtable{N},
+                                   tr::Tracer,
+                                   mons::Vector{MonIdx},
+                                   coeffs::Vector{Coeff},
+                                   ind_ord::IndOrder,
+                                   ord_ind::SigIndex,
+                                   pairset::Pairset{N},
+                                   tags::Tags;
+                                   new_tg::Symbol=:split) where N
+
+    ins_index!(ind_order, ord_ind)
+
+    # add cofactor to input sequence
+    make_room_new_input_el!(basis, pairset, tr)
+
+    lm = basis_ht.exponents[first(mons)]
+
+    lm_divm = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
+    s_ind = add_input_element!(basis, mons,
+                               coeffs, lm_divm, lm)
+
+    # update tags
+    tags[s_ind] = :new_tg
+
+    add_unit_pair!(basis, pairset, s_ind, lm.deg)
+
+    @assert s_ind == basis.input_load == ind_ord.max_ind
 end
 
 function make_room_new_input_el!(basis::Basis,

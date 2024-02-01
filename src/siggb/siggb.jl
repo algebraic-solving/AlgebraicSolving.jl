@@ -257,11 +257,11 @@ function sig_decomp!(basis::Basis{N},
             for i in 1:basis.input_load]
     X = LocClosedSet{eltype(eqns)}(eqns, eltype(eqns)[])
     
-    queue = [(basis, pairset, tags, ind_order, X, Int(basis.input_load))]
+    queue = [(basis, pairset, tags, ind_order, X, Int(basis.input_load), Int[])]
     result = LocClosedSet[]
 
     while !isempty(queue)
-        bs, ps, tgs, ind_ord, lc_set, c = popfirst!(queue)
+        bs, ps, tgs, ind_ord, lc_set, c, syz_queue = popfirst!(queue)
         neqns = length(findall(i -> gettag(tgs, i) == :split, 1:bs.input_load))
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
@@ -278,7 +278,6 @@ function sig_decomp!(basis::Basis{N},
             @info "------------------------------------------"
             continue
         end
-        syz_queue = Int[]
         tr = new_tracer()
         found_zd, isempty, zd_coeffs,
         zd_mons, zd_ind, _, syz_finished = siggb_for_split!(bs, ps,
@@ -287,7 +286,7 @@ function sig_decomp!(basis::Basis{N},
                                                             syz_queue,
                                                             char, shift, [lc_set],
                                                             timer,
-                                                            maintain_nf=true)
+                                                            maintain_nf=false)
         if found_zd
             @info "splitting component"
             tim = @elapsed bs1, ps1, tgs1, ind_ord1, lc_set1,
@@ -300,7 +299,6 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1)))
             pushfirst!(queue, (bs1, ps1, tgs1, ind_ord1, lc_set1, c))
         else
-            # TODO: this may be dangerous
             to_del_eqns = findall(i -> bs.is_red[i], 1:neqns)
             neqns -= length(to_del_eqns)
             deleteat!(lc_set.eqns, to_del_eqns)
@@ -479,13 +477,9 @@ function split!(basis::Basis{N},
         sys1_coeffs = copy(basis.coefficients[1:basis.input_load])
         zd_deg = basis_ht.exponents[first(cofac_mons_hsh)].deg
 
-        nz_from = findfirst(i -> gettag(tags, i) == :col, 1:basis.input_load)
-        if isnothing(nz_from)
-            nz_from = basis.input_load+1
-        end
-        ins_ind = findfirst(i -> basis.degs[i] > zd_deg, 1:nz_from-1)
+        ins_ind = findfirst(i -> basis.degs[i] > zd_deg, 1:basis.input_load)
         if isnothing(ins_ind)
-            ins_ind = nz_from
+            ins_ind = basis.input_load + 1
         end
 
         # insert zd in system

@@ -214,10 +214,7 @@ function process_syzygy!(basis::Basis{N},
             cofac_coeffs[i] = mul(inver, cofac_coeffs[i], vchar)
         end
 
-        # sig index for cofactor
-        ind = SigIndex(basis.input_load + 1)
-
-        # update index order
+        # find order index
         col_inds = findall(tag -> tag == :col, tags)
         filter!(col_ind -> ind_order.ord[col_ind] > ind_order.ord[new_idx],
                 col_inds)
@@ -226,21 +223,10 @@ function process_syzygy!(basis::Basis{N},
         else
             ord_ind = ind_order.max_ind + one(SigIndex)
         end
-        ins_index!(ind_order, ord_ind)
+        add_new_sequence_element!(basis, basis_ht, cofac_mons, cofac_coeffs,
+                                  ind_order, ord_ind, pairset, tags,
+                                  new_tg = :colins)
         ind_order.incompat[(new_idx, ind)] = true
-
-        # update tags
-        tags[ind] = :colins
-
-        # add cofactor to input sequence
-        make_room_new_input_el!(basis, pairset, tr)
-
-        lm = first(cofac_mons)
-
-        lm_divm = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
-        add_input_element!(basis, ind, cofac_mons_hashed,
-                           cofac_coeffs, lm_divm, lm)
-        add_unit_pair!(basis, pairset, ind, lm.deg)
     end
 end
 
