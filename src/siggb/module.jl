@@ -8,8 +8,7 @@ function construct_module(basis::Basis{N},
                           gb_lens::Vector{Int32},
                           gb_cfs::Vector{Int32},
                           gb_exps::Vector{Int32};
-                          maintain_nf::Bool=false) where {N, Char,
-                                                          T <: MPolyRingElem}
+                          maintain_nf::Bool=false) where {N, Char}
 
     @inbounds sig = basis.sigs[basis_index]
 
@@ -64,7 +63,7 @@ function construct_module(sig::Sig{N},
                           gb_lens::Vector{Int32},
                           gb_cfs::Vector{Int32},
                           gb_exps::Vector{Int32};
-                          maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
+                          maintain_nf::Bool=false) where {N, Char}
     
     if ind_ord.ord[index(sig)] < idx
         return Coeff[], Monomial{N}[]
@@ -100,8 +99,7 @@ function construct_module_core(sig::Sig{N},
                                gb_lens::Vector{Int32},
                                gb_cfs::Vector{Int32},
                                gb_exps::Vector{Int32};
-                               maintain_nf::Bool=false) where {N, Char,
-                                                               T <: MPolyRingElem}
+                               maintain_nf::Bool=false) where {N, Char}
 
     if ind_ord.ord[index(sig)] < idx
         return Coeff[], Monomial{N}[]

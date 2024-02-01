@@ -270,11 +270,7 @@ function update_pairset!(pairset::Pairset{N},
 
     # resize pairset if needed
     num_new_pairs = new_basis_idx - 1
-    if pairset.load + num_new_pairs >= pairset.size
-          resize!(pairset.elems, max(2 * pairset.size,
-                                     pairset.load - num_new_pairs))
-          pairset.size *= 2
-    end
+    resize_pairset!(pairset, num_new_pairs)
 
     new_sig_ratio = basis.sigratios[new_basis_idx]
     new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
@@ -387,32 +383,6 @@ function remove_red_pairs!(pairset::Pairset)
         pairset.elems[j] = pairset.elems[i]
     end
     pairset.load = j 
-end
-
-#---------------- resize functions --------------------#
-
-function resize_basis!(basis::Basis)
-    if basis.basis_load >= basis.basis_size
-        basis.basis_size *= 2
-        resize!(basis.sigs, basis.basis_size)
-        resize!(basis.sigmasks, basis.basis_size)
-        resize!(basis.sigratios, basis.basis_size)
-        resize!(basis.rewrite_nodes, basis.basis_size)
-        resize!(basis.lm_masks, basis.basis_size)
-        resize!(basis.monomials, basis.basis_size)
-        resize!(basis.coefficients, basis.basis_size)
-        resize!(basis.is_red, basis.basis_size)
-        resize!(basis.mod_rep_known, basis.basis_size)
-        resize!(basis.mod_reps, basis.basis_size)
-    end
-end
-
-function resize_syz!(basis::Basis)
-    if basis.syz_load >= basis.syz_size
-        basis.syz_size *= 2
-        resize!(basis.syz_sigs, basis.syz_size)
-        resize!(basis.syz_masks, basis.syz_size)
-    end
 end
 
 # # this membership test is temporary
