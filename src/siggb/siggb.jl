@@ -408,6 +408,7 @@ function siggb_for_split!(basis::Basis{N},
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
+    rm("./nf_log.txt")
     lfile = open("./nf_log.txt", "a+")
     println(lfile, "gb: $(first(lc_sets).gb)")
 
