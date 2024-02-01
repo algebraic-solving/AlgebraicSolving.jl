@@ -408,11 +408,6 @@ function siggb_for_split!(basis::Basis{N},
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
-    rm("./nf_log.txt")
-    lfile = open("./nf_log.txt", "a+")
-    println(lfile, "gb: $(first(lc_sets).gb)")
-    close(lfile)
-
     while !iszero(pairset.load)
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
@@ -685,7 +680,6 @@ function process_syz_for_split!(syz_queue::Vector{Int},
 
         push!(to_del, i)
         for cofac_ind in reverse(sorted_inds)
-            @info "index $(cofac_ind)"
             tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
                                                                            basis_ht,
                                                                            tr_ind,

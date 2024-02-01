@@ -35,10 +35,7 @@ function construct_module(basis::Basis{N},
             res_pol = convert_to_pol(parent(first(gb)),
                                      [basis_ht.exponents[midx] for midx in res[2]],
                                      res[1])
-            f = open("./nf_log.txt", "a+")
-            println(f, res_pol)
-            close(f)
-            res_pol_nf = my_normal_form([res_pol], gb)[1]
+            res_pol_nf = iszero(res_pol) ? res_pol : my_normal_form([res_pol], gb)[1]
             res = convert_to_ht(res_pol_nf, basis_ht, vchar, normalise=false)
         end
         basis.mod_rep_known[basis_index][idx] = true
