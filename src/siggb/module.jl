@@ -5,7 +5,9 @@ function construct_module(basis::Basis{N},
                           vchar::Val{Char},
                           ind_order::IndOrder,
                           idx::SigIndex,
-                          gb::Vector{T};
+                          gb_lens::Vector{Int32},
+                          gb_cfs::Vector{Int32},
+                          gb_exps::Vector{Int32};
                           maintain_nf::Bool=false) where {N, Char,
                                                           T <: MPolyRingElem}
 
@@ -28,15 +30,13 @@ function construct_module(basis::Basis{N},
                                     mat_ind, tr,
                                     vchar, 
                                     ind_order, idx,
-                                    gb,
+                                    gb_lens, gb_cfs, gb_exps,
                                     maintain_nf=maintain_nf)
 
-        if maintain_nf
-            res_pol = convert_to_pol(parent(first(gb)),
-                                     [basis_ht.exponents[midx] for midx in res[2]],
-                                     res[1])
-            res_pol_nf = iszero(res_pol) ? res_pol : my_normal_form([res_pol], gb)[1]
-            res = convert_to_ht(res_pol_nf, basis_ht, vchar, normalise=false)
+        if maintain_nf && !isempty(res[1])
+            res = my_normal_form(res[2], res[1], gb_lens, gb_cfs, gb_exps, basis_ht, vchar)
+            s = sortperm(res[2])
+            res = res[1][s], res[2][s]
         end
         basis.mod_rep_known[basis_index][idx] = true
         basis.mod_reps[basis_index][idx] = res
@@ -61,7 +61,9 @@ function construct_module(sig::Sig{N},
                           vchar::Val{Char},
                           ind_ord::IndOrder,
                           idx::SigIndex,
-                          gb::Vector{T};
+                          gb_lens::Vector{Int32},
+                          gb_cfs::Vector{Int32},
+                          gb_exps::Vector{Int32};
                           maintain_nf::Bool=false) where {N, Char, T <: MPolyRingElem}
     
     if ind_ord.ord[index(sig)] < idx
@@ -76,12 +78,14 @@ function construct_module(sig::Sig{N},
     if !iszero(basis_ind)
         @assert basis.sigs[basis_ind] == sig
         return construct_module(basis, basis_ht, basis_ind,
-                                tr, vchar, ind_ord, idx, gb,
+                                tr, vchar, ind_ord, idx,
+                                gb_lens, gb_cfs, gb_exps,
                                 maintain_nf = maintain_nf)
     end
 
     return construct_module_core(sig, basis, basis_ht, mat_index,
-                                 tr, vchar, ind_ord, idx, gb,
+                                 tr, vchar, ind_ord, idx,
+                                 gb_lens, gb_cfs, gb_exps,
                                  maintain_nf = maintain_nf)
 end
 
@@ -93,7 +97,9 @@ function construct_module_core(sig::Sig{N},
                                vchar::Val{Char},
                                ind_ord::IndOrder,
                                idx::SigIndex,
-                               gb::Vector{T};
+                               gb_lens::Vector{Int32},
+                               gb_cfs::Vector{Int32},
+                               gb_exps::Vector{Int32};
                                maintain_nf::Bool=false) where {N, Char,
                                                                T <: MPolyRingElem}
 
@@ -109,7 +115,8 @@ function construct_module_core(sig::Sig{N},
     rewr_mod_cfs, rewr_mod_mns = construct_module(basis, basis_ht,
                                                   rewr_basis_ind,
                                                   tr, vchar,
-                                                  ind_ord, idx, gb,
+                                                  ind_ord, idx,
+                                                  gb_lens, gb_cfs, gb_exps,
                                                   maintain_nf=maintain_nf)
 
     # multiply by monomial
@@ -143,7 +150,8 @@ function construct_module_core(sig::Sig{N},
                                      mat_index,
                                      tr, vchar,
                                      ind_ord,
-                                     idx, gb,
+                                     idx,
+                                     gb_lens, gb_cfs, gb_exps,
                                      maintain_nf=maintain_nf)
         j_mod_coeffs = j_sig_mod[1]
         mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar),

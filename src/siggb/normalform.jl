@@ -126,7 +126,6 @@ end
 
 function my_normal_form(mns::Vector{MonIdx},
                         cfs::Vector{Coeff},
-                        mult::Monomial{N},
                         bs_lens::Vector{Int32},
                         bs_cfs::Vector{Int32},
                         bs_exps::Vector{Int32},
@@ -142,7 +141,11 @@ function my_normal_form(mns::Vector{MonIdx},
     nr_thrds = 1
     info_level = 0
 
-    tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve([mul(mult, basis_ht.exponents[midx]) for midx in mns], cfs)
+    mns_unhashed = [basis_ht.exponents[midx] for midx in mns]
+    s = sortperm(mns_unhashed, lt = lt_drl, rev = true)
+    mns_unhashed = mns_unhashed[s]
+    cfs_s = copy(cfs)[s]
+    tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve([mns_unhashed], [cfs_s])
                         
     nf_ld  = Ref(Cint(0))
     nf_len = Ref(Ptr{Cint}(0))
@@ -235,13 +238,14 @@ function my_normal_form(F::Vector{T},
 end
 
 # compute normal forms with msolve
-@inline function _convert_to_msolve(exps::Vector{<:Monomial},
-                                    cfs::Vector{Coeff})
+@inline function _convert_to_msolve(exps::Vector{Vector{T}},
+                                    cfs::Vector{Vector{Coeff}}) where {T <: Monomial}
 
     len = length(exps)
-    @inbounds ms_cfs = [Int32(cfs[i]) for i in 1:len]
-    @inbounds ms_exps = vcat([convert(Vector{Int32}, exps[i].exps) for i in 1:len]...)
-    return [Int32(len)], ms_cfs, ms_exps
+    @inbounds ms_cfs = (Int32).(vcat(cfs...))
+    @inbounds ms_exps = vcat([vcat([convert(Vector{Int32}, ex.exps) for ex in exps[i]]...)
+                              for i in 1:length(exps)]...)
+    return (Int32).([length(ex) for ex in exps]), ms_cfs, ms_exps
 end
 
 function convert_ms_to_ht(bld::Int32,

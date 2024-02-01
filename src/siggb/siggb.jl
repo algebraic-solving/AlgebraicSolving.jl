@@ -667,9 +667,12 @@ function process_syz_for_split!(syz_queue::Vector{Int},
 
     if maintain_nf
         @assert isone(length(lc_sets))
-        gb = first(lc_sets).gb
+        mns = [[basis_ht.exponents[midx] for midx in basis.monomials[i]]
+               for i in basis.basis_offset:basis.basis_load]
+        cfs = [basis.coefficients[i] for i in basis.basis_offset:basis.basis_load]
+        gb_lens, gb_cfs, gb_exps = _convert_to_msolve(mns, cfs)
     else
-        gb = T[]
+        gb_lens, gb_cfs, gb_exps = Int32[], Int32[], Int32[]
     end
     
     @inbounds for (i, idx) in enumerate(syz_queue)
@@ -685,7 +688,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                                                            tr_ind,
                                                                            tr, char,
                                                                            ind_order, cofac_ind,
-                                                                           gb, 
+                                                                           gb_lens, gb_cfs, gb_exps,
                                                                            maintain_nf=maintain_nf)
             timer.module_time += tim
             if isempty(cofac_coeffs)
