@@ -53,28 +53,6 @@ function input_setup(sys::Vector{<:MPolyRingElem})
     return sys_mons, sys_coeffs, basis_ht, char, shift
 end
 
-function fill_basis!(sys_mons::Vector{Vector{MonIdx}},
-                     sys_coeffs::Vector{Vector{Coeff}},
-                     basis_ht::MonomialHashtable{N}) where N
-
-    # initialize basis
-    sysl = length(sys_mons)
-    basis = new_basis(init_basis_size, init_syz_size, sysl, Val(N))
-
-    @inbounds for i in 1:sysl
-        mons = sys_mons[i]
-        coeffs = sys_coeffs[i]
-        lm = basis_ht.exponents[first(mons)]
-        lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
-
-        add_input_element!(basis,
-                           sys_mons[i], sys_coeffs[i],
-                           lm_mask, lm)
-    end
-
-    return basis
-end
-
 function fill_structs!(sys_mons::Vector{Vector{MonIdx}},
                        sys_coeffs::Vector{Vector{Coeff}},
                        basis_ht::MonomialHashtable{N};

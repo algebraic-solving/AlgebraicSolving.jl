@@ -598,7 +598,6 @@ function process_syz_for_split!(syz_queue::Vector{Int},
 
         push!(to_del, i)
         for cofac_ind in reverse(sorted_inds)
-            println(cofac_ind)
             tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
                                                                            basis_ht,
                                                                            tr_ind,
@@ -615,15 +614,14 @@ function process_syz_for_split!(syz_queue::Vector{Int},
             if all(iszs)
                 continue
             else
-                println((syz_ind, syz_mon))
                 found_zd = true
                 gb = first(lc_sets).gb
                 p = convert_to_pol(parent(first(gb)),
                                    [basis_ht.exponents[mdx] for mdx in cofac_mons_hsh],
                                    cofac_coeffs)
-                println(p)
+                @assert is_homog(p)
                 p_nf = my_normal_form([p], gb)[1]
-                println("good syz $(p_nf)")
+                @assert is_homog(p_nf)
                 zd_coeffs, zd_mons_hsh = convert_to_ht(p_nf, basis_ht, char)
                 # zd_coeffs, zd_mons_hsh = cofac_coeffs, cofac_mons_hsh
                 zd_ind = cofac_ind
@@ -697,6 +695,11 @@ function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
         push!(res, finish(ctx))
     end
     return res
+end
+
+function is_homog(f)
+    d = total_degree(f)
+    return all(e -> sum(e) == d, exponent_vectors(f))
 end
 
 function new_ind_order(basis::Basis)
