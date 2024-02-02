@@ -276,9 +276,11 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1), Int[], tr2))
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr))
         else
+            @assert _is_gb(bs, basis_ht, tgs, char)
             to_del_eqns = findall(i -> bs.is_red[i], 1:neqns)
             neqns -= length(to_del_eqns)
             deleteat!(lc_set.eqns, to_del_eqns)
+            @assert neqns == length(lc_set.eqns) == codim(lc_set)
             @info "finished component $(neqns) eqns, codim $(codim(lc_set))"
             push!(result, lc_set)
         end
@@ -573,6 +575,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
     ind_info = [(index(basis.sigs[i]), basis.is_red[i]) for i in 1:basis.input_load]
     filter!(tpl -> !tpl[2], ind_info)
     sorted_inds = (tpl -> tpl[1]).(ind_info)
+    sort!(sorted_inds, by = ind -> basis.degs[ind], rev = true)
 
     if maintain_nf
         @assert isone(length(lc_sets))
@@ -591,7 +594,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         tr_ind = tr.syz_ind_to_mat[idx]
 
         push!(to_del, i)
-        for cofac_ind in reverse(sorted_inds)
+        for cofac_ind in sorted_inds
             tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
                                                                            basis_ht,
                                                                            tr_ind,
