@@ -60,7 +60,7 @@ function fill_structs!(sys_mons::Vector{Vector{MonIdx}},
 
     # initialize basis
     sysl = length(sys_mons)
-    basis = new_basis(init_basis_size, init_syz_size, sysl, Val(N))
+    basis = new_basis(init_basis_size, init_syz_size, 1000, Val(N))
     pairset = init_pairset(Val(N))
     tags = Tags()
     ind_order = IndOrder(SigIndex[],
