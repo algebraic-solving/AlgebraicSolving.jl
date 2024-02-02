@@ -408,12 +408,23 @@ function siggb_for_split!(basis::Basis{N},
         timer.update_time += tim
 
         # check to see if we can split with one of the syzygies
-        sort!(syz_queue, by = sz -> monomial(basis.sigs[sz]).deg)
-        does_split, cofac_coeffs, cofac_mons,
-        cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
-                                                       basis, tr, ind_order, char, lc_sets,
-                                                       tags, timer, 
-                                                       maintain_nf = maintain_nf)
+        filter!(idx -> !basis.is_red[index(basis.syz_masks[idx])], syz_queue)
+        sort!(syz_queue, by = sz -> basis.syz_sigs[sz].deg)
+        if !isempty(syz_queue)
+            frst_syz_ind = index(basis.syz_masks[first(syz_queue)])
+            poss_syz_new_deg = deg - basis.degs[frst_syz_ind]
+            if basis.syz_sigs[first(syz_queue)].deg <= poss_syz_new_deg
+                does_split, cofac_coeffs, cofac_mons,
+                cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, syz_finished, basis_ht,
+                                                               basis, tr, ind_order, char, lc_sets,
+                                                               tags, timer, 
+                                                               maintain_nf = maintain_nf)
+            else
+                does_split = false
+            end
+        else
+            does_split = false
+        end
 
         if does_split
             return true, false, cofac_coeffs,
