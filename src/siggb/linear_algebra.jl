@@ -147,8 +147,7 @@ function echelonize!(matrix::MacaulayMatrix,
         end
 
         # check if row lead reduced
-        m = monomial(row_sig)
-        @inbounds if isempty(new_row) || (matrix.rows[row_ind][1] != new_row[1] && any(!iszero, m.exps))
+        @inbounds if isempty(new_row) || (matrix.rows[row_ind][1] != new_row[1])
             # TODO: not super happy with this check
             if !(row_ind in matrix.toadd[1:matrix.toadd_length])
                 matrix.toadd[matrix.toadd_length+1] = row_ind

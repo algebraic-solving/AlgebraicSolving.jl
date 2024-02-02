@@ -271,12 +271,12 @@ function sig_decomp!(basis::Basis{N},
                                                            tr, ps,
                                                            zd_ind, tgs,
                                                            ind_ord,
-                                                           syz_queue,
                                                            lc_set)
             timer.comp_lc_time += tim
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1), Int[], tr2))
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr))
         else
+            @assert _is_gb(bs, basis_ht, tgs, char)
             to_del_eqns = findall(i -> bs.is_red[i], 1:neqns)
             neqns -= length(to_del_eqns)
             deleteat!(lc_set.eqns, to_del_eqns)
@@ -447,17 +447,23 @@ function split!(basis::Basis{N},
                 zd_ind::SigIndex,
                 tags::Tags,
                 ind_order::IndOrder,
-                syz_queue::Vector{Int},
                 lc_set::LocClosedSet) where N
 
 
     @inbounds begin
+        # 2nd component input data
+        sys2_mons = copy(basis.monomials[1:basis.input_load])
+        sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
+        deleteat!(sys2_mons, zd_ind)
+        deleteat!(sys2_coeffs, zd_ind)
+        lc_set2 = deepcopy(lc_set)
+
         # 1st component
         zd_deg = basis_ht.exponents[first(cofac_mons_hsh)].deg
 
         ge_deg_inds = filter(i -> basis.degs[i] > zd_deg, 1:basis.input_load)
         if isempty(ge_deg_inds)
-            ord_ind = basis.input_load + 1
+            ord_ind = ind_order.max_ind + one(SigIndex)
         else
             ord_ind, _ = findmin(i -> ind_order.ord[i], ge_deg_inds)
         end
@@ -466,28 +472,24 @@ function split!(basis::Basis{N},
         add_new_sequence_element!(basis, basis_ht, tr,
                                   cofac_mons_hsh, cofac_coeffs,
                                   ind_order, ord_ind, pairset,
-                                  tags, syz_queue)
+                                  tags)
 
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
         add_equation!(lc_set, h)
-                
-        # 2nd component
-        sys2_mons = copy(basis.monomials[1:basis.input_load])
-        sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
-        deleteat!(sys2_mons, zd_ind)
-        deleteat!(sys2_coeffs, zd_ind)
 
         # build basis/pairset for second new system
         basis2, ps2, tags2, ind_ord2, tr2 = fill_structs!(sys2_mons, sys2_coeffs,
                                                           basis_ht, def_tg=:split)
 
-        lc_set2 = deepcopy(lc_set)
         add_inequation!(lc_set2, h)
         deleteat!(lc_set2.eqns, zd_ind)
 
         ind_ord2 = new_ind_order(basis2)
     end
+
+    @debug print_sequence(basis, basis_ht, ind_order, lc_set, tags)
+    @debug print_sequence(basis2, basis_ht, ind_ord2, lc_set2, tags2)
 
     return basis2, ps2, tags2, ind_ord2, lc_set2, tr2
 end    
@@ -688,6 +690,7 @@ end
 function print_sequence(basis::Basis{N},
                         basis_ht::MonomialHashtable,
                         ind_order::IndOrder,
+                        lc_set::LocClosedSet,
                         tags::Tags) where N
 
     inds = sort(collect(1:basis.input_load), by = i -> ind_order.ord[i])
@@ -696,7 +699,11 @@ function print_sequence(basis::Basis{N},
         mns = [basis_ht.exponents[m] for m in mns_hsh]
         cfs = basis.coefficients[i]
         sig = basis.sigs[i]
-        println("$(first(mns)) ------> $(index(basis.sigs[i])), $(gettag(tags, index(basis.sigs[i]))), $(basis.degs[i])")
+        lm = convert_to_pol(ring(lc_set), [first(mns)], [one(Coeff)])
+        println("$(i) ------> $(index(basis.sigs[i])), $(lm), $(gettag(tags, index(basis.sigs[i])))")
+    end
+    for g in lc_set.ineqns
+        println(Nemo.leading_monomial(g))
     end
     println("----")
 end
@@ -710,7 +717,13 @@ function _is_gb(gb::Vector{P}) where {P <: MPolyRingElem}
     lms_msolve = (Nemo.leading_monomial).(gb_msolve)
     res1 = all(u -> any(v -> divides(u, v)[1], lms_gb), lms_msolve)
     res2 = all(u -> any(v -> divides(u, v)[1], lms_msolve), lms_gb)
-    return res1 && res2
+    if !(res1 && res2)
+        idx = findfirst(u -> all(v -> !divides(u, v)[1], lms_gb), lms_msolve)
+        println(lms_gb[idx])
+        println(lms_msolve)
+        return false
+    end
+    return true
 end
 
 function _is_gb(gb::Vector{Tuple{Tuple{Int, P}, P}}) where {P <: MPolyRingElem}

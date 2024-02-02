@@ -65,8 +65,8 @@ function construct_module(sig::Sig{N},
                           gb_exps::Vector{Int32};
                           maintain_nf::Bool=false) where {N, Char}
     
-    if ind_ord.ord[index(sig)] < idx
-        return Coeff[], Monomial{N}[]
+    if ind_ord.ord[index(sig)] < ind_ord.ord[idx]
+        return Coeff[], MonIdx[]
     end
 
     tr_mat = tr.mats[mat_index]
@@ -101,8 +101,8 @@ function construct_module_core(sig::Sig{N},
                                gb_exps::Vector{Int32};
                                maintain_nf::Bool=false) where {N, Char}
 
-    if ind_ord.ord[index(sig)] < idx
-        return Coeff[], Monomial{N}[]
+    if ind_ord.ord[index(sig)] < ind_ord.ord[idx]
+        return Coeff[], MonIdx[]
     end
 
     tr_mat = tr.mats[mat_index]

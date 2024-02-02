@@ -60,6 +60,7 @@ function select_normal!(pairset::Pairset{N},
         end
 
         if !iszero(pair_with_rewr_ind)
+            # println("selected $(curr_top_sig)")
 
             # take pair with non-rewr top signature
             pair = pairset.elems[pair_with_rewr_ind]
@@ -95,8 +96,8 @@ function select_normal!(pairset::Pairset{N},
                 @inbounds for j in 1:npairs
                     pair2 = pairset.elems[j]
                     pair2.bot_sig == curr_top_sig && continue
+                    iszero(pair2.bot_index) && continue
                     if iszero(reducer_ind) || lt_pot(pair2.bot_sig, reducer_sig, ind_order)
-                        iszero(pair2.bot_index) && continue
                         !lt_pot(pair2.bot_sig, curr_top_sig, ind_order) && continue
                         new_red = false
                         if !iszero(pair2.bot_index)

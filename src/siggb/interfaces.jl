@@ -211,6 +211,12 @@ function add_input_element!(basis::Basis{N},
         push!(basis.degs, lm.deg)
         basis.lm_masks[l] = lm_divm
         basis.input_load += 1
+        for i in basis.basis_offset:basis.basis_load
+            if isassigned(basis.mod_rep_known, i)
+                push!(basis.mod_rep_known[i], false)
+                resize!(basis.mod_reps[i], l)
+            end
+        end
 
         # add child to rewrite root
         push!(basis.rewrite_nodes[1], l+1)
@@ -228,14 +234,13 @@ function add_new_sequence_element!(basis::Basis{N},
                                    ind_ord::IndOrder,
                                    ord_ind::SigIndex,
                                    pairset::Pairset{N},
-                                   tags::Tags,
-                                   syz_queue::Vector{Int}=Int[];
+                                   tags::Tags;
                                    new_tg::Symbol=:split) where N
 
     ins_index!(ind_ord, ord_ind)
 
     # add cofactor to input sequence
-    make_room_new_input_el!(basis, pairset, tr, syz_queue)
+    make_room_new_input_el!(basis, pairset, tr)
 
     lm = basis_ht.exponents[first(mons)]
 
@@ -253,8 +258,7 @@ end
 
 function make_room_new_input_el!(basis::Basis,
                                  pairset::Pairset,
-                                 tr::Tracer,
-                                 syz_queue::Vector{Int})
+                                 tr::Tracer)
 
     # this whole block just shifts the basis to the right
     # to make room for new input elements
@@ -287,6 +291,10 @@ function make_room_new_input_el!(basis::Basis,
             basis.monomials[i] = basis.monomials[i-shift]
             basis.coefficients[i] = basis.coefficients[i-shift]
             basis.is_red[i] = basis.is_red[i-shift]
+            if isassigned(basis.mod_rep_known, i-shift)
+                basis.mod_rep_known[i] = basis.mod_rep_known[i-shift]
+                basis.mod_reps[i] = basis.mod_reps[i-shift]
+            end
 
             # adjust tracer
             tr.basis_ind_to_mat[i] = tr.basis_ind_to_mat[i-shift]
@@ -310,6 +318,11 @@ function make_room_new_input_el!(basis::Basis,
                     mat.rows[i] = (v[1], v[2] + shift)
                 end
             end
+            for (i, v) in pairs(mat.is_basis_row)
+                if v >= old_offset
+                    mat.is_basis_row[i] = v + shift
+                end
+            end
         end
 
         # adjust pairset
@@ -321,11 +334,6 @@ function make_room_new_input_el!(basis::Basis,
             if p.bot_index >= old_offset
                 pairset.elems[i].bot_index += shift
             end
-        end
-
-        # adjust syz queue
-        for (i, idx) in enumerate(syz_queue)
-            syz_queue[i] = idx + shift
         end
     end
 end

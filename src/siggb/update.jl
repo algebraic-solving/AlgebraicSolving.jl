@@ -81,6 +81,7 @@ function add_basis_elem!(basis::Basis{N},
     # add to basis hashtable
     insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
     lm = basis_ht.exponents[first(row)]
+    @debug "new lm $(lm)"
     lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
     s = new_sig
 
@@ -102,25 +103,23 @@ function add_basis_elem!(basis::Basis{N},
 
     basis.is_red[l] = false
 
-    if gettag(tags, index(new_sig)) != :colins
-        tree_data = basis.rewrite_nodes[parent_ind+1]
-        insind = 3 
-        @inbounds for j in insind:insind+tree_data[1]
-            child_ind = tree_data[j]
-            rat = basis.sigratios[child_ind-1]
-            if lt_drl(new_sig_ratio, rat)
-                break
-            end
-            insind += 1
+    tree_data = basis.rewrite_nodes[parent_ind+1]
+    insind = 3 
+    @inbounds for j in insind:insind+tree_data[1]
+        child_ind = tree_data[j]
+        rat = basis.sigratios[child_ind-1]
+        if lt_drl(new_sig_ratio, rat)
+            break
         end
-        insert!(tree_data, insind, l+1)
-        tree_data[1] += 1
-
-        # if an existing sig further reduced we dont need the old element
-        if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
-            basis.is_red[parent_ind] = true
-        end 
+        insind += 1
     end
+    insert!(tree_data, insind, l+1)
+    tree_data[1] += 1
+
+    # if an existing sig further reduced we dont need the old element
+    if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
+        basis.is_red[parent_ind] = true
+    end 
 
     basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
     basis.basis_load = l
@@ -283,7 +282,7 @@ function update_pairset!(pairset::Pairset{N},
         basis_sig_idx = index(basis.sigs[i])
         # dont build some pairs if one of the elements is inserted
         # during colon ideal computation
-        are_incompat(new_sig_idx, basis_sig_idx, ind_order) && continue
+        # are_incompat(new_sig_idx, basis_sig_idx, ind_order) && continue
 
         basis_lm = leading_monomial(basis, basis_ht, i)
         mult_new_elem = lcm_div(new_lm, basis_lm)
@@ -298,7 +297,6 @@ function update_pairset!(pairset::Pairset{N},
         new_sig_is_smaller = lt_pot(new_pair_sig, basis_pair_sig, ind_order)
 
         top_idx = new_sig_is_smaller ? basis_sig_idx : new_sig_idx
-        gettag(tags, top_idx) == :colins && continue
         
         # check if S-pair is singular
         new_pair_sig == basis_pair_sig && continue
