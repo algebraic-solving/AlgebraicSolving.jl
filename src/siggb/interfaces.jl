@@ -60,7 +60,7 @@ function fill_structs!(sys_mons::Vector{Vector{MonIdx}},
 
     # initialize basis
     sysl = length(sys_mons)
-    basis = new_basis(init_basis_size, init_syz_size, 1000, Val(N))
+    basis = new_basis(init_basis_size, init_syz_size, sysl, Val(N))
     pairset = init_pairset(Val(N))
     tags = Tags()
     ind_order = IndOrder(SigIndex[],
@@ -190,10 +190,8 @@ function add_input_element!(basis::Basis{N},
         basis.lm_masks[l] = lm_divm
         basis.input_load += 1
         for i in basis.basis_offset:basis.basis_load
-            if isassigned(basis.mod_rep_known, i)
-                push!(basis.mod_rep_known[i], false)
-                resize!(basis.mod_reps[i], l)
-            end
+            push!(basis.mod_rep_known[i], false)
+            resize!(basis.mod_reps[i], l)
         end
 
         # add child to rewrite root
@@ -269,10 +267,8 @@ function make_room_new_input_el!(basis::Basis,
             basis.monomials[i] = basis.monomials[i-shift]
             basis.coefficients[i] = basis.coefficients[i-shift]
             basis.is_red[i] = basis.is_red[i-shift]
-            if isassigned(basis.mod_rep_known, i-shift)
-                basis.mod_rep_known[i] = basis.mod_rep_known[i-shift]
-                basis.mod_reps[i] = basis.mod_reps[i-shift]
-            end
+            basis.mod_rep_known[i] = basis.mod_rep_known[i-shift]
+            basis.mod_reps[i] = basis.mod_reps[i-shift]
 
             # adjust tracer
             tr.basis_ind_to_mat[i] = tr.basis_ind_to_mat[i-shift]

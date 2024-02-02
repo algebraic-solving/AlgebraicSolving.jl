@@ -98,6 +98,9 @@ function add_basis_elem!(basis::Basis{N},
     basis.monomials[l] = row
     basis.coefficients[l] = coeffs
 
+    basis.mod_rep_known[l] = falses(ind_order.max_ind)
+    basis.mod_reps[l] = Vector{Polynomial}(undef, ind_order.max_ind)
+
     basis.is_red[l] = false
 
     tree_data = basis.rewrite_nodes[parent_ind+1]

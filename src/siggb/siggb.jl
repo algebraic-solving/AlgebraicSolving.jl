@@ -385,6 +385,18 @@ function siggb_for_split!(basis::Basis{N},
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
+    lt_squeue = (syz1, syz2) -> begin
+        idx1 = index(syz1)
+        idx2 = index(syz2)
+        mon1 = monomial(syz1)
+        mon2 = monomial(syz2)
+        if mon1.deg == mon2.deg
+            ind_order.ord[idx1] < ind_order.ord[idx2]
+        else
+            mon1.deg < mon2.deg
+        end
+    end
+
     while !iszero(pairset.load)
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
@@ -411,7 +423,7 @@ function siggb_for_split!(basis::Basis{N},
 
         # check to see if we can split with one of the syzygies
         filter!(idx -> !basis.is_red[index(basis.syz_masks[idx])], syz_queue)
-        sort!(syz_queue, by = sz -> basis.syz_sigs[sz].deg)
+        sort!(syz_queue, by = sz -> (index(basis.syz_masks[sz]), basis.syz_sigs[sz]), lt = lt_squeue)
         if !isempty(syz_queue)
             frst_syz_ind = index(basis.syz_masks[first(syz_queue)])
             poss_syz_new_deg = deg - basis.degs[frst_syz_ind]
@@ -489,7 +501,6 @@ function split!(basis::Basis{N},
 
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
-        println(h)
         @assert !isone(h)
         add_equation!(lc_set, h)
 
@@ -502,9 +513,6 @@ function split!(basis::Basis{N},
 
         ind_ord2 = new_ind_order(basis2)
     end
-
-    print_sequence(basis, basis_ht, ind_order, lc_set, tags)
-    print_sequence(basis2, basis_ht, ind_ord2, lc_set2, tags2)
 
     return basis2, ps2, tags2, ind_ord2, lc_set2, tr2
 end    
@@ -597,9 +605,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         tr_ind = tr.syz_ind_to_mat[idx]
 
         push!(to_del, i)
-        println((syz_ind, syz_mon))
         for cofac_ind in reverse(sorted_inds)
-            println(cofac_ind)
             tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
                                                                            basis_ht,
                                                                            tr_ind,

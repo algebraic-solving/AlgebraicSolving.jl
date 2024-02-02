@@ -13,15 +13,9 @@ function construct_module(basis::Basis{N},
     @inbounds sig = basis.sigs[basis_index]
 
     if basis_index >= basis.basis_offset
-        if isassigned(basis.mod_rep_known, basis_index) 
-            ik = basis.mod_rep_known[basis_index]
-            if ik[idx]
-                return basis.mod_reps[basis_index][idx]
-            end
-        else
-            basis.mod_rep_known[basis_index] = falses(ind_order.max_ind)
-            basis.mod_reps[basis_index] =
-                Vector{Polynomial}(undef, ind_order.max_ind)
+        ik = basis.mod_rep_known[basis_index]
+        if ik[idx]
+            return basis.mod_reps[basis_index][idx]
         end
 
         @inbounds mat_ind = tr.basis_ind_to_mat[basis_index]
