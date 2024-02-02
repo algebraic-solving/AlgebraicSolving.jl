@@ -464,10 +464,11 @@ function split!(basis::Basis{N},
 
     @inbounds begin
         # 2nd component input data
-        sys2_mons = copy(basis.monomials[1:basis.input_load])
-        sys2_coeffs = copy(basis.coefficients[1:basis.input_load])
-        deleteat!(sys2_mons, zd_ind)
-        deleteat!(sys2_coeffs, zd_ind)
+        sorted_inds = collect(1:basis.input_load)
+        deleteat!(sorted_inds, zd_ind)
+        sort!(sorted_inds, by = ind -> ind_order.ord[ind])
+        sys2_mons = copy(basis.monomials[sorted_inds])
+        sys2_coeffs = copy(basis.coefficients[sorted_inds])
         lc_set2 = deepcopy(lc_set)
 
         # 1st component
@@ -488,6 +489,8 @@ function split!(basis::Basis{N},
 
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
+        println(h)
+        @assert !isone(h)
         add_equation!(lc_set, h)
 
         # build basis/pairset for second new system
@@ -500,8 +503,8 @@ function split!(basis::Basis{N},
         ind_ord2 = new_ind_order(basis2)
     end
 
-    @debug print_sequence(basis, basis_ht, ind_order, lc_set, tags)
-    @debug print_sequence(basis2, basis_ht, ind_ord2, lc_set2, tags2)
+    print_sequence(basis, basis_ht, ind_order, lc_set, tags)
+    print_sequence(basis2, basis_ht, ind_ord2, lc_set2, tags2)
 
     return basis2, ps2, tags2, ind_ord2, lc_set2, tr2
 end    
@@ -575,7 +578,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
     ind_info = [(index(basis.sigs[i]), basis.is_red[i]) for i in 1:basis.input_load]
     filter!(tpl -> !tpl[2], ind_info)
     sorted_inds = (tpl -> tpl[1]).(ind_info)
-    sort!(sorted_inds, by = ind -> basis.degs[ind], rev = true)
+    sort!(sorted_inds, by = ind -> basis.degs[ind])
 
     if maintain_nf
         @assert isone(length(lc_sets))
@@ -594,7 +597,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         tr_ind = tr.syz_ind_to_mat[idx]
 
         push!(to_del, i)
-        for cofac_ind in sorted_inds
+        for cofac_ind in reverse(sorted_inds)
+            println(cofac_ind)
             tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
                                                                            basis_ht,
                                                                            tr_ind,
@@ -611,12 +615,15 @@ function process_syz_for_split!(syz_queue::Vector{Int},
             if all(iszs)
                 continue
             else
+                println((syz_ind, syz_mon))
                 found_zd = true
                 gb = first(lc_sets).gb
                 p = convert_to_pol(parent(first(gb)),
                                    [basis_ht.exponents[mdx] for mdx in cofac_mons_hsh],
                                    cofac_coeffs)
+                println(p)
                 p_nf = my_normal_form([p], gb)[1]
+                println("good syz $(p_nf)")
                 zd_coeffs, zd_mons_hsh = convert_to_ht(p_nf, basis_ht, char)
                 # zd_coeffs, zd_mons_hsh = cofac_coeffs, cofac_mons_hsh
                 zd_ind = cofac_ind

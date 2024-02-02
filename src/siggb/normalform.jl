@@ -184,7 +184,7 @@ function my_normal_form(F::Vector{T},
                         nr_thrds::Int=1,
                         info_level::Int=0) where T <: MPolyRingElem
 
-    if (length(F) == 0 || length(gb) == 0)
+    if (length(F) == 0 || length(gb) == 0)
         error("Input data not valid.")
     end
 
