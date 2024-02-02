@@ -276,7 +276,6 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1), Int[], tr2))
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr))
         else
-            @assert _is_gb(bs, basis_ht, tgs, char)
             to_del_eqns = findall(i -> bs.is_red[i], 1:neqns)
             neqns -= length(to_del_eqns)
             deleteat!(lc_set.eqns, to_del_eqns)

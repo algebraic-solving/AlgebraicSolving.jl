@@ -262,7 +262,7 @@ function make_room_new_input_el!(basis::Basis,
 
     # this whole block just shifts the basis to the right
     # to make room for new input elements
-    @inbounds if basis.input_size >= basis.input_load
+    @inbounds if basis.input_size <= basis.input_load
         basis.input_size *= 2
         
         shift = basis.input_size
