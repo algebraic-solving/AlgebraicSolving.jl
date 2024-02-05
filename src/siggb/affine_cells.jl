@@ -4,6 +4,10 @@ function affine_cell(F::Vector{T},
     return LocClosedSet{T}(F,H)
 end
 
+function num_eqns(X::LocClosedSet)
+    length(findall((!).(X.eqns_is_red)))
+end
+
 # for displaying locally closed sets
 function Base.show(io::IO, lc::LocClosedSet)
     string_rep = "V("
@@ -77,12 +81,14 @@ function hull(X::LocClosedSet, g::MPolyRingElem)
     if one(ring(X)) in H
         return [X]
     end
-    return remove(X, H)
+    isempty(H) && return typeof(X)[]
+    H_rand = random_lin_combs(H)
+    return remove(X, H_rand)
 end
 
 function remove(X::LocClosedSet,
                 H::Vector{<:MPolyRingElem})
-
+    
     res = typeof(X)[]
     isempty(H) && return res
     h = first(H)
@@ -159,6 +165,25 @@ function quotient(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
     for (i, p) in enumerate(gb)
         res[i] = divides(convert_to_orig_ring(p, R), nz)[2]
     end
+    return res
+end
+
+# assumes H is sorted by degree
+function random_lin_combs(H::Vector{P}) where {P <: MPolyRingElem}
+    res = P[]
+    chr = characteristic(base_ring(first(H)))
+    curr_deg = total_degree(first(H))
+    curr_pol = zero(parent(first(H)))
+    for h in H
+        if total_degree(h) == curr_deg
+            curr_pol += rand(1:chr-1)*h
+        else
+            push!(res, curr_pol)
+            curr_pol = h
+            curr_deg = total_degree(h)
+        end
+    end
+    push!(res, curr_pol)
     return res
 end
 
