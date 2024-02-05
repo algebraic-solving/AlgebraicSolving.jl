@@ -239,7 +239,7 @@ function sig_decomp!(basis::Basis{N},
 
     while !isempty(queue)
         bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr = popfirst!(queue)
-        neqns = bs.input_load
+        neqns = length(findall((!).(lc_set.eqns_is_red)))
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
             @info "empty component"
@@ -250,6 +250,7 @@ function sig_decomp!(basis::Basis{N},
             @info "------------------------------------------"
             continue
         elseif codim(lc_set) == neqns
+            deleteat!(lc_set.eqns, findall(lc_set.eqns_is_red))
             @info "finished component codim $c"
             push!(result, lc_set)
             @info "------------------------------------------"
@@ -276,12 +277,8 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1), Int[], tr2))
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr))
         else
-            @assert _is_gb(bs, basis_ht, tgs, char)
-            to_del_eqns = findall(i -> bs.is_red[i], 1:neqns)
-            neqns -= length(to_del_eqns)
-            deleteat!(lc_set.eqns, to_del_eqns)
-            @assert neqns == length(lc_set.eqns) == codim(lc_set)
-            @info "finished component $(neqns) eqns, codim $(codim(lc_set))"
+            deleteat!(lc_set.eqns, findall(lc_set.eqns_is_red))
+            @info "finished component"
             push!(result, lc_set)
         end
         @info "------------------------------------------"
@@ -419,6 +416,9 @@ function siggb_for_split!(basis::Basis{N},
                                       symbol_ht, basis_ht,
                                       ind_order, tags,
                                       tr, char, syz_queue)
+        for X in lc_sets
+            X.eqns_is_red = basis.is_red[1:basis.input_load]
+        end
         timer.update_time += tim
 
         # check to see if we can split with one of the syzygies
@@ -475,13 +475,31 @@ function split!(basis::Basis{N},
 
 
     @inbounds begin
+        # new polynomial
+        cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
+        h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
+        @assert !isone(h)
+
         # 2nd component input data
         sorted_inds = collect(1:basis.input_load)
-        deleteat!(sorted_inds, zd_ind)
+        to_del = findall(idx -> basis.is_red[idx], sorted_inds)
+        push!(to_del, zd_ind)
+        unique!(sort!(to_del))
+        deleteat!(sorted_inds, to_del)
         sort!(sorted_inds, by = ind -> ind_order.ord[ind])
+
         sys2_mons = copy(basis.monomials[sorted_inds])
         sys2_coeffs = copy(basis.coefficients[sorted_inds])
         lc_set2 = deepcopy(lc_set)
+        deleteat!(lc_set2.eqns, to_del)
+        deleteat!(lc_set2.eqns_is_red, to_del)
+        add_inequation!(lc_set2, h)
+
+        # build basis/pairset for second new system
+        basis2, ps2, tags2, ind_ord2, tr2 = fill_structs!(sys2_mons, sys2_coeffs,
+                                                          basis_ht, def_tg=:split)
+
+        ind_ord2 = new_ind_order(basis2)
 
         # 1st component
         zd_deg = basis_ht.exponents[first(cofac_mons_hsh)].deg
@@ -499,19 +517,7 @@ function split!(basis::Basis{N},
                                   ind_order, ord_ind, pairset,
                                   tags)
 
-        cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
-        h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
-        @assert !isone(h)
         add_equation!(lc_set, h)
-
-        # build basis/pairset for second new system
-        basis2, ps2, tags2, ind_ord2, tr2 = fill_structs!(sys2_mons, sys2_coeffs,
-                                                          basis_ht, def_tg=:split)
-
-        add_inequation!(lc_set2, h)
-        deleteat!(lc_set2.eqns, zd_ind)
-
-        ind_ord2 = new_ind_order(basis2)
     end
 
     return basis2, ps2, tags2, ind_ord2, lc_set2, tr2

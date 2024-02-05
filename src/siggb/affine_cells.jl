@@ -49,6 +49,7 @@ end
 function add_equation!(X::LocClosedSet, f::MPolyRingElem)
     @info "adding equation"
     push!(X.eqns, f)
+    push!(X.eqns_is_red, false)
     X.gb = saturate(push!(X.gb, f), X.ineqns)
 end
 
