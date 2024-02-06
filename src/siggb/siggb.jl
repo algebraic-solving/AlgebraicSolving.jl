@@ -350,7 +350,7 @@ function sig_kalk_decomp!(basis::Basis{N},
                                                                     tags, ind_ord,
                                                                     lc_sets)
             timer.comp_lc_time += tim
-            lc_sets1 = vcat(lc_sets[1:end .∉ nz_nf_inds], new_lc_sets1)
+            lc_sets1 = vcat(lc_sets[findall(i -> !(i in nz_nf_inds), 1:length(lc_sets))], new_lc_sets1)
             lc_sets2 = new_lc_sets2
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_sets2, Int[], tr2))
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_sets1, syz_queue, tr))
@@ -542,7 +542,7 @@ function kalksplit!(basis::Basis{N},
         h = convert_to_pol(ring(first(lc_sets)), cofac_mons, cofac_coeffs)
 
         # compute hull(X, h) for relevant X
-        @info "taking hull of $h"
+        @info "taking hull"
         lc_sets_new1 = LocClosedSet{T}[]
         for X in lc_sets[nz_nf_inds]
             hll = hull(X, h)
