@@ -251,12 +251,13 @@ function sig_decomp!(basis::Basis{N},
             continue
         elseif codim(lc_set) == neqns
             deleteat!(lc_set.eqns, findall(lc_set.eqns_is_red))
+            deleteat!(lc_set.eqns_is_red, findall(lc_set.eqns_is_red)) 
             @info "finished component codim $c"
             push!(result, lc_set)
             @info "------------------------------------------"
             continue
         end
-        found_zd, isempty, zd_coeffs,
+        found_zd, isempt, zd_coeffs,
         zd_mons, zd_ind, _ = siggb_for_split!(bs, ps,
                                               tgs, ind_ord,
                                               basis_ht, tr,
@@ -278,6 +279,7 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr))
         else
             deleteat!(lc_set.eqns, findall(lc_set.eqns_is_red))
+            deleteat!(lc_set.eqns_is_red, findall(lc_set.eqns_is_red))
             @info "finished component"
             push!(result, lc_set)
         end
@@ -476,7 +478,6 @@ function split!(basis::Basis{N},
         # new polynomial
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
-        @assert !isone(h)
 
         # 2nd component input data
         sorted_inds = collect(1:basis.input_load)
@@ -489,8 +490,8 @@ function split!(basis::Basis{N},
         sys2_mons = copy(basis.monomials[sorted_inds])
         sys2_coeffs = copy(basis.coefficients[sorted_inds])
         lc_set2 = deepcopy(lc_set)
-        deleteat!(lc_set2.eqns, to_del)
-        deleteat!(lc_set2.eqns_is_red, to_del)
+        lc_set2.eqns = lc_set2.eqns[sorted_inds]
+        lc_set2.eqns_is_red = lc_set2.eqns_is_red[sorted_inds]
         add_inequation!(lc_set2, h)
 
         # build basis/pairset for second new system

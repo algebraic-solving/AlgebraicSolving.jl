@@ -54,11 +54,11 @@ function add_equation!(X::LocClosedSet, f::MPolyRingElem)
     @info "adding equation"
     push!(X.eqns, f)
     push!(X.eqns_is_red, false)
-    X.gb = saturate(push!(X.gb, f), X.ineqns)
+    X.gb = saturate(vcat(X.gb, [f]), X.ineqns)
 end
 
 function add_inequation!(X::LocClosedSet, h::MPolyRingElem)
-    @info "adding inequation of degree $(total_degree(h))"
+    @info "adding inequation"
     push!(X.ineqns, h)
     X.gb = saturate(X.gb, h)
 end
