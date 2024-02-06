@@ -29,11 +29,11 @@ function update_siggb!(basis::Basis,
         if isempty(row)
             new_syz_c += 1
 
-            # check if syzygy could be interesting to split with
-            if all(iszero, new_sig_mon.exps)
-                # mark input element as redundant
-                basis.is_red[new_idx] = true
-            elseif gettag(tags, new_idx) == :split
+            # # check if syzygy could be interesting to split with
+            # if all(iszero, new_sig_mon.exps)
+            #     # mark input element as redundant
+            #     basis.is_red[new_idx] = true
+            if gettag(tags, new_idx) == :split
                 push!(syz_queue, basis.syz_load+1)
             end
 
