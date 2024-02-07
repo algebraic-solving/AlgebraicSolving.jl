@@ -83,7 +83,8 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
-        siggb!(basis, pairset, basis_ht, char, shift, tags, degbound=degbound)
+        siggb!(basis, pairset, basis_ht, char, shift,
+               tags, ind_order, tr, degbound=degbound)
     end
 
     # output
@@ -100,6 +101,47 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         sig = (Int(index(s)), finish(ctx))
 
         push!(outp, (sig, pol))
+    end
+
+    return outp
+end
+
+function sig_sat(sys::Vector{T}, h::T; info_level::Int=0) where {T <: MPolyRingElem}
+
+    full_sys = vcat(sys, [h])
+    
+    # data structure setup/conversion
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(full_sys)
+
+    # fill basis, pairset, tags
+    basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht)
+
+    # set tag for nz
+    tags[ind_order.max_ind] = :sat
+
+    sysl = length(full_sys)
+    # compute divmasks
+    fill_divmask!(basis_ht)
+    @inbounds for i in 1:sysl
+        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
+    end
+
+    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    with_logger(logger) do
+        siggb!(basis, pairset, basis_ht, char, shift,
+               tags, ind_order, tr, trace=true)
+    end
+
+    # output
+    R = parent(first(sys))
+    eltp = typeof(first(sys))
+    outp = eltp[]
+    @inbounds for i in basis.basis_offset:basis.basis_load
+        gettag(tags, index(basis.sigs[i])) == :sat && continue
+        pol = convert_to_pol(R,
+                             [basis_ht.exponents[m] for m in basis.monomials[i]],
+                             basis.coefficients[i])
+        push!(outp, pol)
     end
 
     return outp
@@ -165,17 +207,11 @@ function siggb!(basis::Basis{N},
                 basis_ht::MonomialHashtable,
                 char::Val{Char},
                 shift::Val{Shift},
-                tags::Tags;
+                tags::Tags,
+                ind_order::IndOrder,
+                tr::Tracer;
                 trace::Bool=false,
                 degbound::Int=0) where {N, Char, Shift}
-
-    # index order
-    ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
-                         Dict{Tuple{SigIndex, SigIndex}, Bool}(),
-                         SigIndex(basis.basis_offset-1))
-
-    # tracer
-    tr = new_tracer()
 
     # fake syz queue
     syz_queue = Int[]

@@ -201,10 +201,12 @@ function process_syzygy!(basis::Basis{N},
         mat_ind = length(tr.mats)
         @info "constructing module"
         cofac = construct_module(new_sig, basis,
+                                 basis_ht,
                                  mat_ind, tr,
                                  vchar,
-                                 ind_order.max_ind,
-                                 ind_order, new_idx)[new_idx]
+                                 ind_order,
+                                 new_idx,
+                                 Int32[], Int32[], Int32[])
         sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
                    lt = lt_drl, rev = true)
         cofac_coeffs, cofac_mons_hashed = cofac
@@ -214,8 +216,9 @@ function process_syzygy!(basis::Basis{N},
 
         # find order index
         sat_inds = findall(tag -> tag == :sat, tags)
-        ord_ind, _ = findmin(sat_ind -> ind_order.ord[col_ind], sat_inds)
-        add_new_sequence_element!(basis, basis_ht, cofac_mons, cofac_coeffs,
+        ord_ind, _ = findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)
+        add_new_sequence_element!(basis, basis_ht, tr, cofac_mons_hashed,
+                                  cofac_coeffs,
                                   ind_order, ord_ind, pairset, tags,
                                   new_tg = :satins)
     end
