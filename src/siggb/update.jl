@@ -190,16 +190,15 @@ function process_syzygy!(basis::Basis{N},
     # remove pairs that became rewriteable in previous loop
     remove_red_pairs!(pairset)
     if tag == :col
-        @info "inserting cofactor from colon ideal computation"
+        @info "inserting cofactor from saturation computation"
         # construct cofactor of zero reduction and ins in hashtable
         mat_ind = length(tr.mats)
         @info "constructing module"
-        cofac_coeffs, cofac_mons = construct_module(new_sig, basis,
-                                                    mat_ind, tr,
-                                                    vchar,
-                                                    ind_order.max_ind,
-                                                    ind_order, new_idx)[new_idx]
-        @info "done"
+        cofac_coeffs, cofac_mons_hashed = construct_module(new_sig, basis,
+                                                           mat_ind, tr,
+                                                           vchar,
+                                                           ind_order.max_ind,
+                                                           ind_order, new_idx)[new_idx]
         cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon)
                              for mon in cofac_mons]
 

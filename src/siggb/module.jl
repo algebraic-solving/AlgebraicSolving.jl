@@ -28,8 +28,7 @@ function construct_module(basis::Basis{N},
 
         if maintain_nf && !isempty(res[1])
             res = my_normal_form(res[2], res[1], gb_lens, gb_cfs, gb_exps, basis_ht, vchar)
-            s = sortperm(res[2])
-            res = res[1][s], res[2][s]
+            sort_poly!(res)
         end
         basis.mod_rep_known[basis_index][idx] = true
         basis.mod_reps[basis_index][idx] = res
@@ -126,9 +125,7 @@ function construct_module_core(sig::Sig{N},
         insert_multiplied_poly_in_hash_table!(res_mod_mns, hsh, mult,
                                               rewr_mod_mns,
                                               basis_ht, basis_ht)
-        s = sortperm(res_mod_mns)
-        res_mod_cfs = res_mod_cfs[s]
-        res_mod_mns = res_mod_mns[s]
+        sort_poly!((res_mod_cfs, res_mod_mns))
     end
 
     # construct module rep of all reducers
@@ -189,92 +186,4 @@ function mul_by_coeff!(coeffs::Vector{Coeff},
     @inbounds for i in 1:length(coeffs)
         coeffs[i] = mul(c, coeffs[i], vchar)
     end
-end
-
-# assumes mons are sorted ascendingly
-function add_pols(coeffs1::Vector{Coeff},
-                  mons1::Vector{MonIdx},
-                  coeffs2::Vector{Coeff},
-                  mons2::Vector{MonIdx},
-                  vch::Val{Char}) where {Char}
-
-    l1 = length(mons1)
-    l2 = length(mons2)
-    mons_res = Vector{MonIdx}(undef, l1 + l2)
-    coeffs_res = Vector{Coeff}(undef, l1 + l2)
-    
-    ind1 = 1
-    ind2 = 1
-    new_l = 0 
-    @inbounds while ind1 <= l1 && ind2 <= l2
-        new_l += 1
-        m1 = mons1[ind1]
-        m2 = mons2[ind2]
-        if m1 == m2
-            mons_res[new_l] = m1
-            coeffs_res[new_l] = add(coeffs1[ind1], coeffs2[ind2], vch)
-            ind1 += 1
-            ind2 += 1
-        elseif m1 < m2
-            mons_res[new_l] = m1
-            coeffs_res[new_l] = coeffs1[ind1]
-            ind1 += 1
-        else
-            mons_res[new_l] = m2
-            coeffs_res[new_l] = coeffs2[ind2]
-            ind2 += 1
-        end
-    end
-
-    while ind1 <= l1
-        new_l += 1
-        mons_res[new_l] = mons1[ind1]
-        coeffs_res[new_l] = coeffs1[ind1]
-        ind1 += 1
-    end
-
-    while ind2 <= l2 
-        new_l += 1
-        mons_res[new_l] = mons2[ind2]
-        coeffs_res[new_l] = coeffs2[ind2]
-        ind2 += 1
-    end
-
-    resize!(mons_res, new_l)
-    resize!(coeffs_res, new_l)
-
-    zero_cfs_inds = findall(c -> iszero(c), coeffs_res)
-    deleteat!(mons_res, zero_cfs_inds)
-    deleteat!(coeffs_res, zero_cfs_inds)
-
-    return coeffs_res, mons_res
-end
-
-
-function add_pols_2(cfs1::Vector{Coeff},
-                    exps1::Vector{Monomial{N}},
-                    cfs2::Vector{Coeff},
-                    exps2::Vector{Monomial{N}},
-                    char::Val{Char}) where {N, Char}
-
-    R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
-                             ordering = :degrevlex)
-    p1 = convert_to_pol(R, exps1, cfs1)
-    p2 = convert_to_pol(R, exps2, cfs2)
-    p = p1+p2
-
-    lp = length(p)
-    exps = exponent_vectors(p)
-    cfs = coefficients(p)
-    
-    res_exps = Vector{Monomial{N}}(undef, lp)
-    res_cfs = Vector{Coeff}(undef, lp)
-    @inbounds for (i, (cf, evec)) in enumerate(zip(cfs, exps)) 
-        m = monomial(SVector{N}((Exp).(evec)))
-        cff = Int(lift(ZZ, cf))
-        res_exps[i] = m
-        res_cfs[i] = cff
-    end
-
-    return res_cfs, res_exps
 end

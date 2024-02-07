@@ -471,10 +471,6 @@ function split!(basis::Basis{N},
 
 
     @inbounds begin
-        s = sortperm(cofac_mons_hsh, by = midx -> basis_ht.exponents[midx],
-                     lt = lt_drl, rev = true)
-        cofac_mons_hsh = cofac_mons_hsh[s]
-        cofac_coeffs = cofac_coeffs[s]
         # new polynomial
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
@@ -534,10 +530,6 @@ function kalksplit!(basis::Basis{N},
 
 
     @inbounds begin
-        s = sortperm(cofac_mons_hsh, by = midx -> basis_ht.exponents[midx],
-                     lt = lt_drl, rev = true)
-        cofac_mons_hsh = cofac_mons_hsh[s]
-        cofac_coeffs = cofac_coeffs[s]
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(first(lc_sets)), cofac_mons, cofac_coeffs)
 
@@ -647,10 +639,9 @@ function process_syz_for_split!(syz_queue::Vector{Int},
     deleteat!(syz_queue, to_del)
             
     if found_zd
-        s = sortperm(zd_mons_hsh, by = midx -> basis_ht.exponents[midx],
-                     lt = lt_drl, rev = true)
-        zd_mons_hsh = zd_mons_hsh[s]
-        zd_coeffs = zd_coeffs[s]
+        sort_poly!((zd_coeffs, zd_mons_hsh),
+                   by = midx -> basis_ht.exponents[midx],
+                   lt = lt_drl, rev = true)
         # normalize cofac coefficients
         inver = inv(first(zd_coeffs), char)
         @inbounds for i in eachindex(zd_coeffs)

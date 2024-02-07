@@ -137,6 +137,105 @@ end
 
 Base.hash(a::Monomial{N}) where N = makehash(Val(N), a.exps)
 
+#---------------------#
+
+#-- For Polynomials --#
+
+function sort_poly!(pol::Polynomial; kwargs...)
+    s = sortperm(pol[2], kwargs...)
+    permute!(pol[1], s)
+    permute!(pol[2], s)
+    return
+end
+
+# assumes mons are sorted ascendingly by hash index
+function add_pols(coeffs1::Vector{Coeff},
+                  mons1::Vector{MonIdx},
+                  coeffs2::Vector{Coeff},
+                  mons2::Vector{MonIdx},
+                  vch::Val{Char}) where {Char}
+
+    l1 = length(mons1)
+    l2 = length(mons2)
+    mons_res = Vector{MonIdx}(undef, l1 + l2)
+    coeffs_res = Vector{Coeff}(undef, l1 + l2)
+    
+    ind1 = 1
+    ind2 = 1
+    new_l = 0 
+    @inbounds while ind1 <= l1 && ind2 <= l2
+        new_l += 1
+        m1 = mons1[ind1]
+        m2 = mons2[ind2]
+        if m1 == m2
+            mons_res[new_l] = m1
+            coeffs_res[new_l] = add(coeffs1[ind1], coeffs2[ind2], vch)
+            ind1 += 1
+            ind2 += 1
+        elseif m1 < m2
+            mons_res[new_l] = m1
+            coeffs_res[new_l] = coeffs1[ind1]
+            ind1 += 1
+        else
+            mons_res[new_l] = m2
+            coeffs_res[new_l] = coeffs2[ind2]
+            ind2 += 1
+        end
+    end
+
+    while ind1 <= l1
+        new_l += 1
+        mons_res[new_l] = mons1[ind1]
+        coeffs_res[new_l] = coeffs1[ind1]
+        ind1 += 1
+    end
+
+    while ind2 <= l2 
+        new_l += 1
+        mons_res[new_l] = mons2[ind2]
+        coeffs_res[new_l] = coeffs2[ind2]
+        ind2 += 1
+    end
+
+    resize!(mons_res, new_l)
+    resize!(coeffs_res, new_l)
+
+    zero_cfs_inds = findall(c -> iszero(c), coeffs_res)
+    deleteat!(mons_res, zero_cfs_inds)
+    deleteat!(coeffs_res, zero_cfs_inds)
+
+    return coeffs_res, mons_res
+end
+
+
+function add_pols_2(cfs1::Vector{Coeff},
+                    exps1::Vector{Monomial{N}},
+                    cfs2::Vector{Coeff},
+                    exps2::Vector{Monomial{N}},
+                    char::Val{Char}) where {N, Char}
+
+    R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
+                             ordering = :degrevlex)
+    p1 = convert_to_pol(R, exps1, cfs1)
+    p2 = convert_to_pol(R, exps2, cfs2)
+    p = p1+p2
+
+    lp = length(p)
+    exps = exponent_vectors(p)
+    cfs = coefficients(p)
+    
+    res_exps = Vector{Monomial{N}}(undef, lp)
+    res_cfs = Vector{Coeff}(undef, lp)
+    @inbounds for (i, (cf, evec)) in enumerate(zip(cfs, exps)) 
+        m = monomial(SVector{N}((Exp).(evec)))
+        cff = Int(lift(ZZ, cf))
+        res_exps[i] = m
+        res_cfs[i] = cff
+    end
+
+    return res_cfs, res_exps
+end
+
 #-------------------------#
 
 # for readibility
