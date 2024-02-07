@@ -21,7 +21,7 @@ include("interfaces.jl")
 #---------------- user functions --------------------#
 
 @doc Markdown.doc"""
-    sig_groebner_basis(sys::Vector{T}; info_level::Int = 0, degbound::Int = 0) where {T <: MPolyRingElem}
+    sig_groebner_basis(sys::Vector{T}; info_level::Int = 0; degbound::Int = 0) where {T <: MPolyRingElem}
 
 Compute a Signature Gröbner basis of the sequence `sys` w.r.t. to the
 degree reverse lexicographical monomial ordering and the degree
@@ -36,7 +36,7 @@ signature and the second the underlying polynomial.
 # Arguments
 - `sys::Vector{T} where T <: MpolyElem`: input generators.
 - `info_level::Int=0`: info level printout: off (`0`, default), computational details (`1`)
-- `degbound::Int=0`: degree bound for Gröbner basis computation, compute a full Gröbner basis if `0` (default) or only up to degree `d`.
+- `degbound::Int=0`: Compute a full Gröbner basis if `0` otherwise only up to degree `degbound`.
 
 # Example
 ```jldoctest
@@ -83,8 +83,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
-        siggb!(basis, pairset, basis_ht, char, shift, tags,
-               degbound = degbound)
+        siggb!(basis, pairset, basis_ht, char, shift, tags, degbound=degbound)
     end
 
     # output
@@ -167,7 +166,8 @@ function siggb!(basis::Basis{N},
                 char::Val{Char},
                 shift::Val{Shift},
                 tags::Tags;
-                degbound = 0) where {N, Char, Shift}
+                trace::Bool=false,
+                degbound::Int=0) where {N, Char, Shift}
 
     # index order
     ind_order = IndOrder((SigIndex).(collect(1:basis.basis_offset-1)),
@@ -179,14 +179,6 @@ function siggb!(basis::Basis{N},
 
     # fake syz queue
     syz_queue = Int[]
-
-    # sum of degrees of nonzero conditions
-    nz_deg = zero(Exp)
-    @inbounds for i in 1:basis.input_load
-        if gettag(tags, SigIndex(i)) == :col
-            nz_deg += basis.degs[i]
-        end
-    end
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -203,17 +195,17 @@ function siggb!(basis::Basis{N},
                      ind_order, tags)
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tr_mat = echelonize!(matrix, tags, ind_order, char, shift)
+        tr_mat = echelonize!(matrix, tags, ind_order, char,
+                             shift, trace = trace)
 
-        push!(tr.mats, tr_mat)
+        trace && push!(tr.mats, tr_mat)
 
         update_siggb!(basis, matrix, pairset, symbol_ht,
                       basis_ht, ind_order, tags,
-                      tr, char, syz_queue)
+                      tr, char, syz_queue; trace = trace)
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
 end
-
 
 #---------------- functions for splitting --------------------#
 

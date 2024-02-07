@@ -142,7 +142,7 @@ Base.hash(a::Monomial{N}) where N = makehash(Val(N), a.exps)
 #-- For Polynomials --#
 
 function sort_poly!(pol::Polynomial; kwargs...)
-    s = sortperm(pol[2], kwargs...)
+    s = sortperm(pol[2]; kwargs...)
     permute!(pol[1], s)
     permute!(pol[2], s)
     return
@@ -160,6 +160,7 @@ function normalize_cfs!(cfs::Vector{Coeff},
         end
         cfs[i] = mul(inver, cfs[i], vchar)
     end
+end
 
 # assumes mons are sorted ascendingly by hash index
 function add_pols(coeffs1::Vector{Coeff},

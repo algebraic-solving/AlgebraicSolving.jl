@@ -115,7 +115,7 @@ function convert_to_ht(f::MPolyRingElem,
         mons[j] = eidx
         coeffs[j] = cf
     end
-    sort_poly!((coeffs, mons), kwargs...)
+    sort_poly!((coeffs, mons); kwargs...)
     if normalise
         normalize_cfs!(coeffs, char)
     end

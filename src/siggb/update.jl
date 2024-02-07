@@ -10,7 +10,8 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       syz_queue::Vector{Int}) where {N, Char}
+                       syz_queue::Vector{Int};
+                       kwargs...) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
@@ -47,7 +48,7 @@ function update_siggb!(basis::Basis,
             added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
                                          row, coeffs,
                                          new_sig, new_sig_mask, parent_ind,
-                                         tr, ind_order, tags)
+                                         tr, ind_order, tags; kwargs...)
         end
     end
 
@@ -69,7 +70,8 @@ function add_basis_elem!(basis::Basis{N},
                          parent_ind::Int,
                          tr::Tracer,
                          ind_order::IndOrder,
-                         tags::Tags) where N
+                         tags::Tags;
+                         trace::Bool=true) where N
 
 
     # make sure we have enough space
@@ -125,15 +127,17 @@ function add_basis_elem!(basis::Basis{N},
     basis.basis_load = l
 
     # update tracer info
-    if tr.load >= tr.size
-        tr.size *= 2
-        resize!(tr.basis_ind_to_mat, tr.size)
+    if trace
+        if tr.load >= tr.size
+            tr.size *= 2
+            resize!(tr.basis_ind_to_mat, tr.size)
+        end
+        tr_mat = last(tr.mats)
+        row_ind, _ = tr_mat.rows[new_sig]
+        tr_mat.is_basis_row[row_ind] = l
+        @inbounds tr.basis_ind_to_mat[l] = length(tr.mats)
+        tr.load += 1
     end
-    tr_mat = last(tr.mats)
-    row_ind, _ = tr_mat.rows[new_sig]
-    tr_mat.is_basis_row[row_ind] = l
-    @inbounds tr.basis_ind_to_mat[l] = length(tr.mats)
-    tr.load += 1
 
     # build new pairs
     update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
@@ -189,6 +193,8 @@ function process_syzygy!(basis::Basis{N},
 
     # remove pairs that became rewriteable in previous loop
     remove_red_pairs!(pairset)
+
+    # insert cofactors in saturation computation
     if tag == :sat
         @info "inserting cofactor from saturation computation"
         # construct cofactor of zero reduction and ins in hashtable
