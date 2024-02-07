@@ -272,6 +272,9 @@ function symbolic_pp!(basis::Basis{N},
         # write to matrix
         if !iszero(red_ind)
             mm = monomial(SVector(mult))
+            if iszero(compat_ind) && gettag(tags, index(mul_red_sig)) == :sat
+                compat_ind = index(mul_red_sig)
+            end
             @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
                                                       red_ind, symbol_ht,
                                                       ht, mm,

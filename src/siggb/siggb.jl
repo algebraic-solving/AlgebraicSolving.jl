@@ -106,9 +106,9 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     return outp
 end
 
-function sig_sat(sys::Vector{T}, h::T; info_level::Int=0) where {T <: MPolyRingElem}
+function sig_sat(sys::Vector{T}, H::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
 
-    full_sys = vcat(sys, [h])
+    full_sys = vcat(sys, H)
     
     # data structure setup/conversion
     sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(full_sys)
@@ -116,10 +116,15 @@ function sig_sat(sys::Vector{T}, h::T; info_level::Int=0) where {T <: MPolyRingE
     # fill basis, pairset, tags
     basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht)
 
-    # set tag for nz
-    tags[ind_order.max_ind] = :sat
-
+    # set tag for sats
     sysl = length(full_sys)
+    for idx in length(sys)+1:sysl
+        tags[idx] = :sat
+        for idx2 in idx+1:length(full_sys)
+            ind_order.incompat[(idx, idx2)] = true
+        end
+    end
+
     # compute divmasks
     fill_divmask!(basis_ht)
     @inbounds for i in 1:sysl
