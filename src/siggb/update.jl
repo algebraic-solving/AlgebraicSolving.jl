@@ -275,9 +275,8 @@ function update_pairset!(pairset::Pairset{N},
         basis.is_red[i] && continue
 
         basis_sig_idx = index(basis.sigs[i])
-        # dont build some pairs if one of the elements is inserted
-        # during colon ideal computation
-        # are_incompat(new_sig_idx, basis_sig_idx, ind_order) && continue
+        # dont build incompatible pairs 
+        are_incompat(new_sig_idx, basis_sig_idx, ind_order) && continue
 
         basis_lm = leading_monomial(basis, basis_ht, i)
         mult_new_elem = lcm_div(new_lm, basis_lm)

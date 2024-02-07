@@ -10,6 +10,8 @@ function select_normal!(pairset::Pairset{N},
     npairs = 0
     min_pair_ind = 0
     deg = Exp(-1) 
+    compat_ind = zero(SigIndex)
+    dont_sel = Int[]
     for i in 1:pairset.load
         if deg == -1
             deg = pairset.elems[i].deg
@@ -18,6 +20,12 @@ function select_normal!(pairset::Pairset{N},
         end
         if pairset.elems[i].deg == deg
             npairs += 1
+            top_s_idx = index(pairset.elems[i].top_sig)
+            if iszero(compat_ind) && gettag(tags, top_s_idx) == :sat
+                compat_ind = top_s_idx
+            elseif are_incompat(top_s_idx, compat_ind, ind_order)
+                push!(dont_sel, i)
+            end
         else
             break
         end
@@ -30,8 +38,15 @@ function select_normal!(pairset::Pairset{N},
     reinitialize_matrix!(matrix, npairs)
     skip = falses(npairs)
 
+    l = 1
+    dl = length(dont_sel)
     @inbounds for i in 1:npairs
         if skip[i]
+            continue
+        end
+
+        if l <= dl && i == dont_sel[l]
+            l += 1
             continue
         end
 
@@ -39,7 +54,6 @@ function select_normal!(pairset::Pairset{N},
         # for each unique pair signature
         curr_top_sig = pair.top_sig
 
-        # TODO: are these checks needed
         rewriteable_syz(basis, curr_top_sig, pair.top_sig_mask, tags) && continue
         rewriteable_koszul(basis, ht,
                            curr_top_sig, pair.top_sig_mask,
@@ -60,8 +74,6 @@ function select_normal!(pairset::Pairset{N},
         end
 
         if !iszero(pair_with_rewr_ind)
-            # println("selected $(curr_top_sig)")
-
             # take pair with non-rewr top signature
             pair = pairset.elems[pair_with_rewr_ind]
             
@@ -97,17 +109,13 @@ function select_normal!(pairset::Pairset{N},
                     pair2 = pairset.elems[j]
                     pair2.bot_sig == curr_top_sig && continue
                     iszero(pair2.bot_index) && continue
+                    are_incompat(index(pair2.bot_sig), compat_ind, ind_order) && continue
                     if iszero(reducer_ind) || lt_pot(pair2.bot_sig, reducer_sig, ind_order)
                         !lt_pot(pair2.bot_sig, curr_top_sig, ind_order) && continue
                         new_red = false
                         if !iszero(pair2.bot_index)
                             rewriteable(basis, ht, pair2.bot_index, pair2.bot_sig,
                                         pair2.bot_sig_mask, ind_order, tags) && continue
-                            # TODO: why only basis check here
-                            # rewriteable_basis(basis, pair2.bot_index,
-                            #                   pair2.bot_sig,
-                            #                   pair2.bot_sig_mask,
-                            #                   tags) && continue
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
                                           monomial(basis.sigs[ind]))
@@ -156,11 +164,16 @@ function select_normal!(pairset::Pairset{N},
     end
 
     # remove selected pairs from pairset
-    @inbounds for i in 1:(pairset.load-npairs)
-        pairset.elems[i] = pairset.elems[i+npairs]
+    l = 1
+    @inbounds for i in 1:(pairset.load-npairs+dl)
+        if l <= dl && i == dont_sel[j]
+            l += 1
+            continue
+        end
+        pairset.elems[i] = pairset.elems[i+npairs-l+1]
     end
     pairset.load -= npairs
-    return deg
+    return deg, compat_ind
 end
 
 function symbolic_pp!(basis::Basis{N},
@@ -168,8 +181,8 @@ function symbolic_pp!(basis::Basis{N},
                       ht::MonomialHashtable,
                       symbol_ht::MonomialHashtable,
                       ind_order::IndOrder,
-                      tags::Tags;
-                      forbidden_tag=:colins::Symbol) where N
+                      tags::Tags,
+                      compat_ind::SigIndex=zero(SigIndex)) where N
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
@@ -223,16 +236,15 @@ function symbolic_pp!(basis::Basis{N},
             end
 
             cand_sig = basis.sigs[j]
+            if !iszero(compat_ind) && are_incompat(index(cand_sig), compat_ind, ind_order)
+                j += 1
+                @goto target
+            end
+            
             mul_cand_sig = (index(cand_sig),
                             mul(monomial(mult2), monomial(cand_sig)))
             cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
                                     ht.ndivbits)
-
-            # dont reduce by nz conditions in NF computation
-            if gettag(tags, index(mul_cand_sig)) == forbidden_tag
-                j += 1
-                @goto target
-            end
 
             # check if new reducer sig is smaller than possible previous
             if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig, ind_order)

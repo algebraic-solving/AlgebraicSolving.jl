@@ -227,10 +227,10 @@ function siggb!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        deg = select_normal!(pairset, basis, matrix,
-                             basis_ht, symbol_ht, ind_order, tags)
+        _, compat_ind = select_normal!(pairset, basis, matrix,
+                                       basis_ht, symbol_ht, ind_order, tags)
         symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
-                     ind_order, tags)
+                     ind_order, tags, compat_ind)
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
         tr_mat = echelonize!(matrix, tags, ind_order, char,
@@ -428,8 +428,8 @@ function siggb_for_split!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        tim = @elapsed deg = select_normal!(pairset, basis, matrix,
-                                            basis_ht, symbol_ht, ind_order, tags)
+        tim = @elapsed deg, _ = select_normal!(pairset, basis, matrix,
+                                               basis_ht, symbol_ht, ind_order, tags)
         timer.select_time += tim
         tim = @elapsed symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
                                     ind_order, tags)
