@@ -244,6 +244,8 @@ function siggb!(basis::Basis{N},
         added_unit && return true
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
+
+    return false
 end
 
 #---------------- functions for splitting --------------------#
