@@ -158,7 +158,7 @@ function normalize_cfs!(cfs::Vector{Coeff},
             cfs[i] = one(Coeff)
             continue
         end
-        cfs[i] = mul(inver, cfs[i], vchar)
+        cfs[i] = mul(inver, cfs[i], char)
     end
 end
 
