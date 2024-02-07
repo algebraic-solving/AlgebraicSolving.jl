@@ -593,8 +593,8 @@ function kalksplit!(basis::Basis{N},
         lc_sets_new2 = [add_inequation(X, h) for X in lc_sets[nz_nf_inds]]
         for X in lc_sets_new2
             deleteat!(X.eqns, zd_ind)
+            deleteat!(X.eqns_is_red, zd_ind)
         end
-
         ind_ord2 = new_ind_order(basis2)
     end
 
