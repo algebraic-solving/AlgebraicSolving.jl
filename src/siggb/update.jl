@@ -189,42 +189,29 @@ function process_syzygy!(basis::Basis{N},
 
     # remove pairs that became rewriteable in previous loop
     remove_red_pairs!(pairset)
-    if tag == :col
+    if tag == :sat
         @info "inserting cofactor from saturation computation"
         # construct cofactor of zero reduction and ins in hashtable
         mat_ind = length(tr.mats)
         @info "constructing module"
-        cofac_coeffs, cofac_mons_hashed = construct_module(new_sig, basis,
-                                                           mat_ind, tr,
-                                                           vchar,
-                                                           ind_order.max_ind,
-                                                           ind_order, new_idx)[new_idx]
-        cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon)
-                             for mon in cofac_mons]
+        cofac = construct_module(new_sig, basis,
+                                 mat_ind, tr,
+                                 vchar,
+                                 ind_order.max_ind,
+                                 ind_order, new_idx)[new_idx]
+        sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
+                   lt = lt_drl, rev = true)
+        cofac_coeffs, cofac_mons_hashed = cofac
 
         # normalize coefficients
-        inver = inv(first(cofac_coeffs), vchar)
-        @inbounds for i in eachindex(cofac_coeffs)
-            if isone(i)
-                cofac_coeffs[i] = one(Coeff)
-                continue
-            end
-            cofac_coeffs[i] = mul(inver, cofac_coeffs[i], vchar)
-        end
+        normalize_cfs!(cofac_coeffs, vchar)
 
         # find order index
-        col_inds = findall(tag -> tag == :col, tags)
-        filter!(col_ind -> ind_order.ord[col_ind] > ind_order.ord[new_idx],
-                col_inds)
-        if !isempty(col_inds)
-            ord_ind, _ = findmin(col_ind -> ind_order.ord[col_ind], col_inds)
-        else
-            ord_ind = ind_order.max_ind + one(SigIndex)
-        end
+        sat_inds = findall(tag -> tag == :sat, tags)
+        ord_ind, _ = findmin(sat_ind -> ind_order.ord[col_ind], sat_inds)
         add_new_sequence_element!(basis, basis_ht, cofac_mons, cofac_coeffs,
                                   ind_order, ord_ind, pairset, tags,
-                                  new_tg = :colins)
-        ind_order.incompat[(new_idx, ind)] = true
+                                  new_tg = :satins)
     end
 end
 

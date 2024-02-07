@@ -148,6 +148,19 @@ function sort_poly!(pol::Polynomial; kwargs...)
     return
 end
 
+function normalize_cfs!(cfs::Vector{Coeff},
+                        char::Val{Char}) where Char
+
+    isone(first(cfs)) && return
+    inver = inv(first(cfs), char)
+    @inbounds for i in eachindex(cfs)
+        if isone(i)
+            cfs[i] = one(Coeff)
+            continue
+        end
+        cfs[i] = mul(inver, cfs[i], vchar)
+    end
+
 # assumes mons are sorted ascendingly by hash index
 function add_pols(coeffs1::Vector{Coeff},
                   mons1::Vector{MonIdx},

@@ -643,14 +643,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                    by = midx -> basis_ht.exponents[midx],
                    lt = lt_drl, rev = true)
         # normalize cofac coefficients
-        inver = inv(first(zd_coeffs), char)
-        @inbounds for i in eachindex(zd_coeffs)
-            if isone(i)
-                zd_coeffs[i] = one(Coeff)
-                continue
-            end
-            zd_coeffs[i] = mul(inver, zd_coeffs[i], char)
-        end
+        normalize_cfs!(zd_coeffs, char)
     end
 
     return found_zd, zd_coeffs, zd_mons_hsh, zd_ind, nz_nf_inds
