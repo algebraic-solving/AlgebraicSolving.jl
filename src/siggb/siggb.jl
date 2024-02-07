@@ -128,23 +128,25 @@ function sig_sat(sys::Vector{T}, h::T; info_level::Int=0) where {T <: MPolyRingE
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
-        siggb!(basis, pairset, basis_ht, char, shift,
-               tags, ind_order, tr, trace=true)
+        added_unit = siggb!(basis, pairset, basis_ht, char, shift,
+                            tags, ind_order, tr, trace=true)
+        # output
+        R = parent(first(sys))
+        eltp = typeof(first(sys))
+        outp = eltp[]
+        if added_unit
+            push!(outp, one(R))
+        else
+            @inbounds for i in basis.basis_offset:basis.basis_load
+                gettag(tags, index(basis.sigs[i])) == :sat && continue
+                pol = convert_to_pol(R,
+                                     [basis_ht.exponents[m] for m in basis.monomials[i]],
+                                     basis.coefficients[i])
+                push!(outp, pol)
+            end
+        end
+        return outp
     end
-
-    # output
-    R = parent(first(sys))
-    eltp = typeof(first(sys))
-    outp = eltp[]
-    @inbounds for i in basis.basis_offset:basis.basis_load
-        gettag(tags, index(basis.sigs[i])) == :sat && continue
-        pol = convert_to_pol(R,
-                             [basis_ht.exponents[m] for m in basis.monomials[i]],
-                             basis.coefficients[i])
-        push!(outp, pol)
-    end
-
-    return outp
 end
 
 function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
@@ -236,9 +238,10 @@ function siggb!(basis::Basis{N},
 
         trace && push!(tr.mats, tr_mat)
 
-        update_siggb!(basis, matrix, pairset, symbol_ht,
-                      basis_ht, ind_order, tags,
-                      tr, char, syz_queue; trace = trace)
+        added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
+                                   basis_ht, ind_order, tags,
+                                   tr, char, syz_queue; trace = trace)
+        added_unit && return true
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
 end
