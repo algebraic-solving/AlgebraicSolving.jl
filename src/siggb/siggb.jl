@@ -366,7 +366,7 @@ function sig_kalk_decomp!(basis::Basis{N},
         append!(result, lc_sets[equidim_inds])
         # what syntax!
         if !isempty(equidim_inds)
-            lc_sets = lc_sets[1:end .∉ equidim_inds]
+            lc_sets = lc_sets[findall(i -> !(i in equidim_inds), 1:length(lc_sets))]
             if isempty(lc_sets)
                 @info "------------------------------------------"
                 continue
@@ -574,9 +574,14 @@ function kalksplit!(basis::Basis{N},
         # compute hull(X, h) for relevant X
         @info "taking hull"
         lc_sets_new1 = LocClosedSet{T}[]
+        lc_sets_new2 = LocClosedSet{T}[]
         for X in lc_sets[nz_nf_inds]
             hll = hull(X, h)
             append!(lc_sets_new1, hll)
+            nz = add_inequation(X, h)
+            push!(lc_sets_new2, nz)
+            deleteat!(nz.eqns, zd_ind)
+            deleteat!(nz.eqns_is_red, zd_ind)
         end
                 
         # 2nd kind of component
@@ -588,13 +593,6 @@ function kalksplit!(basis::Basis{N},
         # build basis/pairset for second new system
         basis2, ps2, tags2, ind_ord2, tr2 = fill_structs!(sys2_mons, sys2_coeffs,
                                                           basis_ht, def_tg=:split)
-
-        @info "adding inequation"
-        lc_sets_new2 = [add_inequation(X, h) for X in lc_sets[nz_nf_inds]]
-        for X in lc_sets_new2
-            deleteat!(X.eqns, zd_ind)
-            deleteat!(X.eqns_is_red, zd_ind)
-        end
         ind_ord2 = new_ind_order(basis2)
     end
 

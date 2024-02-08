@@ -57,18 +57,18 @@ function add_equation!(X::LocClosedSet, f::MPolyRingElem)
     X.gb = saturate(vcat(X.gb, [f]), X.ineqns)
 end
 
-function add_inequation!(X::LocClosedSet, h::MPolyRingElem)
-    @info "adding inequation"
+function add_inequation!(X::LocClosedSet, h::MPolyRingElem; method=:sat)
+    # @info "adding inequation"
     push!(X.ineqns, h)
-    X.gb = saturate(X.gb, h)
+    X.gb = method == :sat ? saturate(X.gb, h) : quotient(X.gb, h)
 end
 
-function add_inequation(X::LocClosedSet, h::MPolyRingElem)
+function add_inequation(X::LocClosedSet, h::MPolyRingElem; kwargs...)
     if isone(h)
         return X
     end
     Y = deepcopy(X)
-    add_inequation!(Y, h)
+    add_inequation!(Y, h; kwargs...)
     return Y
 end
 
@@ -83,7 +83,8 @@ function hull(X::LocClosedSet, g::MPolyRingElem)
     end
     isempty(H) && return typeof(X)[]
     H_rand = random_lin_combs(H)
-    return remove(X, H_rand)
+    res = remove(X, H_rand)
+    return res
 end
 
 function remove(X::LocClosedSet,
@@ -96,11 +97,12 @@ function remove(X::LocClosedSet,
     if iszero(my_normal_form([h], X.gb))
         return cells
     else
-        Y = add_inequation(X, h)
+        Y = add_inequation(X, h; method = :col)
         G = Y.gb
         push!(res, Y)
         for Z in cells
-            cells2 = remove(Z, G)
+            # cells2 = remove(Z, G)
+            cells2 = hull(Z, h)
             append!(res, cells2)
         end
         return res
@@ -187,6 +189,16 @@ function random_lin_combs(H::Vector{P}) where {P <: MPolyRingElem}
     return res
 end
 
+function random_lin_comb(F::Vector{P}) where {P <: MPolyRingElem}
+    R = parent(first(F))
+    res = zero(R)
+    chr = characteristic(R)
+    for f in F
+        res += rand(1:chr-1)*f
+    end
+    return res
+end
+
 function convert_poly_to_t_ring(f::P, S::MPolyRing) where {P <: MPolyRingElem}
     ctx = MPolyBuildCtx(S)
     for (e, c) in zip(exponent_vectors(f), coefficients(f))
@@ -235,3 +247,16 @@ function max_ind_sets(gb::Vector{P}) where {P <: MPolyRingElem}
     return res
 end
     
+
+# for debugging
+function check_decomp(F::Vector{P}, Xs::Vector{<:LocClosedSet}) where {P <: MPolyRingElem}
+    println("checking decomp")
+    gb_ch = F
+    for X in Xs
+        g = random_lin_comb(X.gb)
+        gb_ch = saturate(gb_ch, g)
+    end
+    R = parent(first(F))
+    gb_ch = saturate(gb_ch, last(gens(R)))
+    return one(parent(first(F))) in gb_ch
+end
