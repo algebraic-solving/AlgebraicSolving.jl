@@ -72,6 +72,15 @@ function add_inequation(X::LocClosedSet, h::MPolyRingElem; kwargs...)
     return Y
 end
 
+function add_inequations(X::LocClosedSet{P}, H::Vector{P}) where P
+    Y = deepcopy(X)
+    append!(Y.ineqns, H)
+    for h in H
+        Y.gb = quotient(Y.gb, h)
+    end
+    return Y
+end
+
 function hull(X::LocClosedSet, g::MPolyRingElem)
     gb = X.gb
     col_gb = quotient(gb, g)
@@ -84,6 +93,7 @@ function hull(X::LocClosedSet, g::MPolyRingElem)
     isempty(H) && return typeof(X)[]
     H_rand = random_lin_combs(H)
     res = remove(X, H_rand)
+    # res = remove_with_tree(X, H)
     return res
 end
 
@@ -147,25 +157,29 @@ function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
 end
 
 function quotient(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
+    return quotient(F, [nz])
+end
+
+function quotient(F::Vector{P}, nzs::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
-    S, vars = polynomial_ring(base_ring(R), pushfirst!(["x$i" for i in 1:nvars(R)], "t"),
-                             ordering = :degrevlex)
-    Fconv = typeof(first(F))[]
-    t = vars[1]
-    for f in F
-        push!(Fconv, t*convert_poly_to_t_ring(f, S))
+    S, vars = polynomial_ring(base_ring(R), vcat(["t$i" for i in 1:length(nzs)], ["x$i" for i in 1:nvars(R)]),
+                              ordering = :degrevlex)
+    Fconv = [convert_poly_to_t_ring(f, S) for f in F]
+
+    for (i, h) in enumerate(nzs)
+        ti = vars[i]
+        Fconv .*= ti
+        push!(Fconv, (ti-1)*convert_poly_to_t_ring(h, S))
     end
 
-    push!(Fconv, (t-1)*convert_poly_to_t_ring(nz, S))
-
     gb = groebner_basis(Ideal(Fconv), complete_reduction = true,
-                        eliminate = 1)
+                        eliminate = length(nzs))
 
     # convert back to original ring
     res = Vector{P}(undef, length(gb))
 
     for (i, p) in enumerate(gb)
-        res[i] = divides(convert_to_orig_ring(p, R), nz)[2]
+        res[i] = divides(convert_to_orig_ring(p, R), prod(nzs))[2]
     end
     return res
 end
@@ -201,17 +215,21 @@ end
 
 function convert_poly_to_t_ring(f::P, S::MPolyRing) where {P <: MPolyRingElem}
     ctx = MPolyBuildCtx(S)
+    R = parent(f)
+    nts = nvars(S) - nvars(R)
     for (e, c) in zip(exponent_vectors(f), coefficients(f))
-        enew = pushfirst!(e, 0)
-        push_term!(ctx, c, e)
+        enew = vcat(zeros(Int, nts), e)
+        push_term!(ctx, c, enew)
     end
     return finish(ctx)
 end
 
 function convert_to_orig_ring(f::P, R::MPolyRing) where {P <: MPolyRingElem}
     ctx = MPolyBuildCtx(R)
+    S = parent(f)
+    nts = nvars(S) - nvars(R)
     for (e, c) in zip(exponent_vectors(f), coefficients(f))
-        push_term!(ctx, c, e[2:end])
+        push_term!(ctx, c, e[nts+1:end])
     end
     return finish(ctx)
 end
@@ -260,3 +278,107 @@ function check_decomp(F::Vector{P}, Xs::Vector{<:LocClosedSet}) where {P <: MPol
     gb_ch = saturate(gb_ch, last(gens(R)))
     return one(parent(first(F))) in gb_ch
 end
+
+# EXPERIMENTAL REMOVE
+
+# mutable struct NZNode{T}
+#     p::T
+#     parent::Union{Nothing, NZNode{T}}
+#     children::Vector{NZNode{T}}
+# end
+
+# AbstractTrees.children(nd::NZNode) = nd.children
+# AbstractTrees.nodevalue(nd::NZNode) = Nemo.leading_monomial(nd.p)
+# AbstractTrees.ParentLinks(::Type{<:NZNode}) = StoredParents()
+# AbstractTrees.parent(nd::NZNode) = nd.parent
+# AbstractTrees.NodeType(::Type{<:NZNode}) = HasNodeType()
+# AbstractTrees.nodetype(::Type{<:NZNode{T}}) where T = NZNode{T}
+
+# function add_child!(nd::NZNode{T}, p::T) where T
+#     ch = NZNode(p, nd, NZNode{T}[])
+#     push!(nd.children, ch)
+# end
+
+# function right_siblings(nd::NZNode{T}) where T
+#     pr = AbstractTrees.parent(nd)
+#     if isnothing(pr)
+#         return NZNode{T}[]
+#     else
+#         ch_idx = findfirst(ch -> ch == nd, children(pr))
+#         return children(pr)[ch_idx+1:end]
+#     end
+# end
+
+# function right_sibling(nd::NZNode)
+#     pr = AbstractTrees.parent(nd)
+#     if isnothing(pr)
+#         return nothing
+#     else
+#         ch_idx = findfirst(ch -> ch == nd, children(pr))
+#         if ch_idx == length(children(pr))
+#             return nothing
+#         else
+#             return children(pr)[ch_idx+1]
+#         end
+#     end
+# end
+
+# function get_pols(nd::NZNode)
+#     res = [nd.p]
+#     pr = AbstractTrees.parent(nd) 
+#     while !isnothing(pr)
+#         p = pr.p
+#         !isone(p) && push!(res, pr.p)
+#         pr = AbstractTrees.parent(pr)
+#     end
+#     return res
+# end
+
+# function next_leaf(nd::NZNode)
+#     cr_node = nd
+#     while !isnothing(cr_node) && !isroot(cr_node)
+#         n = right_sibling(cr_node)
+#         if isnothing(n)
+#             cr_node = AbstractTrees.parent(cr_node)
+#         else
+#             # descendleft is not allowed to return nothing
+#             return descendleft(n)
+#         end
+#     end
+#     nothing
+# end
+
+# function remove_with_tree(X::LocClosedSet{P}, H::Vector{P}) where P
+#     res = typeof(X)[]
+
+#     R = ring(X)
+#     root = NZNode(one(R), nothing, NZNode{P}[])
+
+#     H_rand = random_lin_combs(H)
+#     for h in H_rand
+#         add_child!(root, h)
+#     end
+
+#     cr_node = first(children(root))
+#     while !isnothing(cr_node)
+#         pls = get_pols(cr_node)
+#         Y = add_inequations(X, pls)
+#         if !is_empty_set(Y)
+#             push!(res, Y)
+
+#             new_ineqns = random_lin_combs(filter(!iszero, my_normal_form(Y.gb, X.gb)))
+#             sort!(new_ineqns, by = p -> total_degree(p))
+#             for sbl in right_siblings(cr_node)
+#                 if !isempty(children(sbl))
+#                     error(":(")
+#                 end
+#                 for g in new_ineqns
+#                     add_child!(sbl, g)
+#                 end
+#             end
+#         end
+#         cr_node = next_leaf(cr_node)
+#     end
+
+#     return res
+# end
