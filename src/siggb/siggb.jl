@@ -342,7 +342,7 @@ function sig_kalk_decomp!(basis::Basis{N},
     eqns = [convert_to_pol(R, [basis_ht.exponents[mdx] for mdx in basis.monomials[i]],
                            basis.coefficients[i])
             for i in 1:basis.input_load]
-    X = LocClosedSet{eltype(eqns)}(eqns, eltype(eqns)[])
+    X = LocClosedSet{eltype(eqns)}(eqns, [last(gens(R))])
     tracer = new_tracer()
     
     queue = [(basis, pairset, tags, ind_order, [X], Int[], tracer)]
@@ -576,9 +576,9 @@ function kalksplit!(basis::Basis{N},
         lc_sets_new1 = LocClosedSet{T}[]
         lc_sets_new2 = LocClosedSet{T}[]
         for X in lc_sets[nz_nf_inds]
-            hll = hull(X, h)
+            hll = hull(X, h, method = :col)
             append!(lc_sets_new1, hll)
-            nz = add_inequation(X, h)
+            nz = add_inequation(X, h; method = :col)
             push!(lc_sets_new2, nz)
             deleteat!(nz.eqns, zd_ind)
             deleteat!(nz.eqns_is_red, zd_ind)

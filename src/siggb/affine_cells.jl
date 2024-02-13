@@ -81,9 +81,9 @@ function add_inequations(X::LocClosedSet{P}, H::Vector{P}) where P
     return Y
 end
 
-function hull(X::LocClosedSet, g::MPolyRingElem)
+function hull(X::LocClosedSet, g::MPolyRingElem; method = :sat)
     gb = X.gb
-    col_gb = quotient(gb, g)
+    col_gb = method == :sat ? saturate(gb, g) : quotient(gb, g)
     H = my_normal_form(col_gb, gb)
     filter!(h -> !iszero(h), H)
     sort!(H, by = h -> total_degree(h))
@@ -107,11 +107,10 @@ function remove(X::LocClosedSet,
     if iszero(my_normal_form([h], X.gb))
         return cells
     else
-        Y = add_inequation(X, h; method = :col)
+        Y = add_inequation(X, h)
         G = Y.gb
         push!(res, Y)
         for Z in cells
-            # cells2 = remove(Z, G)
             cells2 = hull(Z, h)
             append!(res, cells2)
         end
