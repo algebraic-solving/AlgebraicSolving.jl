@@ -270,7 +270,7 @@ function sig_decomp!(basis::Basis{N},
     eqns = [convert_to_pol(R, [basis_ht.exponents[mdx] for mdx in basis.monomials[i]],
                            basis.coefficients[i])
             for i in 1:basis.input_load]
-    X = LocClosedSet{eltype(eqns)}(eqns, eltype(eqns)[])
+    X = LocClosedSet{eltype(eqns)}(eqns, [last(gens(R))])
     
     queue = [(basis, pairset, tags, ind_order, X, Int(basis.input_load), Int[], tr)]
     result = LocClosedSet[]

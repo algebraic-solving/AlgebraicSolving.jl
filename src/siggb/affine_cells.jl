@@ -122,36 +122,29 @@ end
 
 # --- helper functions --- #
 
-function saturate(F::Vector{P}, nzs::Vector{P}) where {P <: MPolyRingElem}
-    res = F
-    if isempty(nzs)
-        res = groebner_basis(Ideal(res), complete_reduction = true)
-    else
-        for h in nzs
-            res = saturate(res, h)
-        end
-    end
-    return res
+function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
+    return saturate(F, [nz])
 end
 
-function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
+function saturate(F::Vector{P}, nzs::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
-    S, vars = polynomial_ring(base_ring(R), pushfirst!(["x$i" for i in 1:nvars(R)], "t"),
-                             ordering = :degrevlex)
-    Fconv = typeof(first(F))[]
-    for f in F
-        push!(Fconv, convert_poly_to_t_ring(f, S))
+    S, vars = polynomial_ring(base_ring(R), vcat(["t$i" for i in 1:length(nzs)], ["x$i" for i in 1:nvars(R)]),
+                              ordering = :degrevlex)
+    Fconv = [convert_poly_to_t_ring(f, S) for f in F]
+
+    for (i, h) in enumerate(nzs)
+        ti = vars[i]
+        push!(Fconv, ti*convert_poly_to_t_ring(h, S)-1)
     end
 
-    push!(Fconv, first(vars)*convert_poly_to_t_ring(nz, S) - 1)
-
-    gb = groebner_basis(Ideal(Fconv), complete_reduction = true, eliminate = 1)
+    gb = groebner_basis(Ideal(Fconv), complete_reduction = true,
+                        eliminate = length(nzs))
 
     # convert back to original ring
     res = Vector{P}(undef, length(gb))
 
     for (i, p) in enumerate(gb)
-        res[i] = convert_to_orig_ring(p, R)
+        res[i] = convert_to_orig_ring(p, R) 
     end
     return res
 end
@@ -260,7 +253,7 @@ function max_ind_sets(gb::Vector{P}) where {P <: MPolyRingElem}
         unique!(res)
     end
 
-    max_length = maximum(mis -> length(all(mis)), res)
+    max_length = maximum(mis -> length(findall(mis)), res)
     filter!(mis -> length(mis) != max_length, res)
     return res
 end
