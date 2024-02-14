@@ -4,11 +4,7 @@ function construct_module(basis::Basis{N},
                           tr::Tracer,
                           vchar::Val{Char},
                           ind_order::IndOrder,
-                          idx::SigIndex,
-                          gb_lens::Vector{Int32},
-                          gb_cfs::Vector{Int32},
-                          gb_exps::Vector{Int32};
-                          maintain_nf::Bool=false) where {N, Char}
+                          idx::SigIndex) where {N, Char}
 
     @inbounds sig = basis.sigs[basis_index]
 
@@ -22,14 +18,8 @@ function construct_module(basis::Basis{N},
         res = construct_module_core(sig, basis, basis_ht,
                                     mat_ind, tr,
                                     vchar, 
-                                    ind_order, idx,
-                                    gb_lens, gb_cfs, gb_exps,
-                                    maintain_nf=maintain_nf)
+                                    ind_order, idx)
 
-        if maintain_nf && !isempty(res[1])
-            res = my_normal_form(res[2], res[1], gb_lens, gb_cfs, gb_exps, basis_ht, vchar)
-            sort_poly!(res)
-        end
         basis.mod_rep_known[basis_index][idx] = true
         basis.mod_reps[basis_index][idx] = res
         return res
@@ -52,11 +42,7 @@ function construct_module(sig::Sig{N},
                           tr::Tracer,
                           vchar::Val{Char},
                           ind_ord::IndOrder,
-                          idx::SigIndex,
-                          gb_lens::Vector{Int32},
-                          gb_cfs::Vector{Int32},
-                          gb_exps::Vector{Int32};
-                          maintain_nf::Bool=false) where {N, Char}
+                          idx::SigIndex) where {N, Char}
     
     if ind_ord.ord[index(sig)] < ind_ord.ord[idx]
         return Coeff[], MonIdx[]
@@ -76,9 +62,7 @@ function construct_module(sig::Sig{N},
     end
 
     return construct_module_core(sig, basis, basis_ht, mat_index,
-                                 tr, vchar, ind_ord, idx,
-                                 gb_lens, gb_cfs, gb_exps,
-                                 maintain_nf = maintain_nf)
+                                 tr, vchar, ind_ord, idx)
 end
 
 function construct_module_core(sig::Sig{N},
@@ -88,11 +72,7 @@ function construct_module_core(sig::Sig{N},
                                tr::Tracer,
                                vchar::Val{Char},
                                ind_ord::IndOrder,
-                               idx::SigIndex,
-                               gb_lens::Vector{Int32},
-                               gb_cfs::Vector{Int32},
-                               gb_exps::Vector{Int32};
-                               maintain_nf::Bool=false) where {N, Char}
+                               idx::SigIndex) where {N, Char}
 
     if ind_ord.ord[index(sig)] < ind_ord.ord[idx]
         return Coeff[], MonIdx[]
@@ -106,9 +86,7 @@ function construct_module_core(sig::Sig{N},
     rewr_mod_cfs, rewr_mod_mns = construct_module(basis, basis_ht,
                                                   rewr_basis_ind,
                                                   tr, vchar,
-                                                  ind_ord, idx,
-                                                  gb_lens, gb_cfs, gb_exps,
-                                                  maintain_nf=maintain_nf)
+                                                  ind_ord, idx)
 
     # multiply by monomial
     rewr_sig = basis.sigs[rewr_basis_ind]
@@ -139,9 +117,7 @@ function construct_module_core(sig::Sig{N},
                                      mat_index,
                                      tr, vchar,
                                      ind_ord,
-                                     idx,
-                                     gb_lens, gb_cfs, gb_exps,
-                                     maintain_nf=maintain_nf)
+                                     idx)
         j_mod_coeffs = j_sig_mod[1]
         mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar),
                                         vchar)

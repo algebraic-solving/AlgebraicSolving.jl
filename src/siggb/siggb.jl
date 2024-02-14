@@ -301,8 +301,7 @@ function sig_decomp!(basis::Basis{N},
                                               basis_ht, tr,
                                               syz_queue,
                                               char, shift, [lc_set],
-                                              timer,
-                                              maintain_nf=false)
+                                              timer)
         if found_zd
             @info "splitting component"
             tim = @elapsed bs2, ps2, tgs2,
@@ -378,7 +377,7 @@ function sig_kalk_decomp!(basis::Basis{N},
                                                        tgs, ind_ord,
                                                        basis_ht, tr, syz_queue,
                                                        char, shift, lc_sets,
-                                                       timer, maintain_nf = false)
+                                                       timer)
         if found_zd
             @info "splitting components"
             tim = @elapsed new_lc_sets1, bs2, ps2, tgs2,
@@ -412,8 +411,7 @@ function siggb_for_split!(basis::Basis{N},
                           char::Val{Char},
                           shift::Val{Shift},
                           lc_sets::Vector{LocClosedSet{T}},
-                          timer::Timings;
-                          maintain_nf::Bool=false) where {N, Char, Shift, T <: MPolyRingElem}
+                          timer::Timings) where {N, Char, Shift, T <: MPolyRingElem}
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -466,8 +464,7 @@ function siggb_for_split!(basis::Basis{N},
                 does_split, cofac_coeffs, cofac_mons,
                 cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, basis_ht,
                                                                basis, tr, ind_order, char, lc_sets,
-                                                               tags, timer, 
-                                                               maintain_nf = maintain_nf)
+                                                               tags, timer)
             else
                 does_split = false
             end
@@ -485,8 +482,7 @@ function siggb_for_split!(basis::Basis{N},
     does_split, cofac_coeffs, cofac_mons,
     cofac_ind, nz_nf_inds = process_syz_for_split!(syz_queue, basis_ht,
                                                    basis, tr, ind_order, char, lc_sets,
-                                                   tags, timer, 
-                                                   maintain_nf = maintain_nf)
+                                                   tags, timer)
 
     if does_split
         return true, false, cofac_coeffs, cofac_mons,
@@ -607,9 +603,8 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                 char::Val{Char},
                                 lc_sets::Vector{LocClosedSet{T}},
                                 tags::Tags,
-                                timer::Timings;
-                                maintain_nf::Bool=false) where {Char, N,
-                                                                T <: MPolyRingElem}
+                                timer::Timings) where {Char, N,
+                                                       T <: MPolyRingElem}
     
     @info "checking known syzygies"
     found_zd = false
@@ -625,16 +620,6 @@ function process_syz_for_split!(syz_queue::Vector{Int},
     sorted_inds = (tpl -> tpl[1]).(ind_info)
     sort!(sorted_inds, by = ind -> ind_order.ord[ind])
 
-    if maintain_nf
-        @assert isone(length(lc_sets))
-        mns = [[basis_ht.exponents[midx] for midx in basis.monomials[i]]
-               for i in basis.basis_offset:basis.basis_load]
-        cfs = [basis.coefficients[i] for i in basis.basis_offset:basis.basis_load]
-        gb_lens, gb_cfs, gb_exps = _convert_to_msolve(mns, cfs)
-    else
-        gb_lens, gb_cfs, gb_exps = Int32[], Int32[], Int32[]
-    end
-    
     @inbounds for (i, idx) in enumerate(syz_queue)
         syz_mask = basis.syz_masks[idx]
         syz_mon = basis.syz_sigs[idx]
@@ -646,9 +631,7 @@ function process_syz_for_split!(syz_queue::Vector{Int},
                                                                            basis_ht,
                                                                            tr_ind,
                                                                            tr, char,
-                                                                           ind_order, cofac_ind,
-                                                                           gb_lens, gb_cfs, gb_exps,
-                                                                           maintain_nf=maintain_nf)
+                                                                           ind_order, cofac_ind)
             timer.module_time += tim
             if isempty(cofac_coeffs)
                 continue
