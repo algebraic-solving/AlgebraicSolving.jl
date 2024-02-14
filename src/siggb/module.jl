@@ -56,9 +56,7 @@ function construct_module(sig::Sig{N},
     if !iszero(basis_ind)
         @assert basis.sigs[basis_ind] == sig
         return construct_module(basis, basis_ht, basis_ind,
-                                tr, vchar, ind_ord, idx,
-                                gb_lens, gb_cfs, gb_exps,
-                                maintain_nf = maintain_nf)
+                                tr, vchar, ind_ord, idx)
     end
 
     return construct_module_core(sig, basis, basis_ht, mat_index,
