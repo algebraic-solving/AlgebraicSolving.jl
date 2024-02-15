@@ -101,17 +101,17 @@ function _convert_finite_field_array_to_abstract_algebra(
                 continue
             end
         end
-        g  = MPolyBuildCtx(R)
         if bcf[len+1] == 0
-            g.poly = R(0)
+            push!(basis, R(0))
         else
+            g  = MPolyBuildCtx(R)
             for j in 1:blen[i]
                 push_term!(g, CR(bcf[len+j]),
                            convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
             end
+            push!(basis, finish(g))
         end
         len +=  blen[i]
-        push!(basis, g.poly)
     end
 
     return basis
