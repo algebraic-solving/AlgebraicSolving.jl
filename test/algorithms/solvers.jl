@@ -1,5 +1,5 @@
 @testset "Algorithms -> Solvers" begin
-    R, (x1,x2,x3,x4) = polynomial_ring(QQ,["x1","x2","x3","x4"], ordering=:degrevlex)
+    R, (x1,x2,x3,x4) = polynomial_ring(QQ,["x1","x2","x3","x4"], internal_ordering=:degrevlex)
     I = Ideal([x1 + 2*x2 + 2*x3 + 2*x4 - 1,
          x1^2 + 2*x2^2 + 2*x3^2 + 2*x4^2 - x1,
          2*x1*x2 + 2*x2*x3 + 2*x3*x4 - x2,
