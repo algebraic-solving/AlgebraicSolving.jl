@@ -27,7 +27,7 @@ ring structures:
 
 ```@repl
 using AlgebraicSolving
-R, (x,y,z) = polynomial_ring(QQ, ["x", "y", "z"], ordering=:degrevlex)
+R, (x,y,z) = polynomial_ring(QQ, ["x", "y", "z"], internal_ordering=:degrevlex)
 ```
 The above example defines a multivariate polynomial ring in three variables `x`, 
 `y`, and `z` over the rationals using the dgree reverse lexicographical ordering 
@@ -36,7 +36,7 @@ over finite fields:
 
 ```@repl
 using AlgebraicSolving
-R, (x,y,z) = polynomial_ring(GF(101), ["x", "y", "z"], ordering=:degrevlex)
+R, (x,y,z) = polynomial_ring(GF(101), ["x", "y", "z"], internal_ordering=:degrevlex)
 ```
 
 ## Ideals
@@ -47,7 +47,7 @@ effective:
 
 ```@repl
 using AlgebraicSolving
-R, (x,y,z) = polynomial_ring(QQ, ["x", "y", "z"], ordering=:degrevlex)
+R, (x,y,z) = polynomial_ring(QQ, ["x", "y", "z"], internal_ordering=:degrevlex)
 I = Ideal([x+y+1, y*z^2-13*y^2])
 ```
 

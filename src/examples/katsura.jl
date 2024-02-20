@@ -30,9 +30,9 @@ QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 + 2*x2^2 + 2*x3^2 - x1, 2*x1*x2 + 2*x
 """
 function katsura(log_solutions::Int, characteristic::Int=0)
     if characteristic == 0
-        R, _ = polynomial_ring(QQ, log_solutions + 1, ordering=:degrevlex)
+        R, _ = polynomial_ring(QQ, log_solutions + 1, internal_ordering=:degrevlex)
     elseif is_probable_prime(characteristic)
-        R, _ = polynomial_ring(GF(characteristic), log_solutions + 1, ordering=:degrevlex)
+        R, _ = polynomial_ring(GF(characteristic), log_solutions + 1, internal_ordering=:degrevlex)
     else
         error("We only support finite fields or QQ as ground fields.")
     end
