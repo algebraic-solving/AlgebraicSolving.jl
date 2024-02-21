@@ -108,7 +108,6 @@ function remove(X::LocClosedSet,
         return cells
     else
         Y = add_inequation(X, h)
-        G = Y.gb
         push!(res, Y)
         for Z in cells
             cells2 = hull(Z, h)

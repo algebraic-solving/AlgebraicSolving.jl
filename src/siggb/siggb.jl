@@ -272,28 +272,39 @@ function sig_decomp!(basis::Basis{N},
             for i in 1:basis.input_load]
     X = LocClosedSet{eltype(eqns)}(eqns, [last(gens(R))])
     
-    queue = [(basis, pairset, tags, ind_order, X, Int(basis.input_load), Int[], tr)]
+    queue = [(basis, pairset, tags, ind_order, X, Int(basis.input_load), Int[], tr, "")]
     result = LocClosedSet[]
 
     while !isempty(queue)
-        bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr = popfirst!(queue)
+        bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr, id = popfirst!(queue)
         neqns = num_eqns(lc_set)
-        @info "starting component, $(length(queue)) remaining, $(neqns) equations"
+        @info "starting component $(id), $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
             @info "empty component"
             @info "------------------------------------------"
             continue
         elseif codim(lc_set) > c
-            @info "superflous component"
+            @info "superflous component (codim)"
             @info "------------------------------------------"
             continue
         elseif codim(lc_set) == neqns
             deleteat!(lc_set.eqns, findall(lc_set.eqns_is_red))
             deleteat!(lc_set.eqns_is_red, findall(lc_set.eqns_is_red)) 
-            @info "finished component codim $c"
+            @info "finished component codim $(neqns)"
             push!(result, lc_set)
             @info "------------------------------------------"
             continue
+        else
+            # build a witness by intersecting with n - 1 - c hyperplanes
+            # check membership on that
+            vrs = gens(ring(lc_set))
+            amb_dim = length(vrs) - 1
+            @info "checking containment"
+            if any(Y -> one(ring(Y)) in saturate(lc_set.gb, random_lin_comb(Y.gb)), result)
+                @info "superflous component (containment)"
+                @info "------------------------------------------"
+                continue
+            end
         end
         found_zd, isempt, zd_coeffs,
         zd_mons, zd_ind, _ = siggb_for_split!(bs, ps,
@@ -312,8 +323,9 @@ function sig_decomp!(basis::Basis{N},
                                                            ind_ord,
                                                            lc_set)
             timer.comp_lc_time += tim
-            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1), Int[], tr2))
-            pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr))
+            pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr, string(id, "b")))
+            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1), Int[], tr2, string(id, "a")))
+            sort!(queue, by = t -> num_eqns(t[5]))
         else
             deleteat!(lc_set.eqns, findall(lc_set.eqns_is_red))
             deleteat!(lc_set.eqns_is_red, findall(lc_set.eqns_is_red))
