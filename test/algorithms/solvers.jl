@@ -17,7 +17,7 @@
     @test sols == real_solutions(I)
     @test rat_sols == rational_solutions(I)
     @test I.real_sols == real_solutions(I)
-    
+
     C, x = polynomial_ring(QQ, "x")
     elim  = 128304*x^8 - 93312*x^7 + 15552*x^6 + 3144*x^5 - 1120*x^4 + 36*x^3 + 15*x^2 - x
     denom = 1026432*x^7 - 653184*x^6 + 93312*x^5 + 15720*x^4 - 4480*x^3 + 108*x^2 + 30*x - 1
@@ -50,4 +50,13 @@
     I = Ideal([x1^2-x2, x1*x3, x2-12])
 	@test_throws ErrorException real_solutions(I)
 	@test_throws ErrorException rational_solutions(I)
+
+    # check variable permutation
+    R, (x, y) = polynomial_ring(QQ,["x","y"])
+    I = Ideal([x^2-1, y])
+    sols = Vector{QQFieldElem}[
+        [-1, 0],
+        [1, 0]
+            ]
+    @test sols == real_solutions(I)
 end
