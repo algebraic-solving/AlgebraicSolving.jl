@@ -58,5 +58,8 @@
         [-1, 0],
         [1, 0]
             ]
-    @test sols == real_solutions(I)
+    @test sort(sols) == sort(real_solutions(I))
+
+    I = Ideal([x^2-1, y^2])
+    @test sort(sols) == sort(real_solutions(I))
 end
