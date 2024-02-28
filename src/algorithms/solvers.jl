@@ -143,7 +143,7 @@ function _core_msolve(
     jl_vnames = Base.unsafe_wrap(Array, res_vnames[], jl_rp_nr_vars)
     vsymbols  = [Symbol(unsafe_string(jl_vnames[i])) for i in 1:jl_rp_nr_vars]
     #= get possible variable permutation, ignoring additional variables=#
-    perm      = sortperm(vsymbols[1:1:nr_vars])
+    perm      = sortperm(vsymbols[1:nr_vars])
 
     rat_param = _get_rational_parametrization(jl_ld, jl_len,
                                               jl_cf, jl_cf_lf, jl_rp_nr_vars)
