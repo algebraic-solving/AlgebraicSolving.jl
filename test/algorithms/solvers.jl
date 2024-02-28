@@ -59,4 +59,7 @@
         [1, 0]
             ]
     @test sols == real_solutions(I)
+
+    I = Ideal([x^2-1, y^2])
+    @test sols == real_solutions(I)
 end
