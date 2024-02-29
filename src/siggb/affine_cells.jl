@@ -73,15 +73,16 @@ function add_inequation(X::LocClosedSet, h::MPolyRingElem; kwargs...)
 end
 
 function add_inequations(X::LocClosedSet{P}, H::Vector{P}) where P
+    Htil = filter(!isone, H)
+    @info "adding ineqns $((Nemo.leading_monomial).(H))"
     Y = deepcopy(X)
-    append!(Y.ineqns, H)
-    for h in H
-        Y.gb = quotient(Y.gb, h)
-    end
+    append!(Y.ineqns, Htil)
+    Y.gb = saturate(Y.gb, Htil)
     return Y
 end
 
 function hull(X::LocClosedSet, g::MPolyRingElem; method = :sat)
+    @info "hull for lm $(Nemo.leading_monomial(g))"
     gb = X.gb
     col_gb = method == :sat ? saturate(gb, g) : quotient(gb, g)
     H = my_normal_form(col_gb, gb)
@@ -90,30 +91,67 @@ function hull(X::LocClosedSet, g::MPolyRingElem; method = :sat)
     if one(ring(X)) in H
         return [X]
     end
-    isempty(H) && return typeof(X)[]
+    if isempty(H)
+        @info "regular intersection in hull"
+        return typeof(X)[]
+    end
     H_rand = random_lin_combs(H)
     res = remove(X, H_rand)
     # res = remove_with_tree(X, H)
     return res
 end
 
-function remove(X::LocClosedSet,
-                H::Vector{<:MPolyRingElem})
+# function remove(X::LocClosedSet,
+#                 H::Vector{<:MPolyRingElem})
     
+#     res = typeof(X)[]
+#     isempty(H) && return res
+#     h = first(H)
+#     cells = remove(X, H[2:end])
+#     if iszero(my_normal_form([h], X.gb))
+#         return cells
+#     else
+#         @info "inequation for lm $(Nemo.leading_monomial(h))"
+#         Y = add_inequation(X, h)
+#         if is_empty_set(Y)
+#             @info "empty set in remove"
+#             return cells
+#         end
+#         push!(res, Y)
+#         for Z in cells
+#             cells2 = hull(Z, h)
+#             append!(res, cells2)
+#         end
+#         return res
+#     end
+#     return res
+# end
+
+function remove(X::LocClosedSet,
+                H::Vector{<:MPolyRingElem},
+                ineq::MPolyRingElem=one(ring(X)))
+
     res = typeof(X)[]
     isempty(H) && return res
+
     h = first(H)
-    cells = remove(X, H[2:end])
-    if iszero(my_normal_form([h], X.gb))
-        return cells
-    else
-        Y = add_inequation(X, h)
-        push!(res, Y)
-        for Z in cells
-            cells2 = hull(Z, h)
-            append!(res, cells2)
-        end
-        return res
+    @info "checking normal form $((Nemo.leading_monomial(h), Nemo.leading_monomial(ineq)))"
+    if iszero(my_normal_form([h*ineq], X.gb))
+        @info "nf is zero"
+        return remove(X, H[2:end], ineq)
+    end
+    @info "nf is nonzero"
+    @info "adding ineqn $((Nemo.leading_monomial(h), Nemo.leading_monomial(ineq)))"
+    Y = add_inequation(X, h*ineq)
+    if is_empty_set(Y)
+        return remove(X, H[2:end], ineq)
+    end
+    push!(res, Y)
+    G = random_lin_combs(filter(!iszero, my_normal_form(Y.gb, X.gb)))
+    for htil in H[2:end]
+        @info "taking hulls for $(Nemo.leading_monomial(h))"
+        new_comps = remove(X, G, htil)
+        append!(res, new_comps)
     end
     return res
 end
