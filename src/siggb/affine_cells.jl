@@ -85,17 +85,15 @@ function hull(X::LocClosedSet, g::MPolyRingElem; method = :sat)
     @info "hull for lm $(Nemo.leading_monomial(g))"
     gb = X.gb
     col_gb = method == :sat ? saturate(gb, g) : quotient(gb, g)
-    H = my_normal_form(col_gb, gb)
-    filter!(h -> !iszero(h), H)
-    sort!(H, by = h -> total_degree(h))
-    if one(ring(X)) in H
+    if one(ring(X)) in col_gb
         return [X]
     end
-    if isempty(H)
+    sort!(col_gb, by = p -> total_degree(p))
+    H_rand = filter(!iszero, my_normal_form(col_gb, gb))
+    if isempty(H_rand)
         @info "regular intersection in hull"
         return typeof(X)[]
     end
-    H_rand = random_lin_combs(H)
     res = remove(X, H_rand)
     # res = remove_with_tree(X, H)
     return res
@@ -135,19 +133,13 @@ function remove(X::LocClosedSet,
     isempty(H) && return res
 
     h = first(H)
-    @info "checking normal form $((Nemo.leading_monomial(h), Nemo.leading_monomial(ineq)))"
-    if iszero(my_normal_form([h*ineq], X.gb))
-        @info "nf is zero"
-        return remove(X, H[2:end], ineq)
-    end
-    @info "nf is nonzero"
     @info "adding ineqn $((Nemo.leading_monomial(h), Nemo.leading_monomial(ineq)))"
     Y = add_inequation(X, h*ineq)
     if is_empty_set(Y)
         return remove(X, H[2:end], ineq)
     end
     push!(res, Y)
-    G = random_lin_combs(filter(!iszero, my_normal_form(Y.gb, X.gb)))
+    G = filter(!iszero, my_normal_form(random_lin_combs(Y.gb) .* ineq, X.gb))
     for htil in H[2:end]
         @info "taking hulls for $(Nemo.leading_monomial(h))"
         new_comps = remove(X, G, htil)
