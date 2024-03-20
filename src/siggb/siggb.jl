@@ -379,7 +379,7 @@ function sig_kalk_decomp!(basis::Basis{N},
                                                        tgs, ind_ord,
                                                        basis_ht, tr, syz_queue,
                                                        char, shift, lc_sets,
-                                                       timer)
+                                                       timer, 0)
         if found_zd
             @info "splitting components"
             tim = @elapsed new_lc_sets1, bs2, ps2, tgs2,
