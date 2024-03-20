@@ -287,24 +287,14 @@ function sig_decomp!(basis::Basis{N},
             @info "superflous component (codim)"
             @info "------------------------------------------"
             continue
-        elseif codim(lc_set) == neqns
+        # elseif codim(lc_set) == neqns
+        elseif codim(lc_set) in [c, neqns]
             deleteat!(lc_set.eqns, findall(lc_set.eqns_is_red))
             deleteat!(lc_set.eqns_is_red, findall(lc_set.eqns_is_red)) 
             @info "finished component codim $(neqns)"
             push!(result, lc_set)
             @info "------------------------------------------"
             continue
-        else
-            # build a witness by intersecting with n - 1 - c hyperplanes
-            # check membership on that
-            vrs = gens(ring(lc_set))
-            amb_dim = length(vrs) - 1
-            @info "checking containment"
-            if any(Y -> one(ring(Y)) in saturate(lc_set.gb, random_lin_comb(Y.gb)), result)
-                @info "superflous component (containment)"
-                @info "------------------------------------------"
-                continue
-            end
         end
         found_zd, isempt, zd_coeffs,
         zd_mons, zd_ind, _ = siggb_for_split!(bs, ps,
@@ -312,7 +302,7 @@ function sig_decomp!(basis::Basis{N},
                                               basis_ht, tr,
                                               syz_queue,
                                               char, shift, [lc_set],
-                                              timer)
+                                              timer, c)
         if found_zd
             @info "splitting component"
             tim = @elapsed bs2, ps2, tgs2,
@@ -423,7 +413,8 @@ function siggb_for_split!(basis::Basis{N},
                           char::Val{Char},
                           shift::Val{Shift},
                           lc_sets::Vector{LocClosedSet{T}},
-                          timer::Timings) where {N, Char, Shift, T <: MPolyRingElem}
+                          timer::Timings,
+                          allowed_codim::Int) where {N, Char, Shift, T <: MPolyRingElem}
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
@@ -460,7 +451,8 @@ function siggb_for_split!(basis::Basis{N},
         time = @elapsed update_siggb!(basis, matrix, pairset,
                                       symbol_ht, basis_ht,
                                       ind_order, tags,
-                                      tr, char, syz_queue)
+                                      tr, char, syz_queue,
+                                      allowed_codim)
         for X in lc_sets
             X.eqns_is_red = basis.is_red[1:basis.input_load]
         end
@@ -547,8 +539,10 @@ function split!(basis::Basis{N},
 
         ge_deg_inds = filter(i -> basis.degs[i] > zd_deg, 1:basis.input_load)
         if isempty(ge_deg_inds)
+            println("inserting above")
             ord_ind = ind_order.max_ind + one(SigIndex)
         else
+            println("inserting below")
             ord_ind, _ = findmin(i -> ind_order.ord[i], ge_deg_inds)
         end
 

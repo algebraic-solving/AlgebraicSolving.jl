@@ -10,7 +10,8 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       syz_queue::Vector{Int};
+                       syz_queue::Vector{Int},
+                       allowed_codim::Int;
                        kwargs...) where {N, Char}
 
     new_basis_c = 0
@@ -34,6 +35,8 @@ function update_siggb!(basis::Basis,
             # if all(iszero, new_sig_mon.exps)
             #     # mark input element as redundant
             #     basis.is_red[new_idx] = true
+            # sorted_inds = sort(1:basis.input_load, by = idx -> ind_order.ord[idx])
+            # ord_idx = findfirst(i -> i == new_idx, sorted_inds)
             if gettag(tags, new_idx) == :split
                 push!(syz_queue, basis.syz_load+1)
             end
