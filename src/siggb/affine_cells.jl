@@ -43,9 +43,9 @@ function is_empty_set(X::LocClosedSet)
     R = ring(X)
     if one(R) in X.gb
         return true
-    else
-        gb2 = saturate(X.gb, last(gens(R)))
-        return one(R) in gb2
+    # else
+    #     gb2 = saturate(X.gb, last(gens(R)))
+    #     return one(R) in gb2
     end
     return false
 end
@@ -57,10 +57,12 @@ function add_equation!(X::LocClosedSet, f::MPolyRingElem)
     X.gb = saturate(vcat(X.gb, [f]), X.ineqns)
 end
 
-function add_inequation!(X::LocClosedSet, h::MPolyRingElem; method=:sat)
+function add_inequation!(X::LocClosedSet, h::P;
+                         known_eqns::Vector{P}=P[],
+                         method=:sat) where P
     # @info "adding inequation"
     push!(X.ineqns, h)
-    X.gb = method == :sat ? saturate(X.gb, h) : quotient(X.gb, h)
+    X.gb = method == :sat ? saturate(vcat(X.gb, known_eqns), h) : quotient(vcat(X.gb, known_eqns), h)
 end
 
 function add_inequation(X::LocClosedSet, h::MPolyRingElem; kwargs...)
@@ -81,10 +83,27 @@ function add_inequations(X::LocClosedSet{P}, H::Vector{P}) where P
     return Y
 end
 
+function split(X::LocClosedSet, g::MPolyRingElem; method = :col)
+    tim = @elapsed X_min_g = add_inequation(X, g; method = method)
+    @info "initial quotient time $(tim)"
+    col_gb = X_min_g.gb
+    if one(ring(X)) in col_gb
+        return X_min_g, [X]
+    end
+    sort(col_gb, by = p -> total_degree(p))
+    H_rand = filter(!iszero, random_lin_combs(my_normal_form(col_gb, X.gb)))
+    if isempty(H_rand)
+        @info "regular intersection in hull"
+        return X_min_g, typeof(X)[]
+    end
+    res = remove(X, H_rand, known_eqns=[g])
+    return X_min_g, res
+end
+
 function hull(X::LocClosedSet, g::MPolyRingElem; method = :sat)
-    @info "hull for lm $(Nemo.leading_monomial(g))"
     gb = X.gb
-    col_gb = method == :sat ? saturate(gb, g) : quotient(gb, g)
+    tim = @elapsed col_gb = method == :sat ? saturate(gb, g) : quotient(gb, g)
+    @info "initial quotient time $(tim)"
     if one(ring(X)) in col_gb
         return [X]
     end
@@ -126,24 +145,29 @@ end
 # end
 
 function remove(X::LocClosedSet,
-                H::Vector{<:MPolyRingElem})
+                H::Vector{P};
+                known_eqns::Vector{P}=P[]) where P
 
     res = typeof(X)[]
     isempty(H) && return res
 
     h = first(H)
     # @info "adding ineqn $((Nemo.leading_monomial(h)))"
-    Y = add_inequation(X, h)
+    tim = @elapsed Y = add_inequation(X, h, known_eqns=known_eqns)
+    @info "remove time $(tim) for degree $(total_degree(h))"
     if is_empty_set(Y)
-        return remove(X, H[2:end])
+        @info "is empty"
+        return remove(X, H[2:end], known_eqns=known_eqns)
     end
     push!(res, Y)
-    G = filter(!iszero, my_normal_form(random_lin_combs(Y.gb), X.gb))
+    tim = @elapsed G = filter(!iszero, my_normal_form(random_lin_combs(Y.gb), X.gb))
+    @info "normal form time $(tim)"
     for htil in H[2:end]
         # @info "taking hulls for $(Nemo.leading_monomial(h))"
         # @info "with inequality $(Nemo.leading_monomial(htil))"
-        Grem = filter(!iszero, my_normal_form(G .* htil, X.gb))
-        new_comps = remove(X, Grem)
+        tim = @elapsed Grem = filter(!iszero, my_normal_form(G .* htil, X.gb))
+        @info "constructing new equations time $(tim)"
+        new_comps = remove(X, Grem, known_eqns=vcat(known_eqns, [h]))
         append!(res, new_comps)
     end
     return res

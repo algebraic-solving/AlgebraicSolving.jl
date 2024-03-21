@@ -578,9 +578,10 @@ function kalksplit!(basis::Basis{N},
         lc_sets_new1 = LocClosedSet{T}[]
         lc_sets_new2 = LocClosedSet{T}[]
         for X in lc_sets[nz_nf_inds]
-            hll = hull(X, h, method = :col)
+            nz, hll = split(X, h)
+            # hll = hull(X, h, method = :col)
             append!(lc_sets_new1, hll)
-            nz = add_inequation(X, h; method = :col)
+            # nz = add_inequation(X, h; method = :col)
             push!(lc_sets_new2, nz)
             deleteat!(nz.eqns, zd_ind)
             deleteat!(nz.eqns_is_red, zd_ind)
