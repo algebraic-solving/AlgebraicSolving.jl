@@ -283,7 +283,7 @@ function max_ind_sets(gb::Vector{P}) where {P <: MPolyRingElem}
     end
 
     max_length = maximum(mis -> length(findall(mis)), res)
-    filter!(mis -> length(mis) != max_length, res)
+    filter!(mis -> length(findall(mis)) == max_length, res)
     return res
 end
     
