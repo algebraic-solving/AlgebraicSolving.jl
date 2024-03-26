@@ -1,179 +1,119 @@
-# for convenience
-function affine_cell(F::Vector{T},
-                     H::Vector{T}) where {T <: MPolyRingElem}
-    return LocClosedSet{T}(F,H)
-end
-
+# TODO: is this needed?
 function num_eqns(X::LocClosedSet)
-    length(findall((!).(X.eqns_is_red)))
+    return length(X.seq)
 end
 
 # for displaying locally closed sets
 function Base.show(io::IO, lc::LocClosedSet)
     string_rep = "V("
-    for (i, f) in enumerate(lc.eqns)
-        if i != length(lc.eqns)
+    for (i, f) in enumerate(lc.seq)
+        if i != length(lc.seq)
             string_rep *= "$f, "
         else
-            string_rep *= "$(f)) \\ "
+            string_rep *= "$(f))"
         end
     end
-    string_rep *= "V("
-    for (i, f) in enumerate(lc.ineqns)
-        if i != length(lc.ineqns)
-            string_rep *= "($f)*"
-        else
-            string_rep *= "($f)"
-        end
-    end
-    string_rep *= ")"
-    print(io, string_rep)
 end
 
 function ring(X::LocClosedSet)
-    return parent(first(X.eqns))
+    return parent(first(X.seq))
 end
 
 function codim(X::LocClosedSet)
-    mis = first(max_ind_sets(X.gb))
+    mis = first(max_ind_sets(first(X.gbs)))
     return length(findall(b -> !b, mis))
 end
 
 function is_empty_set(X::LocClosedSet)
     R = ring(X)
-    if one(R) in X.gb
+    if isempty(X.gbs)
         return true
-    # else
-    #     gb2 = saturate(X.gb, last(gens(R)))
-    #     return one(R) in gb2
+    elseif all(gb -> one(R) in gb, X.gbs)
+        return true
     end
     return false
 end
 
-function add_equation!(X::LocClosedSet, f::MPolyRingElem)
-    @info "adding equation"
-    push!(X.eqns, f)
-    push!(X.eqns_is_red, false)
-    X.gb = saturate(vcat(X.gb, [f]), X.ineqns)
+function add_inequation_sat!(X::LocClosedSet, h::P;
+                             known_zds:Vector{P}=P[]) where P
+    R = ring(X)
+    X.gbs = [saturate(vcat(gb, known_zds), h) for gb in X.gbs] 
 end
 
-function add_inequation!(X::LocClosedSet, h::P;
-                         known_eqns::Vector{P}=P[],
-                         method=:sat) where P
-    # @info "adding inequation"
-    push!(X.ineqns, h)
-    X.gb = method == :sat ? saturate(vcat(X.gb, known_eqns), h) : quotient(vcat(X.gb, known_eqns), h)
+function add_inequation_col!(X::LocClosedSet, h::P;
+                             known_zds:Vector{P}=P[]) where P
+    R = ring(X)
+    X.gbs = [quotient(vcat(gb, known_zds), h) for gb in X.gbs] 
 end
 
-function add_inequation(X::LocClosedSet, h::MPolyRingElem; kwargs...)
+function add_inequation(X::LocClosedSet, h::MPolyRingElem; method = :sat)
+    Y = deepcopy(X)
     if isone(h)
-        return X
+        return Y
     end
-    Y = deepcopy(X)
-    add_inequation!(Y, h; kwargs...)
+    method == sat ? add_inequation_sat!(Y, h) : add_inequation_col!(Y, h)
     return Y
 end
 
-function add_inequations(X::LocClosedSet{P}, H::Vector{P}) where P
-    Htil = filter(!isone, H)
-    @info "adding ineqns $((Nemo.leading_monomial).(H))"
-    Y = deepcopy(X)
-    append!(Y.ineqns, Htil)
-    Y.gb = saturate(Y.gb, Htil)
-    return Y
-end
-
-function split(X::LocClosedSet, g::MPolyRingElem; method = :col)
-    tim = @elapsed X_min_g = add_inequation(X, g; method = method)
+function split(X::LocClosedSet, g::MPolyRingElem, zd_ind::Integer)
+    tim = @elapsed X_min_g = add_inequation(X, g; method = :col)
     @info "initial quotient time $(tim)"
-    col_gb = X_min_g.gb
-    if one(ring(X)) in col_gb
-        return X_min_g, [X]
+
+    if is_empty_set(X_min_g)
+        return X, X_min_g
     end
-    sort(col_gb, by = p -> total_degree(p))
-    H_rand = filter(!iszero, random_lin_combs(my_normal_form(col_gb, X.gb)))
-    if isempty(H_rand)
-        @info "regular intersection in hull"
-        return X_min_g, typeof(X)[]
+
+    X_hull_g = deepcopy(X)
+    push!(X_hull_g.hull_eqns, g)
+
+    col_gbs = X_min_g.gbs
+    hull_gbs = Vector{typeof(g)}[]
+    R = ring(X)
+    for (X_gb, col_gb) in zip(X.gbs, col_gbs)
+        if one(R) in col_gb
+            push!(hull_gbs, X_gb)
+            continue
+        end
+        sort(col_gb, by = p -> total_degree(p))
+        H_rand = filter(!iszero, my_normal_form(random_lin_combs(col_gb), X_gb))
+        new_gbs = remove(X_gb, H_rand, known_eqns = [g])
+        append!(hull_gbs, new_gbs)
     end
-    res = remove(X, H_rand, known_eqns=[g])
-    return X_min_g, res
+    X_hull_g.gbs = hull_gbs
+
+    return X_hull_g, X_min_g
 end
 
-function hull(X::LocClosedSet, g::MPolyRingElem; method = :sat)
-    gb = X.gb
-    tim = @elapsed col_gb = method == :sat ? saturate(gb, g) : quotient(gb, g)
-    @info "initial quotient time $(tim)"
-    if one(ring(X)) in col_gb
-        return [X]
-    end
-    sort!(col_gb, by = p -> total_degree(p))
-    H_rand = filter(!iszero, random_lin_combs(my_normal_form(col_gb, gb)))
-    if isempty(H_rand)
-        @info "regular intersection in hull"
-        return typeof(X)[]
-    end
-    res = remove(X, H_rand)
-    # res = remove_with_tree(X, H)
-    return res
-end
-
-# function remove(X::LocClosedSet,
-#                 H::Vector{<:MPolyRingElem})
-    
-#     res = typeof(X)[]
-#     isempty(H) && return res
-#     h = first(H)
-#     cells = remove(X, H[2:end])
-#     if iszero(my_normal_form([h], X.gb))
-#         return cells
-#     else
-#         @info "inequation for lm $(Nemo.leading_monomial(h))"
-#         Y = add_inequation(X, h)
-#         if is_empty_set(Y)
-#             @info "empty set in remove"
-#             return cells
-#         end
-#         push!(res, Y)
-#         for Z in cells
-#             cells2 = hull(Z, h)
-#             append!(res, cells2)
-#         end
-#         return res
-#     end
-#     return res
-# end
-
-function remove(X::LocClosedSet,
+function remove(gb::Vector{P},
                 H::Vector{P};
                 known_eqns::Vector{P}=P[]) where P
 
-    res = typeof(X)[]
+    res = Vector{P}[]
     isempty(H) && return res
 
+    R = parent(first(gb))
     h = first(H)
-    # @info "adding ineqn $((Nemo.leading_monomial(h)))"
-    tim = @elapsed Y = add_inequation(X, h, known_eqns=known_eqns)
+    tim = @elapsed gb1 = saturate(vcat(gb, known_eqns), h)
     @info "remove time $(tim) for degree $(total_degree(h))"
-    if is_empty_set(Y)
+    if one(R) in gb1
         @info "is empty"
-        return remove(X, H[2:end], known_eqns=known_eqns)
+        return remove(gb, H[2:end], known_eqns=known_eqns)
     end
-    push!(res, Y)
-    tim = @elapsed G = filter(!iszero, my_normal_form(random_lin_combs(Y.gb), X.gb))
+    push!(res, gb1)
+    tim = @elapsed G = filter(!iszero, my_normal_form(random_lin_combs(gb1), gb))
     @info "normal form time $(tim)"
     for htil in H[2:end]
-        # @info "taking hulls for $(Nemo.leading_monomial(h))"
-        # @info "with inequality $(Nemo.leading_monomial(htil))"
-        tim = @elapsed Grem = filter(!iszero, my_normal_form(G .* htil, X.gb))
+        tim = @elapsed Grem = filter(!iszero, my_normal_form(G .* htil, gb))
         @info "constructing new equations time $(tim)"
-        new_comps = remove(X, Grem, known_eqns=vcat(known_eqns, [h]))
-        append!(res, new_comps)
+        new_gbs = remove(gb, Grem, known_eqns=vcat(known_eqns, [h]))
+        append!(res, new_gbs)
     end
     return res
 end
 
+# ------------------------ #
 # --- helper functions --- #
+# ------------------------ #
 
 function saturate(F::Vector{P}, nz::P) where {P <: MPolyRingElem}
     return saturate(F, [nz])
@@ -324,107 +264,3 @@ function check_decomp(F::Vector{P}, Xs::Vector{<:LocClosedSet}) where {P <: MPol
     gb_ch = saturate(gb_ch, last(gens(R)))
     return one(parent(first(F))) in gb_ch
 end
-
-# EXPERIMENTAL REMOVE
-
-# mutable struct NZNode{T}
-#     p::T
-#     parent::Union{Nothing, NZNode{T}}
-#     children::Vector{NZNode{T}}
-# end
-
-# AbstractTrees.children(nd::NZNode) = nd.children
-# AbstractTrees.nodevalue(nd::NZNode) = Nemo.leading_monomial(nd.p)
-# AbstractTrees.ParentLinks(::Type{<:NZNode}) = StoredParents()
-# AbstractTrees.parent(nd::NZNode) = nd.parent
-# AbstractTrees.NodeType(::Type{<:NZNode}) = HasNodeType()
-# AbstractTrees.nodetype(::Type{<:NZNode{T}}) where T = NZNode{T}
-
-# function add_child!(nd::NZNode{T}, p::T) where T
-#     ch = NZNode(p, nd, NZNode{T}[])
-#     push!(nd.children, ch)
-# end
-
-# function right_siblings(nd::NZNode{T}) where T
-#     pr = AbstractTrees.parent(nd)
-#     if isnothing(pr)
-#         return NZNode{T}[]
-#     else
-#         ch_idx = findfirst(ch -> ch == nd, children(pr))
-#         return children(pr)[ch_idx+1:end]
-#     end
-# end
-
-# function right_sibling(nd::NZNode)
-#     pr = AbstractTrees.parent(nd)
-#     if isnothing(pr)
-#         return nothing
-#     else
-#         ch_idx = findfirst(ch -> ch == nd, children(pr))
-#         if ch_idx == length(children(pr))
-#             return nothing
-#         else
-#             return children(pr)[ch_idx+1]
-#         end
-#     end
-# end
-
-# function get_pols(nd::NZNode)
-#     res = [nd.p]
-#     pr = AbstractTrees.parent(nd) 
-#     while !isnothing(pr)
-#         p = pr.p
-#         !isone(p) && push!(res, pr.p)
-#         pr = AbstractTrees.parent(pr)
-#     end
-#     return res
-# end
-
-# function next_leaf(nd::NZNode)
-#     cr_node = nd
-#     while !isnothing(cr_node) && !isroot(cr_node)
-#         n = right_sibling(cr_node)
-#         if isnothing(n)
-#             cr_node = AbstractTrees.parent(cr_node)
-#         else
-#             # descendleft is not allowed to return nothing
-#             return descendleft(n)
-#         end
-#     end
-#     nothing
-# end
-
-# function remove_with_tree(X::LocClosedSet{P}, H::Vector{P}) where P
-#     res = typeof(X)[]
-
-#     R = ring(X)
-#     root = NZNode(one(R), nothing, NZNode{P}[])
-
-#     H_rand = random_lin_combs(H)
-#     for h in H_rand
-#         add_child!(root, h)
-#     end
-
-#     cr_node = first(children(root))
-#     while !isnothing(cr_node)
-#         pls = get_pols(cr_node)
-#         Y = add_inequations(X, pls)
-#         if !is_empty_set(Y)
-#             push!(res, Y)
-
-#             new_ineqns = random_lin_combs(filter(!iszero, my_normal_form(Y.gb, X.gb)))
-#             sort!(new_ineqns, by = p -> total_degree(p))
-#             for sbl in right_siblings(cr_node)
-#                 if !isempty(children(sbl))
-#                     error(":(")
-#                 end
-#                 for g in new_ineqns
-#                     add_child!(sbl, g)
-#                 end
-#             end
-#         end
-#         cr_node = next_leaf(cr_node)
-#     end
-
-#     return res
-# end

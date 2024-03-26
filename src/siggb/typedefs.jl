@@ -147,14 +147,15 @@ const Tags = Dict{SigIndex, Symbol}
 
 # For output of decomp (at the moment)
 mutable struct LocClosedSet{T<:MPolyRingElem}
-    eqns::Vector{T}
-    eqns_is_red::Vector{Bool}
-    ineqns::Vector{T}
-    gb::Vector{T}
+    seq::Vector{T}
+    hull_eqns::Vector{T}
+    gbs::Vector{Vector{T}}
 
-    function LocClosedSet{T}(eqns::Vector{T}, ineqns::Vector{T}) where {T<:MPolyRingElem}
-        gb = saturate(eqns, ineqns)
-        return new(eqns, falses(length(eqns)), ineqns, gb)
+    function LocClosedSet{T}(seq::Vector{T}) where {T<:MPolyRingElem}
+        @assert !isempty(seq) "cannot construct affine cell from no equations."
+        R = parent(first(seq))
+        gb = saturate(eqns, last(gens(R)))
+        return new(seq, T[], [gb])
     end
 end
 
