@@ -70,58 +70,17 @@ end
 
 # compute normal form with respect to basis
 # *without* computing a GB for the corresponding ideal
-function my_iszero_normal_form(mons::Vector{MonIdx},
-                               coeffs::Vector{Coeff},
-                               ht::MonomialHashtable{N},
-                               gb::Vector{<:MPolyRingElem}) where N
+function my_normal_form(mons::Vector{MonIdx},
+                        coeffs::Vector{Coeff},
+                        ht::MonomialHashtable{N},
+                        gb::Vector{<:MPolyRingElem}) where N
     
 
     R = parent(first(gb))
     @inbounds mons = [ht.exponents[midx] for midx in mons]
     f = convert_to_pol(R, mons, coeffs)
     F = [f]
-    nr_vars     = nvars(R)
-    field_char  = Int(characteristic(R))
-
-    G = gb
-
-    tbr_nr_gens = length(F)
-    bs_nr_gens  = length(G)
-    is_gb       = 1
-
-    # convert ideal to flattened arrays of ints
-    tbr_lens, tbr_cfs, tbr_exps = _convert_to_msolve(F)
-    bs_lens, bs_cfs, bs_exps    = _convert_to_msolve(G)
-
-    nf_ld  = Ref(Cint(0))
-    nf_len = Ref(Ptr{Cint}(0))
-    nf_exp = Ref(Ptr{Cint}(0))
-    nf_cf  = Ref(Ptr{Cvoid}(0))
-
-    nr_terms  = ccall((:export_nf, libneogb), Int,
-        (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
-        Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid},
-        Cint, Cint, Cint, Cint, Cint, Cint, Cint),
-        cglobal(:jl_malloc), nf_ld, nf_len, nf_exp, nf_cf, tbr_nr_gens, tbr_lens, tbr_exps,
-        tbr_cfs, bs_nr_gens, bs_lens, bs_exps, bs_cfs, field_char, 0, 0, nr_vars, is_gb,
-        1, 0)
-
-    # convert to julia array, also give memory management to julia
-    jl_ld   = nf_ld[]
-    jl_len  = Base.unsafe_wrap(Array, nf_len[], jl_ld)
-    jl_exp  = Base.unsafe_wrap(Array, nf_exp[], nr_terms*nr_vars)
-    ptr     = reinterpret(Ptr{Int32}, nf_cf[])
-    jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
-
-    res = _convert_finite_field_array_to_abstract_algebra(
-        jl_ld, jl_len, jl_cf, jl_exp, R, 0)
-
-    ccall((:free_f4_julia_result_data, libneogb), Nothing ,
-          (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
-           Ptr{Ptr{Cvoid}}, Int, Int),
-          cglobal(:jl_free), nf_len, nf_exp, nf_cf, jl_ld, field_char)
-
-    return iszero(first(res))
+    return my_normal_form(F, gb)
 end
 
 function my_normal_form(mns::Vector{MonIdx},

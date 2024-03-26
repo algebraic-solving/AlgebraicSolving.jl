@@ -19,9 +19,9 @@ function ring(X::LocClosedSet)
     return parent(first(X.seq))
 end
 
-function codim(X::LocClosedSet)
-    mis = first(max_ind_sets(first(X.gbs)))
-    return length(findall(b -> !b, mis))
+function is_lci(X::LocClosedSet)
+    neqns = num_eqns(X)
+    return all(gb -> codim(gb) == neqns, X.gbs)
 end
 
 function is_empty_set(X::LocClosedSet)
@@ -250,7 +250,11 @@ function max_ind_sets(gb::Vector{P}) where {P <: MPolyRingElem}
     filter!(mis -> length(findall(mis)) == max_length, res)
     return res
 end
-    
+
+function codim(gb::Vector{P}) where P
+    miss = max_ind_sets(gb)
+    return length(findall(b -> !b, first(miss)))
+end
 
 # for debugging
 function check_decomp(F::Vector{P}, Xs::Vector{<:LocClosedSet}) where {P <: MPolyRingElem}
