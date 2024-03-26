@@ -198,7 +198,7 @@ function sig_decomp!(basis::Basis{N},
             for i in 1:basis.input_load]
     X = LocClosedSet{eltype(eqns)}(eqns)
     
-    queue = [(basis, pairset, tags, ind_order, X, Int(basis.input_load), Int[], tr)]
+    queue = [(basis, pairset, tags, ind_order, X, Int(basis.input_load), SyzInfo[], tr)]
     result = LocClosedSet[]
 
     while !isempty(queue)
@@ -249,7 +249,7 @@ function siggb_for_split!(basis::Basis{N},
                           ind_order::IndOrder,
                           basis_ht::MonomialHashtable,
                           tr::Tracer,
-                          syz_queue::Vector{Int},
+                          syz_queue::Vector{SyzInfo},
                           char::Val{Char},
                           shift::Val{Shift},
                           lc_set::LocClosedSet{T},
@@ -298,21 +298,11 @@ function siggb_for_split!(basis::Basis{N},
         timer.update_time += tim
 
         # check to see if we can split with one of the syzygies
-        sort!(syz_queue, by = sz -> (index(basis.syz_masks[sz]), basis.syz_sigs[sz]), lt = lt_squeue)
-        if !isempty(syz_queue)
-            frst_syz_ind = index(basis.syz_masks[first(syz_queue)])
-            poss_syz_new_deg = deg - basis.degs[frst_syz_ind]
-            if basis.syz_sigs[first(syz_queue)].deg <= poss_syz_new_deg
-                does_split, cofac_coeffs, cofac_mons,
-                cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
-                                                   basis, tr, ind_order, char, lc_set,
-                                                   tags, splitting_inds, timer)
-            else
-                does_split = false
-            end
-        else
-            does_split = false
-        end
+        sort!(syz_queue, by = sz -> monomial(basis.syz_sigs[sz[1]]).deg)
+        does_split, cofac_coeffs,
+        cofac_mons, cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
+                                                       basis, tr, ind_order, char, lc_set,
+                                                       tags, splitting_inds, timer)
 
         if does_split
             return true, false, cofac_coeffs,
@@ -327,8 +317,8 @@ function siggb_for_split!(basis::Basis{N},
                                        tags, splitting_inds, timer)
 
     if does_split
-        return true, false, cofac_coeffs, cofac_mons,
-               cofac_ind
+        return true, false, cofac_coeffs,
+               cofac_mons, cofac_ind
     end
 
     return false, false, Coeff[], Monomial{N}[], zero(SigIndex)
@@ -396,7 +386,7 @@ function split!(basis::Basis{N},
     return basis2, ps2, tags2, ind_ord2, lc_set2, tr2
 end    
 
-function process_syz_for_split!(syz_queue::Vector{Int},
+function process_syz_for_split!(syz_queue::Vector{SyzInfo},
                                 basis_ht::MonomialHashtable,
                                 basis::Basis{N},
                                 tr::Tracer,
@@ -414,19 +404,21 @@ function process_syz_for_split!(syz_queue::Vector{Int},
     zd_mons_hsh = MonIdx[]
     zd_ind = zero(SigIndex)
 
-    @inbounds for (i, idx) in enumerate(syz_queue)
+    @inbounds for (idx, proc_info) in syz_queue
         syz_mask = basis.syz_masks[idx]
         syz_mon = basis.syz_sigs[idx]
         syz_ind = index(syz_mask)
         tr_ind = tr.syz_ind_to_mat[idx]
 
         for cofac_ind in reverse(splitting_inds)
+            get(proc_info, cofac_ind, false) && continue
             tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
                                                                            basis_ht,
                                                                            tr_ind,
                                                                            tr, char,
                                                                            ind_order, cofac_ind)
             timer.module_time += tim
+            proc_info[cofac_ind] = true
             if isempty(cofac_coeffs)
                 continue
             end
@@ -441,8 +433,6 @@ function process_syz_for_split!(syz_queue::Vector{Int},
         end
         if found_zd
             break
-        else
-            push!(to_del, i)
         end    
     end
 

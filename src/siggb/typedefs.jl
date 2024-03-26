@@ -145,6 +145,9 @@ end
 # This is to store where certain elements come from
 const Tags = Dict{SigIndex, Symbol}
 
+# For syzygy processing during splitting
+const SyzInfo = Tuple{SigIndex, Dict{SigIndex, Bool}}
+
 # For output of decomp (at the moment)
 mutable struct LocClosedSet{T<:MPolyRingElem}
     seq::Vector{T}
