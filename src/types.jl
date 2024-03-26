@@ -29,6 +29,7 @@ mutable struct Ideal{T <: MPolyRingElem}
     gens::Vector{T}
     dim::Int
     gb::Dict{Int, Vector{T}}
+    inter_sols::Vector{Vector{Vector{QQFieldElem}}}
     real_sols::Vector{Vector{QQFieldElem}}
     rat_sols::Vector{Vector{QQFieldElem}}
     rat_param::RationalParametrization
