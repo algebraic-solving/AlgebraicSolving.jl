@@ -10,7 +10,7 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       syz_queue::Vector{Int};
+                       syz_queue::Vector{SyzInfo};
                        kwargs...) where {N, Char}
 
     new_basis_c = 0
@@ -30,7 +30,7 @@ function update_siggb!(basis::Basis,
         if isempty(row)
             new_syz_c += 1
 
-            push!(syz_queue, basis.syz_load+1)
+            push!(syz_queue, (basis.syz_load+1, Dict{SigIndex, Bool}()))
 
             process_syzygy!(basis, basis_ht, pairset, new_sig,
                             new_sig_mask,

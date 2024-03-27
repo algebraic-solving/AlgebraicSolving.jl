@@ -203,6 +203,8 @@ function sig_decomp!(basis::Basis{N},
 
     while !isempty(queue)
         bs, ps, tgs, ind_ord, lc_set, syz_queue, tr = popfirst!(queue)
+        println(lc_set.seq)
+        println(lc_set.hull_eqns)
         neqns = num_eqns(lc_set)
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
@@ -216,24 +218,24 @@ function sig_decomp!(basis::Basis{N},
             continue
         end
         found_zd, isempt, zd_coeffs,
-        zd_mons, zd_ind, _ = siggb_for_split!(bs, ps,
-                                              tgs, ind_ord,
-                                              basis_ht, tr,
-                                              syz_queue,
-                                              char, shift, [lc_set],
-                                              timer, c)
+        zd_mons, zd_ind = siggb_for_split!(bs, ps,
+                                           tgs, ind_ord,
+                                           basis_ht, tr,
+                                           syz_queue,
+                                           char, shift, lc_set,
+                                           timer)
         if found_zd
             @info "splitting component"
-            tim = @elapsed bs2, ps2, tgs2,
-                           ind_ord2, lc_set2, tr2 = split!(bs, basis_ht,
+            tim = @elapsed lc_set_hull, bs2, ps2, tgs2,
+                           ind_ord2, lc_set_nz, tr2 = split!(bs, basis_ht,
                                                            zd_mons, zd_coeffs,
                                                            tr, ps,
                                                            zd_ind, tgs,
                                                            ind_ord,
                                                            lc_set)
             timer.comp_lc_time += tim
-            pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, syz_queue, tr))
-            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, syz_queue, tr2))
+            pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set_hull, syz_queue, tr))
+            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set_nz, syz_queue, tr2))
         else
             @info "finished component"
             push!(result, lc_set)
@@ -256,7 +258,7 @@ function siggb_for_split!(basis::Basis{N},
                           timer::Timings) where {N, Char, Shift, T <: MPolyRingElem}
 
     splitting_inds = [index(basis.sigs[i]) for i in 1:basis.input_load]
-    filter!(ind -> gettag(tags, ind) == :split, ind_info)
+    filter!(ind -> gettag(tags, ind) == :split, splitting_inds)
     sort!(splitting_inds, by = ind -> ind_order.ord[ind])
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
@@ -298,7 +300,7 @@ function siggb_for_split!(basis::Basis{N},
         timer.update_time += tim
 
         # check to see if we can split with one of the syzygies
-        sort!(syz_queue, by = sz -> monomial(basis.syz_sigs[sz[1]]).deg)
+        sort!(syz_queue, by = sz -> basis.syz_sigs[sz[1]].deg)
         does_split, cofac_coeffs,
         cofac_mons, cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
                                                        basis, tr, ind_order, char, lc_set,
@@ -340,6 +342,7 @@ function split!(basis::Basis{N},
         # new polynomial
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
+        println("splitting with $h")
 
         # component with nonzero condition
         basis2 = deepcopy(basis)
@@ -369,12 +372,13 @@ function split!(basis::Basis{N},
 
         # new components
         lc_set_hull, lc_set_nz = split(lc_set, h)
+        push!(lc_set_hull.seq, h)
         push!(lc_set_hull.hull_eqns, s_ind)
         empty!(lc_set_nz.hull_eqns)
         push!(lc_set_nz.hull_eqns, zd_ind)
     end
 
-    return basis2, ps2, tags2, ind_ord2, lc_set2, tr2
+    return lc_set_hull, basis2, ps2, tags2, ind_ord2, lc_set_nz, tr2
 end    
 
 function process_syz_for_split!(syz_queue::Vector{SyzInfo},

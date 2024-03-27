@@ -39,6 +39,8 @@ function is_empty_set(X::LocClosedSet)
         return true
     elseif all(gb -> one(R) in gb, X.gbs)
         return true
+    elseif all(isempty, X.gbs)
+        return true
     end
     return false
 end
@@ -60,7 +62,7 @@ function add_inequation(X::LocClosedSet, h::MPolyRingElem; method = :sat)
     if isone(h)
         return Y
     end
-    method == sat ? add_inequation_sat!(Y, h) : add_inequation_col!(Y, h)
+    method == :sat ? add_inequation_sat!(Y, h) : add_inequation_col!(Y, h)
     return Y
 end
 
@@ -85,6 +87,7 @@ function split(X::LocClosedSet, g::MPolyRingElem)
         end
         sort(col_gb, by = p -> total_degree(p))
         H_rand = filter(!iszero, my_normal_form(random_lin_combs(col_gb), X_gb))
+        println(H_rand)
         new_gbs = remove(X_gb, H_rand, known_eqns = [g])
         append!(hull_gbs, new_gbs)
     end

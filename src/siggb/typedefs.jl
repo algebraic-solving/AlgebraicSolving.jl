@@ -157,7 +157,7 @@ mutable struct LocClosedSet{T<:MPolyRingElem}
     function LocClosedSet{T}(seq::Vector{T}) where {T<:MPolyRingElem}
         @assert !isempty(seq) "cannot construct affine cell from no equations."
         R = parent(first(seq))
-        gb = saturate(eqns, last(gens(R)))
+        gb = saturate(seq, last(gens(R)))
         return new(seq, Int[], [gb])
     end
 end
