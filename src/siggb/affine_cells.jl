@@ -87,7 +87,6 @@ function split(X::LocClosedSet, g::MPolyRingElem)
         end
         sort(col_gb, by = p -> total_degree(p))
         H_rand = filter(!iszero, my_normal_form(random_lin_combs(col_gb), X_gb))
-        println(H_rand)
         new_gbs = remove(X_gb, H_rand, known_eqns = [g])
         append!(hull_gbs, new_gbs)
     end

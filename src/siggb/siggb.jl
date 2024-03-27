@@ -203,8 +203,6 @@ function sig_decomp!(basis::Basis{N},
 
     while !isempty(queue)
         bs, ps, tgs, ind_ord, lc_set, syz_queue, tr = popfirst!(queue)
-        println(lc_set.seq)
-        println(lc_set.hull_eqns)
         neqns = num_eqns(lc_set)
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
@@ -235,7 +233,7 @@ function sig_decomp!(basis::Basis{N},
                                                            lc_set)
             timer.comp_lc_time += tim
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set_hull, syz_queue, tr))
-            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set_nz, syz_queue, tr2))
+            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set_nz, SyzInfo[], tr2))
         else
             @info "finished component"
             push!(result, lc_set)
@@ -342,17 +340,21 @@ function split!(basis::Basis{N},
         # new polynomial
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
-        println("splitting with $h")
 
         # component with nonzero condition
-        basis2 = deepcopy(basis)
-        ps2 = deepcopy(pairset)
-        ind_ord2 = deepcopy(ind_order)
-        tr2 = deepcopy(tr)
-        tags2 = Tags()
-        for k in keys(tags)
-            tags2[k] = k == zd_ind ? :hull : :split
-        end
+        sorted_inds = collect(1:basis.input_load)
+        to_del = findall(idx -> basis.is_red[idx] || gettag(tags, idx) == :hull, sorted_inds)
+        push!(to_del, zd_ind)
+        unique!(sort!(to_del))
+        deleteat!(sorted_inds, to_del)
+        sort!(sorted_inds, by = ind -> ind_order.ord[ind])
+
+        sys2_mons = copy(basis.monomials[sorted_inds])
+        sys2_coeffs = copy(basis.coefficients[sorted_inds])
+        basis2, ps2, tags2, ind_ord2, tr2 = fill_structs!(sys2_mons, sys2_coeffs,
+                                                          basis_ht, def_tg=:split)
+
+        ind_ord2 = new_ind_order(basis2)
         
         # hull component
         zd_deg = basis_ht.exponents[first(cofac_mons_hsh)].deg
@@ -374,8 +376,12 @@ function split!(basis::Basis{N},
         lc_set_hull, lc_set_nz = split(lc_set, h)
         push!(lc_set_hull.seq, h)
         push!(lc_set_hull.hull_eqns, s_ind)
+
+        to_del = lc_set_nz.hull_eqns
+        push!(to_del, zd_ind)
+        sort!(to_del)
+        deleteat!(lc_set_nz.seq, to_del)
         empty!(lc_set_nz.hull_eqns)
-        push!(lc_set_nz.hull_eqns, zd_ind)
     end
 
     return lc_set_hull, basis2, ps2, tags2, ind_ord2, lc_set_nz, tr2
