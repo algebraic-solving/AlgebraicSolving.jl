@@ -224,6 +224,8 @@ function add_new_sequence_element!(basis::Basis{N},
     add_unit_pair!(basis, pairset, s_ind, lm.deg)
 
     @assert s_ind == basis.input_load == ind_ord.max_ind
+
+    return s_ind
 end
 
 function make_room_new_input_el!(basis::Basis,

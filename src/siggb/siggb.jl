@@ -341,46 +341,37 @@ function split!(basis::Basis{N},
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
 
-        # 2nd component input data
-        sorted_inds = collect(1:basis.input_load)
-        to_del = findall(idx -> basis.is_red[idx], sorted_inds)
-        push!(to_del, zd_ind)
-        unique!(sort!(to_del))
-        deleteat!(sorted_inds, to_del)
-        sort!(sorted_inds, by = ind -> ind_order.ord[ind])
-
-        sys2_mons = copy(basis.monomials[sorted_inds])
-        sys2_coeffs = copy(basis.coefficients[sorted_inds])
-        lc_set2 = deepcopy(lc_set)
-        lc_set2.eqns = lc_set2.eqns[sorted_inds]
-        lc_set2.eqns_is_red = lc_set2.eqns_is_red[sorted_inds]
-        add_inequation!(lc_set2, h)
-
-        # build basis/pairset for second new system
-        basis2, ps2, tags2, ind_ord2, tr2 = fill_structs!(sys2_mons, sys2_coeffs,
-                                                          basis_ht, def_tg=:split)
-
-        ind_ord2 = new_ind_order(basis2)
-
-        # 1st component
+        # component with nonzero condition
+        basis2 = deepcopy(basis)
+        ps2 = deepcopy(pairset)
+        ind_ord2 = deepcopy(ind_order)
+        tr2 = deepcopy(tr)
+        tags2 = Tags()
+        for k in keys(tags)
+            tags2[k] = k == zd_ind ? :hull : :split
+        end
+        
+        # hull component
         zd_deg = basis_ht.exponents[first(cofac_mons_hsh)].deg
 
         ge_deg_inds = filter(i -> basis.degs[i] > zd_deg, 1:basis.input_load)
         if isempty(ge_deg_inds)
-            println("inserting above")
             ord_ind = ind_order.max_ind + one(SigIndex)
         else
-            println("inserting below")
             ord_ind, _ = findmin(i -> ind_order.ord[i], ge_deg_inds)
         end
 
         # insert zd in system
-        add_new_sequence_element!(basis, basis_ht, tr,
-                                  cofac_mons_hsh, cofac_coeffs,
-                                  ind_order, ord_ind, pairset,
-                                  tags)
+        s_ind = add_new_sequence_element!(basis, basis_ht, tr,
+                                          cofac_mons_hsh, cofac_coeffs,
+                                          ind_order, ord_ind, pairset,
+                                          tags, new_tg = :hull)
 
-        add_equation!(lc_set, h)
+        # new components
+        lc_set_hull, lc_set_nz = split(lc_set, h)
+        push!(lc_set_hull.hull_eqns, s_ind)
+        empty!(lc_set_nz.hull_eqns)
+        push!(lc_set_nz.hull_eqns, zd_ind)
     end
 
     return basis2, ps2, tags2, ind_ord2, lc_set2, tr2

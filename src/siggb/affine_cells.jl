@@ -1,18 +1,27 @@
 # TODO: is this needed?
 function num_eqns(X::LocClosedSet)
-    return length(X.seq)
+    return length(X.seq) - length(X.hull_eqns)
 end
 
 # for displaying locally closed sets
 function Base.show(io::IO, lc::LocClosedSet)
     string_rep = "V("
+    j = 1
+    is_first = true
     for (i, f) in enumerate(lc.seq)
-        if i != length(lc.seq)
-            string_rep *= "$f, "
+        if j <= length(lc.hull_eqns) && i == lc.hull_eqns[j]
+            j += 1
+            continue
+        end
+        if !is_first
+            string_rep *= ", $f"
         else
-            string_rep *= "$(f))"
+            is_first = false
+            string_rep *= "$f"
         end
     end
+    string_rep *= ")"
+    print(io, string_rep)
 end
 
 function ring(X::LocClosedSet)
@@ -55,7 +64,8 @@ function add_inequation(X::LocClosedSet, h::MPolyRingElem; method = :sat)
     return Y
 end
 
-function split(X::LocClosedSet, g::MPolyRingElem, zd_ind::Integer)
+# which equations are hull equations needs to be managed outside of this function
+function split(X::LocClosedSet, g::MPolyRingElem)
     tim = @elapsed X_min_g = add_inequation(X, g; method = :col)
     @info "initial quotient time $(tim)"
 
@@ -64,7 +74,6 @@ function split(X::LocClosedSet, g::MPolyRingElem, zd_ind::Integer)
     end
 
     X_hull_g = deepcopy(X)
-    push!(X_hull_g.hull_eqns, g)
 
     col_gbs = X_min_g.gbs
     hull_gbs = Vector{typeof(g)}[]
