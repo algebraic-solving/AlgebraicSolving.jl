@@ -198,11 +198,11 @@ function sig_decomp!(basis::Basis{N},
             for i in 1:basis.input_load]
     X = LocClosedSet{eltype(eqns)}(eqns)
     
-    queue = [(basis, pairset, tags, ind_order, X, Int(basis.input_load), SyzInfo[], tr)]
+    queue = [(basis, pairset, tags, ind_order, X, SyzInfo[], tr)]
     result = LocClosedSet[]
 
     while !isempty(queue)
-        bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr = popfirst!(queue)
+        bs, ps, tgs, ind_ord, lc_set, syz_queue, tr = popfirst!(queue)
         neqns = num_eqns(lc_set)
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
@@ -232,8 +232,8 @@ function sig_decomp!(basis::Basis{N},
                                                            ind_ord,
                                                            lc_set)
             timer.comp_lc_time += tim
-            pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, c, syz_queue, tr))
-            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, min(c, neqns-1), Int[], tr2))
+            pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set, syz_queue, tr))
+            pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set2, syz_queue, tr2))
         else
             @info "finished component"
             push!(result, lc_set)

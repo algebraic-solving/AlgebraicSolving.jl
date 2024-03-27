@@ -44,13 +44,13 @@ function is_empty_set(X::LocClosedSet)
 end
 
 function add_inequation_sat!(X::LocClosedSet, h::P;
-                             known_zds:Vector{P}=P[]) where P
+                             known_zds=P[]::Vector{P}) where P
     R = ring(X)
     X.gbs = [saturate(vcat(gb, known_zds), h) for gb in X.gbs] 
 end
 
 function add_inequation_col!(X::LocClosedSet, h::P;
-                             known_zds:Vector{P}=P[]) where P
+                             known_zds=P[]::Vector{P}) where P
     R = ring(X)
     X.gbs = [quotient(vcat(gb, known_zds), h) for gb in X.gbs] 
 end
