@@ -205,6 +205,7 @@ function sig_decomp!(basis::Basis{N},
         bs, ps, tgs, ind_ord, lc_set, syz_queue, tr = popfirst!(queue)
         neqns = num_eqns(lc_set)
         filter!(gb -> !(one(R) in gb), lc_set.gbs)
+        @info "codims $((codim).(lc_set.gbs))"
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
             @info "empty component"

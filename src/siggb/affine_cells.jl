@@ -87,7 +87,8 @@ function split(X::LocClosedSet, g::MPolyRingElem)
     for (i, (X_gb, col_gb)) in enumerate(zip(X.gbs, col_gbs))
         if one(R) in col_gb
             @info "equation vanishes on one GB"
-            tim = @elapsed new_gb = saturate(vcat(X_gb, [g]), X.ineqns[i])
+            # tim = @elapsed new_gb = saturate(vcat(X_gb, [g]), X.ineqns[i])
+            tim = @elapsed new_gb = saturate(vcat(X_gb, [g]), typeof(g)[])
             @info "adding equation time $(tim)"
             push!(hull_gbs, new_gb)
             push!(new_ineqns, X.ineqns[i])
