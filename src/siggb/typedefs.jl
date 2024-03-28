@@ -151,14 +151,14 @@ const SyzInfo = Tuple{SigIndex, Dict{SigIndex, Bool}}
 # For output of decomp (at the moment)
 mutable struct LocClosedSet{T<:MPolyRingElem}
     seq::Vector{T}
-    hull_eqns::Vector{Int}
+    ineqns::Vector{Vector{T}}
     gbs::Vector{Vector{T}}
 
     function LocClosedSet{T}(seq::Vector{T}) where {T<:MPolyRingElem}
         @assert !isempty(seq) "cannot construct affine cell from no equations."
         R = parent(first(seq))
         gb = saturate(seq, last(gens(R)))
-        return new(seq, Int[], [gb])
+        return new(seq, [[last(gens(R))]], [gb])
     end
 end
 

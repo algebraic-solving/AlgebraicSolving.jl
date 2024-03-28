@@ -1,27 +1,33 @@
 # TODO: is this needed?
 function num_eqns(X::LocClosedSet)
-    return length(X.seq) - length(X.hull_eqns)
+    return length(X.seq)
 end
 
 # for displaying locally closed sets
 function Base.show(io::IO, lc::LocClosedSet)
-    string_rep = "V("
-    j = 1
-    is_first = true
-    for (i, f) in enumerate(lc.seq)
-        if j <= length(lc.hull_eqns) && i == lc.hull_eqns[j]
-            j += 1
-            continue
-        end
-        if !is_first
-            string_rep *= ", $f"
+    string_rep_seq = variety_string_rep(lc.seq)
+    for (i, ineqn_set) in enumerate(lc.ineqns)
+        ineqn_string = variety_string_rep(ineqn_set, sep = "*")
+        if isone(i)
+            string_rep_seq *= "\\" * ineqn_string
         else
-            is_first = false
+            string_rep_seq *= (" ∪ " * ineqn_string)
+        end
+    end
+    print(io, string_rep_seq)
+end
+
+function variety_string_rep(F::Vector{<:MPolyRingElem}; sep = ", ")
+    string_rep = "V("
+    for (i, f) in enumerate(F)
+        if isone(i)
             string_rep *= "$f"
+        else
+            string_rep *= (sep * "$f")
         end
     end
     string_rep *= ")"
-    print(io, string_rep)
+    return string_rep
 end
 
 function ring(X::LocClosedSet)
@@ -45,52 +51,56 @@ function is_empty_set(X::LocClosedSet)
     return false
 end
 
-function add_inequation_sat!(X::LocClosedSet, h::P;
+function add_inequation!(X::LocClosedSet, h::P;
                              known_zds=P[]::Vector{P}) where P
     R = ring(X)
-    X.gbs = [saturate(vcat(gb, known_zds), h) for gb in X.gbs] 
+    for (i, gb) in enumerate(X.gbs)
+        X.gbs[i] = saturate(vcat(gb, known_zds), h)
+        push!(X.ineqns[i], h)
+    end
 end
 
-function add_inequation_col!(X::LocClosedSet, h::P;
-                             known_zds=P[]::Vector{P}) where P
-    R = ring(X)
-    X.gbs = [quotient(vcat(gb, known_zds), h) for gb in X.gbs] 
-end
-
-function add_inequation(X::LocClosedSet, h::MPolyRingElem; method = :sat)
+function add_inequation(X::LocClosedSet, h::MPolyRingElem)
     Y = deepcopy(X)
     if isone(h)
         return Y
     end
-    method == :sat ? add_inequation_sat!(Y, h) : add_inequation_col!(Y, h)
+    add_inequation!(Y, h)
     return Y
 end
 
 # which equations are hull equations needs to be managed outside of this function
 function split(X::LocClosedSet, g::MPolyRingElem)
-    tim = @elapsed X_min_g = add_inequation(X, g; method = :col)
-    @info "initial quotient time $(tim)"
+    tim = @elapsed X_min_g = add_inequation(X, g)
+    @info "initial saturation time $(tim)"
 
     if is_empty_set(X_min_g)
-        return X, X_min_g
+        @info "equation vanishes"
     end
 
     X_hull_g = deepcopy(X)
 
     col_gbs = X_min_g.gbs
     hull_gbs = Vector{typeof(g)}[]
+    new_ineqns = Vector{typeof(g)}[]
     R = ring(X)
-    for (X_gb, col_gb) in zip(X.gbs, col_gbs)
+    for (i, (X_gb, col_gb)) in enumerate(zip(X.gbs, col_gbs))
         if one(R) in col_gb
-            push!(hull_gbs, X_gb)
+            @info "equation vanishes on one GB"
+            tim = @elapsed new_gb = saturate(vcat(X_gb, [g]), X.ineqns[i])
+            @info "adding equation time $(tim)"
+            push!(hull_gbs, new_gb)
+            push!(new_ineqns, X.ineqns[i])
             continue
         end
         sort(col_gb, by = p -> total_degree(p))
         H_rand = filter(!iszero, my_normal_form(random_lin_combs(col_gb), X_gb))
-        new_gbs = remove(X_gb, H_rand, known_eqns = [g])
-        append!(hull_gbs, new_gbs)
+        new_ineqns_and_gbs = remove(X_gb, H_rand, known_eqns = [g])
+        append!(new_ineqns, [vcat(X.ineqns[i], [f]) for f in (x -> x[1]).(new_ineqns_and_gbs)])
+        append!(hull_gbs, (x -> x[2]).(new_ineqns_and_gbs))
     end
     X_hull_g.gbs = hull_gbs
+    X_hull_g.ineqns = new_ineqns
 
     return X_hull_g, X_min_g
 end
@@ -99,10 +109,10 @@ function remove(gb::Vector{P},
                 H::Vector{P};
                 known_eqns::Vector{P}=P[]) where P
 
-    res = Vector{P}[]
+    res = Tuple{P, Vector{P}}[]
     isempty(H) && return res
 
-    R = parent(first(gb))
+    R = base_ring(first(gb))
     h = first(H)
     tim = @elapsed gb1 = saturate(vcat(gb, known_eqns), h)
     @info "remove time $(tim) for degree $(total_degree(h))"
@@ -110,7 +120,7 @@ function remove(gb::Vector{P},
         @info "is empty"
         return remove(gb, H[2:end], known_eqns=known_eqns)
     end
-    push!(res, gb1)
+    push!(res, (h, gb1))
     tim = @elapsed G = filter(!iszero, my_normal_form(random_lin_combs(gb1), gb))
     @info "normal form time $(tim)"
     for htil in H[2:end]
@@ -264,7 +274,8 @@ end
 
 function codim(gb::Vector{P}) where P
     miss = max_ind_sets(gb)
-    return length(findall(b -> !b, first(miss)))
+    cd = length(findall(b -> !b, first(miss)))
+    return cd
 end
 
 # for debugging
@@ -272,8 +283,10 @@ function check_decomp(F::Vector{P}, Xs::Vector{<:LocClosedSet}) where {P <: MPol
     println("checking decomp")
     gb_ch = F
     for X in Xs
-        g = random_lin_comb(X.gb)
-        gb_ch = saturate(gb_ch, g)
+        for gb in X.gbs
+            g = random_lin_comb(gb)
+            gb_ch = saturate(gb_ch, g)
+        end
     end
     R = parent(first(F))
     gb_ch = saturate(gb_ch, last(gens(R)))

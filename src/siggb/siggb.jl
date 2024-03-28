@@ -204,6 +204,7 @@ function sig_decomp!(basis::Basis{N},
     while !isempty(queue)
         bs, ps, tgs, ind_ord, lc_set, syz_queue, tr = popfirst!(queue)
         neqns = num_eqns(lc_set)
+        filter!(gb -> !(one(R) in gb), lc_set.gbs)
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
         if is_empty_set(lc_set)
             @info "empty component"
@@ -274,6 +275,10 @@ function siggb_for_split!(basis::Basis{N},
     end
 
     while !iszero(pairset.load)
+        # find minimum pair index
+        min_pair_idx = minimum(pair -> ind_order.ord[index(pair.top_sig)],
+                               pairset.elems[1:pairset.load])
+
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
@@ -297,12 +302,21 @@ function siggb_for_split!(basis::Basis{N},
                                       tr, char, syz_queue)
         timer.update_time += tim
 
+        # find minimum syzygy index
+        sort!(syz_queue, by = sz -> (ind_order.ord[index(basis.syz_masks[sz[1]])], basis.syz_sigs[sz[1]].deg))
+        if !isempty(syz_queue)
+            min_syz_idx = minimum(sz -> ind_order.ord[index(basis.syz_masks[sz[1]])], syz_queue)
+        else
+            min_syz_idx = min_pair_idx
+        end
+        regular_up_to = min(min_pair_idx, min_syz_idx) - 1
+
         # check to see if we can split with one of the syzygies
-        sort!(syz_queue, by = sz -> basis.syz_sigs[sz[1]].deg)
         does_split, cofac_coeffs,
         cofac_mons, cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
                                                        basis, tr, ind_order, char, lc_set,
-                                                       tags, splitting_inds, timer)
+                                                       tags, splitting_inds, regular_up_to,
+                                                       timer)
 
         if does_split
             return true, false, cofac_coeffs,
@@ -311,10 +325,15 @@ function siggb_for_split!(basis::Basis{N},
 
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
     end
-    does_split, cofac_coeffs, cofac_mons,
-    cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
-                                       basis, tr, ind_order, char, lc_set,
-                                       tags, splitting_inds, timer)
+    if !isempty(syz_queue)
+        sort!(syz_queue, by = sz -> basis.syz_sigs[sz[1]].deg)
+        regular_up_to = minimum(sz -> ind_order.ord[index(basis.syz_masks[sz[1]])], syz_queue) - 1
+        does_split, cofac_coeffs, cofac_mons,
+        cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
+                                           basis, tr, ind_order, char, lc_set,
+                                           tags, splitting_inds, regular_up_to,
+                                           timer)
+    end
 
     if does_split
         return true, false, cofac_coeffs,
@@ -340,6 +359,7 @@ function split!(basis::Basis{N},
         # new polynomial
         cofac_mons = [basis_ht.exponents[midx] for midx in cofac_mons_hsh]
         h = convert_to_pol(ring(lc_set), cofac_mons, cofac_coeffs)
+        @info "splitting index $(zd_ind), degree $(total_degree(h))"
 
         # component with nonzero condition
         sorted_inds = collect(1:basis.input_load)
@@ -370,18 +390,13 @@ function split!(basis::Basis{N},
         s_ind = add_new_sequence_element!(basis, basis_ht, tr,
                                           cofac_mons_hsh, cofac_coeffs,
                                           ind_order, ord_ind, pairset,
-                                          tags, new_tg = :hull)
+                                          tags, new_tg = :split)
 
         # new components
         lc_set_hull, lc_set_nz = split(lc_set, h)
         push!(lc_set_hull.seq, h)
-        push!(lc_set_hull.hull_eqns, s_ind)
 
-        to_del = lc_set_nz.hull_eqns
-        push!(to_del, zd_ind)
-        sort!(to_del)
         deleteat!(lc_set_nz.seq, to_del)
-        empty!(lc_set_nz.hull_eqns)
     end
 
     return lc_set_hull, basis2, ps2, tags2, ind_ord2, lc_set_nz, tr2
@@ -396,23 +411,34 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
                                 lc_set::LocClosedSet{T},
                                 tags::Tags,
                                 splitting_inds::Vector{SigIndex},
+                                regular_up_to::Integer,
                                 timer::Timings) where {Char, N,
                                                        T <: MPolyRingElem}
     
-    @info "checking known syzygies"
+    @info "checking known syzygies, regular up to $(regular_up_to)"
     found_zd = false
     zd_coeffs = Coeff[]
     zd_mons_hsh = MonIdx[]
     zd_ind = zero(SigIndex)
 
-    @inbounds for (idx, proc_info) in syz_queue
+    to_del = Int[]
+
+    @inbounds for (i, (idx, proc_info)) in enumerate(syz_queue)
         syz_mask = basis.syz_masks[idx]
         syz_mon = basis.syz_sigs[idx]
         syz_ind = index(syz_mask)
         tr_ind = tr.syz_ind_to_mat[idx]
 
+        if all(idx -> get(proc_info, idx, false), splitting_inds)
+            push!(to_del, i)
+        end
+
         for cofac_ind in reverse(splitting_inds)
             get(proc_info, cofac_ind, false) && continue
+            if ind_order.ord[cofac_ind] <= regular_up_to
+                proc_info[cofac_ind] = true
+                continue
+            end
             tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
                                                                            basis_ht,
                                                                            tr_ind,
@@ -444,6 +470,8 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
         # normalize cofac coefficients
         normalize_cfs!(zd_coeffs, char)
     end
+
+    deleteat!(syz_queue, to_del)
 
     return found_zd, zd_coeffs, zd_mons_hsh, zd_ind
 end
