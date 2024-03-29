@@ -304,7 +304,7 @@ function siggb_for_split!(basis::Basis{N},
         timer.update_time += tim
 
         # find minimum syzygy index
-        sort!(syz_queue, by = sz -> (ind_order.ord[index(basis.syz_masks[sz[1]])], basis.syz_sigs[sz[1]].deg))
+        sort!(syz_queue, by = sz -> (basis.syz_sigs[sz[1]].deg, ind_order.ord[index(basis.syz_masks[sz[1]])]))
         if !isempty(syz_queue)
             min_syz_idx = minimum(sz -> ind_order.ord[index(basis.syz_masks[sz[1]])], syz_queue)
         else
@@ -313,15 +313,21 @@ function siggb_for_split!(basis::Basis{N},
         regular_up_to = min(min_pair_idx, min_syz_idx) - 1
 
         # check to see if we can split with one of the syzygies
-        does_split, cofac_coeffs,
-        cofac_mons, cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
-                                                       basis, tr, ind_order, char, lc_set,
-                                                       tags, splitting_inds, regular_up_to,
-                                                       timer)
-
-        if does_split
-            return true, false, cofac_coeffs,
-                   cofac_mons, cofac_ind
+        if !isempty(syz_queue)
+            fs_syz_idx = first(syz_queue)[1]
+            min_syz_deg = basis.syz_sigs[fs_syz_idx].deg
+            poss_syz_new_deg = deg - basis.degs[basis.input_load]
+            if min_syz_deg <= poss_syz_new_deg
+                does_split, cofac_coeffs,
+                cofac_mons, cofac_ind = process_syz_for_split!(syz_queue, basis_ht,
+                                                               basis, tr, ind_order, char, lc_set,
+                                                               tags, splitting_inds, regular_up_to,
+                                                               timer)
+                if does_split
+                    return true, false, cofac_coeffs,
+                    cofac_mons, cofac_ind
+                end
+            end
         end
 
         sort_pairset_by_degree!(pairset, 1, pairset.load-1)
