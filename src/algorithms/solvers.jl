@@ -151,6 +151,10 @@ function _core_msolve(
 
     I.rat_param = RationalParametrization(vsymbols, rat_param[1],rat_param[2],
                                           rat_param[3], rat_param[4])
+    if get_param == 2
+        return rat_param, undef
+    end
+
     if jl_nb_sols == 0
         I.real_sols = QQFieldElem[]
         I.inter_sols = Vector{QQFieldElem}[]
