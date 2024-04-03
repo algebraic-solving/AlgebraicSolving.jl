@@ -59,6 +59,7 @@ function _core_msolve(
         max_nr_pairs::Int=0,                  # number of pairs maximally chosen
                                               # in symbolic preprocessing
         la_option::Int=2,                     # linear algebra option
+        get_param::Int=1,                     # get rational parametrization
         info_level::Int=0,                    # info level for print outs
         precision::Int=32                     # precision of the solution set
         )
@@ -76,7 +77,6 @@ function _core_msolve(
 
     reset_ht  = 0
     print_gb  = 0
-    get_param = 1
 
     mon_order       = 0
     elim_block_size = 0
@@ -151,6 +151,10 @@ function _core_msolve(
 
     I.rat_param = RationalParametrization(vsymbols, rat_param[1],rat_param[2],
                                           rat_param[3], rat_param[4])
+    if get_param == 2
+        return rat_param, undef
+    end
+
     if jl_nb_sols == 0
         I.real_sols = QQFieldElem[]
         I.inter_sols = Vector{QQFieldElem}[]
@@ -253,6 +257,7 @@ function rational_parametrization(
                  max_nr_pairs = max_nr_pairs,
                  la_option = la_option,
                  info_level = info_level,
+                 get_param = 2, # only rational parametrization, no solutions are computed
                  precision = precision)
 
     return I.rat_param
