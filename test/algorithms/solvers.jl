@@ -23,7 +23,7 @@
     rat_sols = Vector{QQFieldElem}[[49, 0, 0, 0], [49//3, 0, 0, 1//3]]
 
     @test sols == real_solutions(I)
-    @test inter_sols == inter_solutions(I)
+    @test inter_sols == real_solutions(I, interval=true)
     @test rat_sols == rational_solutions(I)
     @test I.real_sols == real_solutions(I)
 
@@ -54,12 +54,11 @@
 
     I = Ideal([x1^2-x2, x1*x3-x4, x2*x4-12, x4^3-x3^2])
     real_solutions(I)
-    inter_solutions(I)
     @test I.rat_param.vars == Symbol[]
 
     I = Ideal([x1^2-x2, x1*x3, x2-12])
 	@test_throws ErrorException real_solutions(I)
-    @test_throws ErrorException inter_solutions(I)
+    @test_throws ErrorException real_solutions(I, interval=true)
 	@test_throws ErrorException rational_solutions(I)
 
     # check variable permutation
