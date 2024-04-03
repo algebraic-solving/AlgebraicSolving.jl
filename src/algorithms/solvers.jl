@@ -1,6 +1,6 @@
 import msolve_jll: libmsolve
 
-export inter_solutions, real_solutions, rational_solutions, rational_parametrization
+export real_solutions, rational_solutions, rational_parametrization
 
 @doc Markdown.doc"""
     _get_rational_parametrization(nr::Int32, lens::Vector{Int32}, cfs::Ptr{BigInt})
@@ -374,6 +374,7 @@ is greater than zero an empty array is returned.
 - `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 - `precision::Int=32`: bit precision for the computed solutions.
+- `interval::Bool=false`: return real solutions as intervals.
 
 # Examples
 ```jldoctest
@@ -391,6 +392,13 @@ julia> real_solutions(I)
  [1, 0, 0]
  [1945971683//8589934592, 972985841//8589934592, 744426424910260862653434112767010536665//2722258935367507707706996859454145691648]
  [2863311531//8589934592, 0, 3629678580490010276942662479272194255531//10889035741470030830827987437816582766592]
+
+julia> inter_solutions(I, interval=true)
+4-element Vector{Vector{Vector{QQFieldElem}}}:
+ [[1354207349//2147483648, 2708414699//4294967296], [1354207349//4294967296, 677103675//2147483648], [-355532291286331190123863132844989723573//2722258935367507707706996859454145691648, -1422129165145324760495452531379958894291//10889035741470030830827987437816582766592]]
+ [[1, 1], [0, 0], [0, 0]]
+ [[972985841//4294967296, 486492921//2147483648], [60811615//536870912, 486492921//4294967296], [93053303113782607831679264095876317083//340282366920938463463374607431768211456, 372213212455130431326717056383505268333//1361129467683753853853498429727072845824]]
+ [[1431655765//4294967296, 715827883//2147483648], [-1//4294967296, 1//4294967296], [1814839290245005138471331239636097127765//5444517870735015415413993718908291383296, 907419645122502569235665619818048563883//2722258935367507707706996859454145691648]]
 ```
 """
 function real_solutions(
@@ -401,7 +409,8 @@ function real_solutions(
                                               # in symbolic preprocessing
         la_option::Int=2,                     # linear algebra option
         info_level::Int=0,                    # info level for print outs
-        precision::Int=32                     # precision of the solution set
+        precision::Int=32,                    # precision of the solution set
+        interval::Bool=false                  # return real solutions as intervals
         )
 
     isdefined(I, :real_sols) ||
@@ -413,64 +422,9 @@ function real_solutions(
                  info_level = info_level,
                  precision = precision)
 
-    return I.real_sols
-end
-
-@doc Markdown.doc"""
-    inter_solutions(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
-
-Given an ideal `I` with a finite solution set over the complex numbers, return
-the intervals with a given precision (default 32 bits), containing the roots of the ideal.
-
-**Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
-is greater than zero an empty array is returned.
-
-# Arguments
-- `I::Ideal{T} where T <: MPolyRingElem`: input generators.
-- `initial_hts::Int=17`: initial hash table size `log_2`.
-- `nr_thrds::Int=1`: number of threads for parallel linear algebra.
-- `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
-- `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
-- `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
-- `precision::Int=32`: bit precision for the computed solutions.
-
-# Examples
-```jldoctest
-julia> using AlgebraicSolving
-
-julia> R,(x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
-(Multivariate polynomial ring in 3 variables over QQ, QQMPolyRingElem[x1, x2, x3])
-
-julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
-QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
-
-julia> inter_solutions(I)
-4-element Vector{Vector{Vector{QQFieldElem}}}:
- [[1354207349//2147483648, 2708414699//4294967296], [1354207349//4294967296, 677103675//2147483648], [-355532291286331190123863132844989723573//2722258935367507707706996859454145691648, -1422129165145324760495452531379958894291//10889035741470030830827987437816582766592]]
- [[1, 1], [0, 0], [0, 0]]
- [[972985841//4294967296, 486492921//2147483648], [60811615//536870912, 486492921//4294967296], [93053303113782607831679264095876317083//340282366920938463463374607431768211456, 372213212455130431326717056383505268333//1361129467683753853853498429727072845824]]
- [[1431655765//4294967296, 715827883//2147483648], [-1//4294967296, 1//4294967296], [1814839290245005138471331239636097127765//5444517870735015415413993718908291383296, 907419645122502569235665619818048563883//2722258935367507707706996859454145691648]]
-```
-"""
-function inter_solutions(
-    I::Ideal{T} where T <: MPolyRingElem;     # input generators
-    initial_hts::Int=17,                  # hash table size, default 2^17
-    nr_thrds::Int=1,                      # number of threads
-    max_nr_pairs::Int=0,                  # number of pairs maximally chosen
-                                          # in symbolic preprocessing
-    la_option::Int=2,                     # linear algebra option
-    info_level::Int=0,                    # info level for print outs
-    precision::Int=32                     # precision of the solution set
-    )
-
-isdefined(I, :inter_sols) ||
-_core_msolve(I,
-             initial_hts = initial_hts,
-             nr_thrds = nr_thrds,
-             max_nr_pairs = max_nr_pairs,
-             la_option = la_option,
-             info_level = info_level,
-             precision = precision)
-
-return I.inter_sols
+    if interval
+        return I.inter_sols
+    else
+        return I.real_sols
+    end
 end
