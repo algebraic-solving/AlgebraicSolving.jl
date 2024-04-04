@@ -126,7 +126,7 @@ function remove(gb::Vector{P},
     for htil in H[2:end]
         tim = @elapsed Grem = filter(!iszero, my_normal_form(G .* htil, gb))
         @info "constructing new equations time $(tim)"
-        new_gbs = remove(gb, Grem, known_eqns=vcat(known_eqns, [h]))
+        new_gbs = remove(gb, Grem, known_eqns=known_eqns)
         append!(res, new_gbs)
     end
     return res
