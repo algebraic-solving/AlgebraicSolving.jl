@@ -7,7 +7,8 @@ end
 function Base.show(io::IO, lc::LocClosedSet)
     string_rep_seq = variety_string_rep(lc.seq)
     for (i, ineqn_set) in enumerate(lc.ineqns)
-        ineqn_string = variety_string_rep(ineqn_set, sep = "*")
+        ineqn_string = variety_string_rep(ineqn_set,
+                                          sep = "*", lpar = "(", rpar = ")")
         if isone(i)
             string_rep_seq *= "\\" * ineqn_string
         else
@@ -17,13 +18,14 @@ function Base.show(io::IO, lc::LocClosedSet)
     print(io, string_rep_seq)
 end
 
-function variety_string_rep(F::Vector{<:MPolyRingElem}; sep = ", ")
+function variety_string_rep(F::Vector{<:MPolyRingElem};
+                            sep = ", ", lpar = "", rpar = "")
     string_rep = "V("
     for (i, f) in enumerate(F)
         if isone(i)
-            string_rep *= "$f"
+            string_rep *= (lpar * "$f" * rpar)
         else
-            string_rep *= (sep * "$f")
+            string_rep *= (sep * lpar * "$f" * rpar)
         end
     end
     string_rep *= ")"
