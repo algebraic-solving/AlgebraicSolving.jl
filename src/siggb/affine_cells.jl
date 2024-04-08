@@ -1,10 +1,9 @@
-# TODO: is this needed?
-function num_eqns(X::LocClosedSet)
+function num_eqns(X::AffineCell)
     return length(X.seq)
 end
 
 # for displaying locally closed sets
-function Base.show(io::IO, lc::LocClosedSet)
+function Base.show(io::IO, lc::AffineCell)
     string_rep_seq = variety_string_rep(lc.seq)
     for (i, ineqn_set) in enumerate(lc.ineqns)
         ineqn_string = variety_string_rep(ineqn_set,
@@ -32,7 +31,7 @@ function variety_string_rep(F::Vector{<:MPolyRingElem};
     return string_rep
 end
 
-function ring(X::LocClosedSet)
+function ring(X::AffineCell)
     return parent(first(X.seq))
 end
 
@@ -53,8 +52,69 @@ function is_empty_set(X::LocClosedSet)
     return false
 end
 
-function add_inequation!(X::LocClosedSet, h::P;
-                             known_zds=P[]::Vector{P}) where P
+function is_empty_set_or_equidim(X::WLocClosedSet)
+    R = ring(X)
+    if isempty(X.gbs)
+        return true
+    elseif all(gb -> one(R) in gb, X.gbs)
+        return true
+    elseif all(isempty, X.gbs)
+        return true
+    end
+    return false
+end
+
+function add_to_output!(res::Vector{LocClosedSet},
+                        X::LocClosedSet)
+    if is_lci(X)
+        @info "component with $(num_eqns(X)) eqns done"
+        push!(res, X)
+        return true
+    elseif is_empty_set(X)
+        @info "empty component"
+        return true
+    end
+    return false
+end
+
+function add_to_output!(res::Vector{WLocClosedSet},
+                        X::WLocClosedSet)
+
+    if is_empty_set_or_equidim(X)
+        @info "component with $(num_eqns(X)) eqns done"
+        push!(res, X)
+        return true
+    end
+    return false
+end
+
+function codim_upper_bound(X::LocClosedSet)
+    return ngens(ring(X)) - 1
+end
+
+function codim_upper_bound(X::WLocClosedSet)
+    return X.codim_upper_bound
+end
+
+function add_hyperplanes!(X::LocClosedSet, new_codim_ub::Int)
+    return
+end
+
+function add_hyperplanes!(X::WLocClosedSet, new_codim_ub::Int)
+    R = ring(X)
+    n_new_hypplanes = X.codim_upper_bound - new_codim_ub
+    iszero(n_new_hypplanes) && return
+    new_hypplanes = [random_lin_comb(gens(R)) for _ in 1:n_new_hypplanes]
+    append!(X.hypplanes, new_hypplanes)
+    X.codim_upper_bound = new_codim_ub
+    @assert length(X.hypplanes) == ngens(R) - new_codim_ub
+    X.gbs = [saturate(vcat(gb, new_hypplanes), last(gens(R)))
+             for gb in X.gbs]
+    return
+end
+
+function add_inequation!(X::AffineCell, h::P;
+                         known_zds=P[]::Vector{P}) where P
     R = ring(X)
     for (i, gb) in enumerate(X.gbs)
         X.gbs[i] = saturate(vcat(gb, known_zds), h)
@@ -62,7 +122,7 @@ function add_inequation!(X::LocClosedSet, h::P;
     end
 end
 
-function add_inequation(X::LocClosedSet, h::MPolyRingElem)
+function add_inequation(X::AffineCell, h::MPolyRingElem)
     Y = deepcopy(X)
     if isone(h)
         return Y
@@ -72,13 +132,9 @@ function add_inequation(X::LocClosedSet, h::MPolyRingElem)
 end
 
 # which equations are hull equations needs to be managed outside of this function
-function split(X::LocClosedSet, g::MPolyRingElem)
+function split(X::AffineCell, g::MPolyRingElem)
     tim = @elapsed X_min_g = add_inequation(X, g)
     @info "initial saturation time $(tim)"
-
-    if is_empty_set(X_min_g)
-        @info "equation vanishes"
-    end
 
     X_hull_g = deepcopy(X)
 

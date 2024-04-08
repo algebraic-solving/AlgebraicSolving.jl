@@ -148,8 +148,11 @@ const Tags = Dict{SigIndex, Symbol}
 # For syzygy processing during splitting
 const SyzInfo = Tuple{SigIndex, Dict{SigIndex, Bool}}
 
-# For output of decomp (at the moment)
-mutable struct LocClosedSet{T<:MPolyRingElem}
+# For output of decomp algorithms
+
+abstract type AffineCell end
+
+mutable struct LocClosedSet{T<:MPolyRingElem} <: AffineCell
     seq::Vector{T}
     ineqns::Vector{Vector{T}}
     gbs::Vector{Vector{T}}
@@ -159,6 +162,24 @@ mutable struct LocClosedSet{T<:MPolyRingElem}
         R = parent(first(seq))
         gb = saturate(seq, last(gens(R)))
         return new(seq, [[last(gens(R))]], [gb])
+    end
+end
+
+mutable struct WLocClosedSet{T<:MPolyRingElem} <: AffineCell
+    seq::Vector{T}
+    hypplanes::Vector{T}
+    codim_upper_bound::Int
+    ineqns::Vector{Vector{T}}
+    gbs::Vector{Vector{T}}
+
+    function WLocClosedSet{T}(seq::Vector{T}) where {T<:MPolyRingElem}
+        @assert !isempty(seq) "cannot construct affine cell from no equations."
+        R = parent(first(seq))
+        codim_upper_bound = min(length(seq), ngens(R) - 1)
+        hypplanes = [random_lin_comb(gens(R)) for _ in 1:(ngens(R) - codim_upper_bound)]
+        gb = saturate(vcat(seq, hypplanes), last(gens(R)))
+        return new(seq, hypplanes, codim_upper_bound,
+                   [[last(gens(R))]], [gb])
     end
 end
 
