@@ -206,7 +206,11 @@ function sig_decomp!(basis::Basis{N},
         neqns = num_eqns(lc_set)
         filter!(gb -> !(one(R) in gb), lc_set.gbs)
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
-        if add_to_output!(result, lc_set)
+        if any(isone, lc_set.hull_eqns)
+            @info "is empty set"
+            @info "------------------------------------------"
+            continue
+        elseif add_to_output!(result, lc_set)
             @info "------------------------------------------"
             continue
         end
@@ -394,8 +398,12 @@ function split!(basis::Basis{N},
         # new components
         lc_set_hull, lc_set_nz = split(lc_set, h)
         push!(lc_set_hull.seq, h)
+        push!(lc_set_hull.tags, :hull)
+        push!(lc_set_hull.hull_eqns, h)
 
+        # TODO: do we need to delete from hull eqns?
         deleteat!(lc_set_nz.seq, to_del)
+        deleteat!(lc_set_nz.tags, to_del)
         new_codim_ub = min(codim_upper_bound(lc_set), num_eqns(lc_set) - 1)
         add_hyperplanes!(lc_set_nz, new_codim_ub)
     end

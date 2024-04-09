@@ -3,18 +3,23 @@ function num_eqns(X::AffineCell)
 end
 
 # for displaying locally closed sets
-function Base.show(io::IO, lc::AffineCell)
+function Base.show(io::IO, lc::LocClosedSet)
     string_rep_seq = variety_string_rep(lc.seq)
-    for (i, ineqn_set) in enumerate(lc.ineqns)
-        ineqn_string = variety_string_rep(ineqn_set,
+    string_rep_ineqn = variety_string_rep(lc.ineqns,
                                           sep = "*", lpar = "(", rpar = ")")
-        if isone(i)
-            string_rep_seq *= "\\" * ineqn_string
-        else
-            string_rep_seq *= (" ∪ " * ineqn_string)
-        end
+    print(io, string_rep_seq * "\\" * string_rep_ineqn)
+end
+
+function Base.show(io::IO, lc::WLocClosedSet)
+    string_rep_seq = variety_string_rep(lc.seq[findall(tg -> tg == :seq, lc.tags)])
+    string_rep_ineqn = variety_string_rep(lc.ineqns,
+                                          sep = "*", lpar = "(", rpar = ")")
+    if !isempty(lc.hull_eqns)
+        string_rep_hull = variety_string_rep(lc.hull_eqns)
+        print(io, "hull(" * string_rep_seq * "\\" * string_rep_ineqn * ", " * string_rep_hull * ")")
+    else
+        print(io, string_rep_seq * "\\" * string_rep_ineqn)
     end
-    print(io, string_rep_seq)
 end
 
 function variety_string_rep(F::Vector{<:MPolyRingElem};
@@ -52,7 +57,7 @@ function is_empty_set(X::LocClosedSet)
     return false
 end
 
-function is_empty_set_or_equidim(X::WLocClosedSet)
+function is_empty_set(X::WLocClosedSet)
     R = ring(X)
     if isempty(X.gbs)
         return true
@@ -80,7 +85,10 @@ end
 function add_to_output!(res::Vector{WLocClosedSet},
                         X::WLocClosedSet)
 
-    if is_empty_set_or_equidim(X)
+    if is_empty_set(X)
+        @info "empty component"
+        return true
+    elseif all(gb -> codim(gb) == ngens(ring(X)) - 1, X.gbs)
         @info "component with $(num_eqns(X)) eqns done"
         push!(res, X)
         return true
@@ -107,7 +115,7 @@ function add_hyperplanes!(X::WLocClosedSet, new_codim_ub::Int)
     new_hypplanes = [random_lin_comb(gens(R)) for _ in 1:n_new_hypplanes]
     append!(X.hypplanes, new_hypplanes)
     X.codim_upper_bound = new_codim_ub
-    @assert length(X.hypplanes) == ngens(R) - new_codim_ub
+    @assert length(X.hypplanes) == ngens(R) - new_codim_ub - 1
     X.gbs = [saturate(vcat(gb, new_hypplanes), last(gens(R)))
              for gb in X.gbs]
     return
@@ -116,9 +124,9 @@ end
 function add_inequation!(X::AffineCell, h::P;
                          known_zds=P[]::Vector{P}) where P
     R = ring(X)
+    push!(X.ineqns, h)
     for (i, gb) in enumerate(X.gbs)
         X.gbs[i] = saturate(vcat(gb, known_zds), h)
-        push!(X.ineqns[i], h)
     end
 end
 
@@ -140,7 +148,6 @@ function split(X::AffineCell, g::MPolyRingElem)
 
     col_gbs = X_min_g.gbs
     hull_gbs = Vector{typeof(g)}[]
-    new_ineqns = Vector{typeof(g)}[]
     R = ring(X)
     for (i, (X_gb, col_gb)) in enumerate(zip(X.gbs, col_gbs))
         if one(R) in col_gb
@@ -148,19 +155,16 @@ function split(X::AffineCell, g::MPolyRingElem)
             tim = @elapsed new_gb = saturate(vcat(X_gb, [g]), last(gens(R)))
             @info "adding equation time $(tim)"
             push!(hull_gbs, new_gb)
-            push!(new_ineqns, X.ineqns[i])
             continue
         end
         sort(col_gb, by = p -> total_degree(p))
         H_rand = filter(!iszero, my_normal_form(random_lin_combs(col_gb), X_gb))
         gbs = remove(X_gb, H_rand, known_eqns = [g])
         for gb in gbs
-            push!(new_ineqns, X.ineqns[i])
             push!(hull_gbs, gb)
         end
     end
     X_hull_g.gbs = hull_gbs
-    X_hull_g.ineqns = new_ineqns
 
     return X_hull_g, X_min_g
 end
@@ -190,6 +194,21 @@ function remove(gb::Vector{P},
         append!(res, new_gbs)
     end
     return res
+end
+
+function compute_gbs(X::WLocClosedSet{P},
+                     base_seq::Vector{P}) where P
+
+    gb = saturate(base_seq, X.ineqns)
+    R = ring(X)
+    isempty(X.hull_eqns) && return [gb]
+
+    mdeg = maximum(p -> total_degree(p), X.hull_eqns)
+    hull_eqn = random_lin_comb([p*random_lin_comb(gens(R))^(mdeg - total_degree(p))
+                                for p in X.hull_eqns])
+    sat_gb = saturate(gb, hull_eqn)
+    H = filter(!iszero, my_normal_form(random_lin_combs(sat_gb), gb))
+    return remove(gb, H, known_eqns = [hull_eqn])
 end
 
 # ------------------------ #

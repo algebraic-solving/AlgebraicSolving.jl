@@ -167,19 +167,22 @@ end
 
 mutable struct WLocClosedSet{T<:MPolyRingElem} <: AffineCell
     seq::Vector{T}
+    tags::Vector{Symbol}
+    hull_eqns::Vector{T}
     hypplanes::Vector{T}
     codim_upper_bound::Int
-    ineqns::Vector{Vector{T}}
+    ineqns::Vector{T}
     gbs::Vector{Vector{T}}
 
     function WLocClosedSet{T}(seq::Vector{T}) where {T<:MPolyRingElem}
         @assert !isempty(seq) "cannot construct affine cell from no equations."
         R = parent(first(seq))
         codim_upper_bound = min(length(seq), ngens(R) - 1)
-        hypplanes = [random_lin_comb(gens(R)) for _ in 1:(ngens(R) - codim_upper_bound)]
+        hypplanes = [random_lin_comb(gens(R)) for _ in 1:(ngens(R) - codim_upper_bound - 1)]
         gb = saturate(vcat(seq, hypplanes), last(gens(R)))
-        return new(seq, hypplanes, codim_upper_bound,
-                   [[last(gens(R))]], [gb])
+        return new(seq, [:seq for _ in 1:length(seq)],
+                   T[], hypplanes, codim_upper_bound,
+                   [last(gens(R))], [gb])
     end
 end
 
