@@ -145,7 +145,7 @@ function split(X::AffineCell, g::MPolyRingElem)
     for (i, (X_gb, col_gb)) in enumerate(zip(X.gbs, col_gbs))
         if one(R) in col_gb
             @info "equation vanishes on one GB"
-            tim = @elapsed new_gb = saturate(vcat(X_gb, [g]), X.ineqns[i])
+            tim = @elapsed new_gb = saturate(vcat(X_gb, [g]), last(gens(R)))
             @info "adding equation time $(tim)"
             push!(hull_gbs, new_gb)
             push!(new_ineqns, X.ineqns[i])
@@ -153,9 +153,11 @@ function split(X::AffineCell, g::MPolyRingElem)
         end
         sort(col_gb, by = p -> total_degree(p))
         H_rand = filter(!iszero, my_normal_form(random_lin_combs(col_gb), X_gb))
-        new_ineqns_and_gbs = remove(X_gb, H_rand, known_eqns = [g])
-        append!(new_ineqns, [vcat(X.ineqns[i], [f]) for f in (x -> x[1]).(new_ineqns_and_gbs)])
-        append!(hull_gbs, (x -> x[2]).(new_ineqns_and_gbs))
+        gbs = remove(X_gb, H_rand, known_eqns = [g])
+        for gb in gbs
+            push!(new_ineqns, X.ineqns[i])
+            push!(hull_gbs, gb)
+        end
     end
     X_hull_g.gbs = hull_gbs
     X_hull_g.ineqns = new_ineqns
@@ -167,7 +169,7 @@ function remove(gb::Vector{P},
                 H::Vector{P};
                 known_eqns::Vector{P}=P[]) where P
 
-    res = Tuple{P, Vector{P}}[]
+    res = Vector{P}[]
     isempty(H) && return res
 
     R = base_ring(first(gb))
@@ -178,7 +180,7 @@ function remove(gb::Vector{P},
         @info "is empty"
         return remove(gb, H[2:end], known_eqns=known_eqns)
     end
-    push!(res, (h, gb1))
+    push!(res, gb1)
     tim = @elapsed G = filter(!iszero, my_normal_form(random_lin_combs(gb1), gb))
     @info "normal form time $(tim)"
     for htil in H[2:end]
