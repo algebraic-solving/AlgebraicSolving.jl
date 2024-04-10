@@ -206,11 +206,11 @@ function sig_decomp!(basis::Basis{N},
         neqns = num_eqns(lc_set)
         filter!(gb -> !(one(R) in gb), lc_set.gbs)
         @info "starting component, $(length(queue)) remaining, $(neqns) equations"
-        if any(isone, lc_set.hull_eqns)
-            @info "is empty set"
-            @info "------------------------------------------"
-            continue
-        elseif add_to_output!(result, lc_set)
+        # if any(isone, lc_set.hull_eqns)
+        #     @info "is empty set"
+        #     @info "------------------------------------------"
+        #     continue
+        if add_to_output!(result, lc_set)
             @info "------------------------------------------"
             continue
         end

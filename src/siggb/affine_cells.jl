@@ -82,14 +82,30 @@ function add_to_output!(res::Vector{LocClosedSet},
     return false
 end
 
+# function add_to_output!(res::Vector{WLocClosedSet},
+#                         X::WLocClosedSet)
+
+#     if is_empty_set(X)
+#         @info "empty component"
+#         return true
+#     elseif all(gb -> codim(gb) == ngens(ring(X)) - 1, X.gbs)
+#         @info "component with $(num_eqns(X)) eqns done"
+#         push!(res, X)
+#         return true
+#     end
+#     return false
+# end
+
 function add_to_output!(res::Vector{WLocClosedSet},
                         X::WLocClosedSet)
-
-    if is_empty_set(X)
-        @info "empty component"
+    R = ring(X)
+    if isempty(X.gbs)
+        push!(res, X)
         return true
-    elseif all(gb -> codim(gb) == ngens(ring(X)) - 1, X.gbs)
-        @info "component with $(num_eqns(X)) eqns done"
+    elseif all(gb -> one(R) in gb, X.gbs)
+        push!(res, X)
+        return true
+    elseif all(isempty, X.gbs)
         push!(res, X)
         return true
     end
@@ -115,7 +131,7 @@ function add_hyperplanes!(X::WLocClosedSet, new_codim_ub::Int)
     new_hypplanes = [random_lin_comb(gens(R)) for _ in 1:n_new_hypplanes]
     append!(X.hypplanes, new_hypplanes)
     X.codim_upper_bound = new_codim_ub
-    @assert length(X.hypplanes) == ngens(R) - new_codim_ub - 1
+    @assert length(X.hypplanes) == ngens(R) - new_codim_ub
     X.gbs = [saturate(vcat(gb, new_hypplanes), last(gens(R)))
              for gb in X.gbs]
     return
@@ -231,7 +247,8 @@ function saturate(F::Vector{P}, nzs::Vector{P}) where {P <: MPolyRingElem}
     end
 
     gb = groebner_basis(Ideal(Fconv), complete_reduction = true,
-                        eliminate = length(nzs))
+                        eliminate = length(nzs),
+                        info_level = 2)
 
     # convert back to original ring
     res = Vector{P}(undef, length(gb))

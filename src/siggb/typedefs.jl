@@ -178,7 +178,7 @@ mutable struct WLocClosedSet{T<:MPolyRingElem} <: AffineCell
         @assert !isempty(seq) "cannot construct affine cell from no equations."
         R = parent(first(seq))
         codim_upper_bound = min(length(seq), ngens(R) - 1)
-        hypplanes = [random_lin_comb(gens(R)) for _ in 1:(ngens(R) - codim_upper_bound - 1)]
+        hypplanes = [random_lin_comb(gens(R)) for _ in 1:(ngens(R) - codim_upper_bound)]
         gb = saturate(vcat(seq, hypplanes), last(gens(R)))
         return new(seq, [:seq for _ in 1:length(seq)],
                    T[], hypplanes, codim_upper_bound,
