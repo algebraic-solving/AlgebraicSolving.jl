@@ -106,6 +106,54 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
     return outp
 end
 
+function sig_sat(sys::Vector{T}, H::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
+
+    full_sys = vcat(sys, H)
+    
+    # data structure setup/conversion
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(full_sys)
+
+    # fill basis, pairset, tags
+    basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht)
+
+    # set tag for sats
+    sysl = length(full_sys)
+    for idx in length(sys)+1:sysl
+        tags[idx] = :sat
+        for idx2 in idx+1:length(full_sys)
+            ind_order.incompat[(idx, idx2)] = true
+        end
+    end
+
+    # compute divmasks
+    fill_divmask!(basis_ht)
+    @inbounds for i in 1:sysl
+        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
+    end
+
+    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    with_logger(logger) do
+        added_unit = siggb!(basis, pairset, basis_ht, char, shift,
+                            tags, ind_order, tr, trace=true)
+        # output
+        R = parent(first(sys))
+        eltp = typeof(first(sys))
+        outp = eltp[]
+        if added_unit
+            push!(outp, one(R))
+        else
+            @inbounds for i in basis.basis_offset:basis.basis_load
+                gettag(tags, index(basis.sigs[i])) == :sat && continue
+                pol = convert_to_pol(R,
+                                     [basis_ht.exponents[m] for m in basis.monomials[i]],
+                                     basis.coefficients[i])
+                push!(outp, pol)
+            end
+        end
+        return outp
+    end
+end
+
 function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
 
     # data structure setup/conversion

@@ -199,8 +199,7 @@ function process_syzygy!(basis::Basis{N},
                                  mat_ind, tr,
                                  vchar,
                                  ind_order,
-                                 new_idx,
-                                 Int32[], Int32[], Int32[])
+                                 new_idx)
         sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
                    lt = lt_drl, rev = true)
         cofac_coeffs, cofac_mons_hashed = cofac
