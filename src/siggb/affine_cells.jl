@@ -27,9 +27,9 @@ function variety_string_rep(F::Vector{<:MPolyRingElem};
     string_rep = "V("
     for (i, f) in enumerate(F)
         if isone(i)
-            string_rep *= (lpar * "$f" * rpar)
+            string_rep *= (lpar * "$(f)" * rpar)
         else
-            string_rep *= (sep * lpar * "$f" * rpar)
+            string_rep *= (sep * lpar * "$(f)" * rpar)
         end
     end
     string_rep *= ")"
@@ -45,19 +45,7 @@ function is_lci(X::LocClosedSet)
     return all(gb -> codim(gb) == neqns, X.gbs)
 end
 
-function is_empty_set(X::LocClosedSet)
-    R = ring(X)
-    if isempty(X.gbs)
-        return true
-    elseif all(gb -> one(R) in gb, X.gbs)
-        return true
-    elseif all(isempty, X.gbs)
-        return true
-    end
-    return false
-end
-
-function is_empty_set(X::WLocClosedSet)
+function is_empty_set(X::AffineCell)
     R = ring(X)
     if isempty(X.gbs)
         return true
@@ -81,20 +69,6 @@ function add_to_output!(res::Vector{LocClosedSet},
     end
     return false
 end
-
-# function add_to_output!(res::Vector{WLocClosedSet},
-#                         X::WLocClosedSet)
-
-#     if is_empty_set(X)
-#         @info "empty component"
-#         return true
-#     elseif all(gb -> codim(gb) == ngens(ring(X)) - 1, X.gbs)
-#         @info "component with $(num_eqns(X)) eqns done"
-#         push!(res, X)
-#         return true
-#     end
-#     return false
-# end
 
 function add_to_output!(res::Vector{WLocClosedSet},
                         X::WLocClosedSet)
@@ -212,21 +186,6 @@ function remove(gb::Vector{P},
     return res
 end
 
-function compute_gbs(X::WLocClosedSet{P},
-                     base_seq::Vector{P}) where P
-
-    gb = saturate(base_seq, X.ineqns)
-    R = ring(X)
-    isempty(X.hull_eqns) && return [gb]
-
-    mdeg = maximum(p -> total_degree(p), X.hull_eqns)
-    hull_eqn = random_lin_comb([p*random_lin_comb(gens(R))^(mdeg - total_degree(p))
-                                for p in X.hull_eqns])
-    sat_gb = saturate(gb, hull_eqn)
-    H = filter(!iszero, my_normal_form(random_lin_combs(sat_gb), gb))
-    return remove(gb, H, known_eqns = [hull_eqn])
-end
-
 # ------------------------ #
 # --- helper functions --- #
 # ------------------------ #
@@ -247,8 +206,7 @@ function saturate(F::Vector{P}, nzs::Vector{P}) where {P <: MPolyRingElem}
     end
 
     gb = groebner_basis(Ideal(Fconv), complete_reduction = true,
-                        eliminate = length(nzs),
-                        info_level = 2)
+                        eliminate = length(nzs))
 
     # convert back to original ring
     res = Vector{P}(undef, length(gb))
