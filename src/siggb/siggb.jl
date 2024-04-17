@@ -147,7 +147,7 @@ function siggb!(basis::Basis{N},
                 degbound::Int=0) where {N, Char, Shift}
 
     # fake syz queue
-    syz_queue = Int[]
+    syz_queue = SyzInfo[]
 
     sort_pairset_by_degree!(pairset, 1, pairset.load-1)
 
