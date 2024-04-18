@@ -149,7 +149,6 @@ const Tags = Dict{SigIndex, Symbol}
 const SyzInfo = Tuple{SigIndex, Dict{SigIndex, Bool}}
 
 # For output of decomp algorithms
-
 abstract type AffineCell end
 
 mutable struct LocClosedSet{T<:MPolyRingElem} <: AffineCell

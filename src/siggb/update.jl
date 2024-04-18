@@ -373,29 +373,3 @@ function remove_red_pairs!(pairset::Pairset)
     end
     pairset.load = j 
 end
-
-# # this membership test is temporary
-# does_div = false
-# for j in basis.basis_offset:basis.basis_load
-#     tg = gettag(tags, index(basis.sigs[j]))
-#     tg == :col && continue
-#     lm_msk = basis.lm_masks[j]
-#     lm = basis_ht.exponents[first(basis.monomials[j])]
-#     if divch(lm, new_sig_mon,
-#              lm_msk, mask(new_sig_mask))
-#         does_div = true
-#         break
-#     end
-# end
-
-# if !does_div
-#     @info "found something to split with"
-#     mat_ind = length(tr.mats)
-#     cofac_coeffs, cofac_mons = construct_module(new_sig, basis, mat_ind, tr, vchar,
-#                                                 ind_order.max_ind,
-#                                                 ind_order, new_idx)[new_idx]
-#     cofac_mons_hashed = [insert_in_hash_table!(basis_ht, mon) for mon in cofac_mons]
-#     return true, cofac_coeffs, cofac_mons_hashed, new_idx
-# else
-#     @info "cofac contained in ideal, not splitting"
-# end

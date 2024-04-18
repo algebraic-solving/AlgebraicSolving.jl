@@ -120,11 +120,8 @@ function sig_sat(sys::Vector{T}, H::Vector{T}; info_level::Int=0) where {T <: MP
     sysl = length(full_sys)
     for idx in length(sys)+1:sysl
         tags[idx] = :sat
-        for idx2 in idx+1:length(full_sys)
-            ind_order.incompat[(idx, idx2)] = true
-        end
     end
-
+    make_sat_incompat!(tags, ind_order)
 
     # compute divmasks
     fill_divmask!(basis_ht)
@@ -157,26 +154,27 @@ end
 
 function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
 
-    full_sys = vcat(sys, H)
-    
     # data structure setup/conversion
-    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(full_sys)
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
 
     # fill basis, pairset, tags
     basis, _, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht, def_tg=:ndeg)
-    nvrs = ngens(base_ring(first(sys)))
+    R = parent(first(sys))
+    nvrs = ngens(R)
+    r_char = characteristic(R)
     pairset = init_pairset(Val(nvrs))
 
     # compute divmasks
     fill_divmask!(basis_ht)
+    sysl = length(sys)
     @inbounds for i in 1:sysl
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
     end
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
-    # TODO: fix this
     with_logger(logger) do
-        for i in 1:length(sys)
+        for i in 1:sysl
+            @info "sequence index $(i)"
             add_unit_pair!(basis, pairset, i, basis.degs[i])
             added_unit = siggb!(basis, pairset, basis_ht, char, shift,
                                 tags, ind_order, tr, trace=true)
@@ -184,12 +182,49 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
                 return [one(R)]
             end
 
-            # extract suitable random linear combinations
-            # THIS IS SO BORING
-            if i >= 2
-                continue
+            # extract suitable random linear combinations of inserted elements
+            sig_inds = (SigIndex).(collect(eachindex(ind_order.ord)))
+            for idx in sig_inds
+                gettag(tags, idx) != :ndegins && continue
+                # check if element was inserted in previous round
+                gr_inds = filter(idx2 -> gettag(tags, idx2) == :ndeg && !cmp_ind(idx2, idx, ind_order),
+                                 sig_inds)
+                f_ord_ind = ind_order.ord[i]
+                min_gr_ord_ind, _ = findmin(idx2 -> ind_order.ord[idx2], gr_inds)
+                f_ord_ind != min_gr_ord_ind && continue
+
+                # construct nonzero condition to append
+                nz_cfs, nz_mons = Coeff[], MonIdx[]
+                for (j, syz_msk) in enumerate(basis.syz_masks[1:basis.syz_load])
+                    if index(syz_msk) == idx
+                        to_add_cfs, to_add_mns = construct_module((idx, basis.syz_sigs[j]),
+                                                                  basis,
+                                                                  basis_ht,
+                                                                  tr.syz_ind_to_mat[j],
+                                                                  tr,
+                                                                  char,
+                                                                  ind_order, idx)
+                        mul_by_coeff!(to_add_cfs, rand(one(Coeff):Coeff(r_char-1)),
+                                      char)
+                        nz_cfs, nz_mons = add_pols(nz_cfs, nz_mons,
+                                                   to_add_cfs, to_add_mns, char)
+                    end
+                end
+                sort_poly!((nz_cfs, nz_mons), by = midx -> basis_ht.exponents[midx],
+                           lt = lt_drl, rev = true)
+                normalize_cfs!(nz_cfs, char)
+                add_new_sequence_element!(basis, basis_ht, tr, nz_mons, nz_cfs,
+                                          ind_order, ind_order.max_ind+one(SigIndex),
+                                          pairset, tags,
+                                          new_tg = :sat)
+                make_sat_incompat!(tags, ind_order)
             end
+            @info "------------------------------------------"
         end
+
+        @info "final saturation step"
+        siggb!(basis, pairset, basis_ht, char, shift, tags, ind_order, tr, trace=true)
+        @info "------------------------------------------"
 
         # output
         R = parent(first(sys))
@@ -607,6 +642,17 @@ function overwrite!(basis1::Basis,
         basis2.monomials[j]     = basis1.monomials[i]
         basis2.coefficients[j]  = basis1.coefficients[i]
         basis2.is_red[j]        = basis1.is_red[i]
+    end
+end
+
+# make saturators incompatible
+function make_sat_incompat!(tags::Tags, ind_order::IndOrder)
+    for idx in keys(ind_order.ord)
+        gettag(tags, idx) != :sat && continue
+        for idx2 in keys(ind_order.ord)
+            (gettag(tags, idx2) != :sat || idx2 <= idx) && continue
+            ind_order.incompat[(idx, idx2)] = true
+        end
     end
 end
 
