@@ -125,6 +125,7 @@ function sig_sat(sys::Vector{T}, H::Vector{T}; info_level::Int=0) where {T <: MP
         end
     end
 
+
     # compute divmasks
     fill_divmask!(basis_ht)
     @inbounds for i in 1:sysl
@@ -149,6 +150,57 @@ function sig_sat(sys::Vector{T}, H::Vector{T}; info_level::Int=0) where {T <: MP
                                      basis.coefficients[i])
                 push!(outp, pol)
             end
+        end
+        return outp
+    end
+end
+
+function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
+
+    full_sys = vcat(sys, H)
+    
+    # data structure setup/conversion
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(full_sys)
+
+    # fill basis, pairset, tags
+    basis, _, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht, def_tg=:ndeg)
+    nvrs = ngens(base_ring(first(sys)))
+    pairset = init_pairset(Val(nvrs))
+
+    # compute divmasks
+    fill_divmask!(basis_ht)
+    @inbounds for i in 1:sysl
+        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
+    end
+
+    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    # TODO: fix this
+    with_logger(logger) do
+        for i in 1:length(sys)
+            add_unit_pair!(basis, pairset, i, basis.degs[i])
+            added_unit = siggb!(basis, pairset, basis_ht, char, shift,
+                                tags, ind_order, tr, trace=true)
+            if added_unit
+                return [one(R)]
+            end
+
+            # extract suitable random linear combinations
+            # THIS IS SO BORING
+            if i >= 2
+                continue
+            end
+        end
+
+        # output
+        R = parent(first(sys))
+        eltp = typeof(first(sys))
+        outp = eltp[]
+        @inbounds for i in basis.basis_offset:basis.basis_load
+            gettag(tags, index(basis.sigs[i])) == :sat && continue
+            pol = convert_to_pol(R,
+                                 [basis_ht.exponents[m] for m in basis.monomials[i]],
+                                 basis.coefficients[i])
+            push!(outp, pol)
         end
         return outp
     end

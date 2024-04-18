@@ -189,7 +189,7 @@ function process_syzygy!(basis::Basis{N},
     remove_red_pairs!(pairset)
 
     # insert cofactors in saturation computation
-    if tag == :sat
+    if tag in [:sat, :ndeg]
         @info "inserting cofactor from saturation computation"
         # construct cofactor of zero reduction and ins in hashtable
         mat_ind = length(tr.mats)
@@ -209,11 +209,15 @@ function process_syzygy!(basis::Basis{N},
 
         # find order index
         sat_inds = findall(tag -> tag == :sat, tags)
-        ord_ind, _ = findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)
+        if tag == :sat
+            ord_ind, _ = findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)
+        else
+            ord_ind = ind_order.ord[new_idx]
+        end
         add_new_sequence_element!(basis, basis_ht, tr, cofac_mons_hashed,
                                   cofac_coeffs,
                                   ind_order, ord_ind, pairset, tags,
-                                  new_tg = :satins)
+                                  new_tg = tag == :sat ? :satins : :ndegins)
     end
 end
 
