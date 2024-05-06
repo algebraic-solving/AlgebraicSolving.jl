@@ -106,7 +106,6 @@ end
 #-- Masking and hashing --#
 
 # from groebner.jl
-# TODO: make this generated?
 function divmask(e::Monomial{N},
                  divmap,
                  ndivbits) where N
@@ -140,6 +139,10 @@ Base.hash(a::Monomial{N}) where N = makehash(Val(N), a.exps)
 #---------------------#
 
 #-- For Polynomials --#
+
+function is_one(pol::Polynomial, ht::MonomialHashtable)
+    return length(pol[2]) == 1 && all(iszero, ht.exponents[pol[2][1]].exps)
+end
 
 function sort_poly!(pol::Polynomial; kwargs...)
     s = sortperm(pol[2]; kwargs...)
@@ -219,35 +222,6 @@ function add_pols(coeffs1::Vector{Coeff},
     deleteat!(coeffs_res, zero_cfs_inds)
 
     return coeffs_res, mons_res
-end
-
-
-function add_pols_2(cfs1::Vector{Coeff},
-                    exps1::Vector{Monomial{N}},
-                    cfs2::Vector{Coeff},
-                    exps2::Vector{Monomial{N}},
-                    char::Val{Char}) where {N, Char}
-
-    R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
-                             ordering = :degrevlex)
-    p1 = convert_to_pol(R, exps1, cfs1)
-    p2 = convert_to_pol(R, exps2, cfs2)
-    p = p1+p2
-
-    lp = length(p)
-    exps = exponent_vectors(p)
-    cfs = coefficients(p)
-    
-    res_exps = Vector{Monomial{N}}(undef, lp)
-    res_cfs = Vector{Coeff}(undef, lp)
-    @inbounds for (i, (cf, evec)) in enumerate(zip(cfs, exps)) 
-        m = monomial(SVector{N}((Exp).(evec)))
-        cff = Int(lift(ZZ, cf))
-        res_exps[i] = m
-        res_cfs[i] = cff
-    end
-
-    return res_cfs, res_exps
 end
 
 #-------------------------#

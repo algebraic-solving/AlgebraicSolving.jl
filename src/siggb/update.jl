@@ -11,7 +11,8 @@ function update_siggb!(basis::Basis,
                        tr::Tracer,
                        vchar::Val{Char},
                        syz_queue::Vector{SyzInfo},
-                       trace::Bool=false) where {N, Char}
+                       trace::Bool=false,
+                       ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
@@ -34,7 +35,8 @@ function update_siggb!(basis::Basis,
 
             process_syzygy!(basis, basis_ht, pairset, new_sig,
                             new_sig_mask,
-                            tags, ind_order, tr, vchar)
+                            tags, ind_order, tr, vchar,
+                            ndeg_ins_index)
         else
             new_basis_c += 1
             coeffs = matrix.coeffs[i]
@@ -147,7 +149,8 @@ function process_syzygy!(basis::Basis{N},
                          tags::Tags,
                          ind_order::IndOrder,
                          tr::Tracer,
-                         vchar::Val{Char}) where {N, Char}
+                         vchar::Val{Char},
+                         ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char}
 
     new_idx = index(new_sig_mask)
     tag = gettag(tags, new_idx)
@@ -210,7 +213,11 @@ function process_syzygy!(basis::Basis{N},
         # find order index
         sat_inds = findall(tag -> tag == :sat, tags)
         if tag == :sat
-            ord_ind, _ = findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)
+            if iszero(ndeg_ins_index)
+                ord_ind, _ = findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)
+            else
+                ord_ind = ind_order.ord[ndeg_ins_index]
+            end
         else
             ord_ind = ind_order.ord[new_idx]
         end
@@ -345,11 +352,11 @@ function gettag(tags::Tags, i::Integer)
 end
 
 function sort_pairset!(pairset::Pairset, from::Int, sz::Int,
-                       mord::ModOrd)
+                       mord::ModOrd, ind_ord::IndOrder)
     ordr = if mord == :DPOT
         Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
     elseif mord == :POT
-        Base.Sort.ord(isless, p -> (index(p.top_sig), monomial(p.top_sig).deg),
+        Base.Sort.ord(isless, p -> (ind_ord.ord[index(p.top_sig)], monomial(p.top_sig).deg),
                       false, Base.Sort.Forward)
     end
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 

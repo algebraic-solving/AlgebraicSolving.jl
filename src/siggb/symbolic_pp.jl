@@ -165,7 +165,7 @@ function select_normal!(pairset::Pairset{N},
         @info if mod_ord == :DPOT
             "selected $(npairs) pairs, degree $(deg)"
         else
-            "selected $(npairs) pairs, index $(sigind), degree $(deg)"
+            "selected $(npairs) pairs, index $(sigind), order index $(ind_order.ord[sigind]), tag $(gettag(tags, sigind)), degree $(deg)"
         end
         @info "$(added_to_matrix) non-rewriteable critical signatures added to matrix"
     end

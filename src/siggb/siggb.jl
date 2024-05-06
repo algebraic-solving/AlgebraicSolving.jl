@@ -86,7 +86,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
     with_logger(logger) do
         siggb!(basis, pairset, basis_ht, char, shift,
                tags, ind_order, tr, degbound,
-               mod_ord)
+               mod_ord, true)
     end
 
     # output
@@ -154,6 +154,98 @@ function sig_sat(sys::Vector{T}, H::Vector{T}; info_level::Int=0) where {T <: MP
     end
 end
 
+function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
+
+    # data structure setup/conversion
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys, :POT)
+
+    # fill basis, pairset, tags
+    basis, _, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht, def_tg=:ndeg)
+    R = parent(first(sys))
+    nvrs = ngens(R)
+    r_char = characteristic(R)
+    pairset = init_pairset(Val(nvrs))
+
+    # compute divmasks
+    fill_divmask!(basis_ht)
+    sysl = length(sys)
+    @inbounds for i in 1:sysl
+        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
+    end
+
+    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    with_logger(logger) do
+        for i in 1:sysl
+            @info "sequence index $(i)"
+            add_unit_pair!(basis, pairset, i, basis.degs[i])
+            ndeg_ins_index = i < sysl ? SigIndex(i+1) : zero(SigIndex)
+            added_unit = siggb!(basis, pairset, basis_ht, char, shift,
+                                tags, ind_order, tr, 0, :POT, true,
+                                ndeg_ins_index)
+            # if added_unit
+            #     error("alarm")
+            #     return [one(R)]
+            # end
+
+            # extract suitable random linear combinations of inserted elements
+            sig_inds = (SigIndex).(collect(eachindex(ind_order.ord)))
+            for idx in sig_inds
+                gettag(tags, idx) != :ndegins && continue
+                # check if element was inserted in previous round
+                gr_inds = filter(idx2 -> gettag(tags, idx2) == :ndeg && !cmp_ind(idx2, idx, ind_order),
+                                 sig_inds)
+                f_ord_ind = ind_order.ord[i]
+                min_gr_ord_ind, _ = findmin(idx2 -> ind_order.ord[idx2], gr_inds)
+                f_ord_ind != min_gr_ord_ind && continue
+
+                # construct nonzero condition to append
+                nz_cfs, nz_mons = Coeff[], MonIdx[]
+                for (j, syz_msk) in enumerate(basis.syz_masks[1:basis.syz_load])
+                    if index(syz_msk) == idx
+                        to_add_cfs, to_add_mns = construct_module((idx, basis.syz_sigs[j]),
+                                                                  basis,
+                                                                  basis_ht,
+                                                                  tr.syz_ind_to_mat[j],
+                                                                  tr,
+                                                                  char,
+                                                                  ind_order, idx)
+                        mul_by_coeff!(to_add_cfs, rand(one(Coeff):Coeff(r_char-1)),
+                                      char)
+                        nz_cfs, nz_mons = add_pols(nz_cfs, nz_mons,
+                                                   to_add_cfs, to_add_mns, char)
+                    end
+                end
+                is_one((nz_cfs, nz_mons), basis_ht) && continue
+                sort_poly!((nz_cfs, nz_mons), by = midx -> basis_ht.exponents[midx],
+                           lt = lt_drl, rev = true)
+                normalize_cfs!(nz_cfs, char)
+                add_new_sequence_element!(basis, basis_ht, tr, nz_mons, nz_cfs,
+                                          ind_order, ind_order.max_ind+one(SigIndex),
+                                          pairset, tags,
+                                          new_tg = :sat)
+                make_sat_incompat!(tags, ind_order)
+            end
+            @info "------------------------------------------"
+            @info "saturation step"
+            siggb!(basis, pairset, basis_ht, char, shift, tags, ind_order, tr, 0, :POT, true)
+            @info "------------------------------------------"
+        end
+
+        # output
+        R = parent(first(sys))
+        eltp = typeof(first(sys))
+        outp = eltp[]
+        @inbounds for i in basis.basis_offset:basis.basis_load
+            gettag(tags, index(basis.sigs[i])) == :sat && continue
+            pol = convert_to_pol(R,
+                                 [basis_ht.exponents[m] for m in basis.monomials[i]],
+                                 basis.coefficients[i])
+            push!(outp, pol)
+        end
+        return outp
+    end
+end
+
 function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
 
     # data structure setup/conversion
@@ -193,12 +285,13 @@ function siggb!(basis::Basis{N},
                 tr::Tracer,
                 degbound::Int=0,
                 mod_ord::Symbol=:DPOT,
-                trace::Bool=false) where {N, Char, Shift}
+                trace::Bool=false,
+                ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char, Shift}
 
     # fake syz queue
     syz_queue = SyzInfo[]
 
-    sort_pairset!(pairset, 1, pairset.load-1, mod_ord)
+    sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
 
     while !iszero(pairset.load)
         if !iszero(degbound) && first(pairset.elems).deg > degbound
@@ -221,9 +314,10 @@ function siggb!(basis::Basis{N},
 
         added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
                                    basis_ht, ind_order, tags,
-                                   tr, char, syz_queue, trace)
+                                   tr, char, syz_queue, trace,
+                                   ndeg_ins_index)
         added_unit && return true
-        sort_pairset!(pairset, 1, pairset.load-1, mod_ord)
+        sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
     end
 
     return false
@@ -308,7 +402,7 @@ function siggb_for_split!(basis::Basis{N},
     filter!(ind -> gettag(tags, ind) == :split, splitting_inds)
     sort!(splitting_inds, by = ind -> ind_order.ord[ind])
 
-    sort_pairset!(pairset, 1, pairset.load-1)
+    sort_pairset!(pairset, 1, pairset.load-1, ind_order)
 
     lt_squeue = (syz1, syz2) -> begin
         idx1 = index(syz1)
@@ -377,7 +471,7 @@ function siggb_for_split!(basis::Basis{N},
             end
         end
 
-        sort_pairset!(pairset, 1, pairset.load-1)
+        sort_pairset!(pairset, 1, pairset.load-1, ind_order)
     end
     if !isempty(syz_queue)
         sort!(syz_queue, by = sz -> basis.syz_sigs[sz[1]].deg)
