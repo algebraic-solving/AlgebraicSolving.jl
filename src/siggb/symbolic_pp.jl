@@ -4,21 +4,24 @@ function select_normal!(pairset::Pairset{N},
                         ht::MonomialHashtable,
                         symbol_ht::MonomialHashtable,
                         ind_order::IndOrder,
-                        tags::Tags) where N
+                        tags::Tags,
+                        mod_ord::Symbol=:DPOT) where N
 
     # number of selected pairs
     npairs = 0
     min_pair_ind = 0
     deg = Exp(-1) 
+    sigind = zero(SigIndex)
     compat_ind = zero(SigIndex)
     dont_sel = Int[]
     for i in 1:pairset.load
-        if deg == -1
+        if deg == -1 && iszero(sigind)
             deg = pairset.elems[i].deg
+            sigind = index(pairset.elems[i].top_sig)
             npairs += 1
             continue
         end
-        if pairset.elems[i].deg == deg
+        if pairset.elems[i].deg == deg && (mod_ord != :POT || index(pairset.elems[i].top_sig) == sigind)
             npairs += 1
             top_s_idx = index(pairset.elems[i].top_sig)
             if iszero(compat_ind) && gettag(tags, top_s_idx) == :sat
@@ -31,7 +34,6 @@ function select_normal!(pairset::Pairset{N},
         end
     end
 
-    @info "selected $(npairs) pairs, degree $(deg)"
     added_to_matrix = 0
 
     # allocate matrix
@@ -160,6 +162,11 @@ function select_normal!(pairset::Pairset{N},
     end
                 
     if !iszero(added_to_matrix)
+        @info if mod_ord == :DPOT
+            "selected $(npairs) pairs, degree $(deg)"
+        else
+            "selected $(npairs) pairs, index $(sigind), degree $(deg)"
+        end
         @info "$(added_to_matrix) non-rewriteable critical signatures added to matrix"
     end
 

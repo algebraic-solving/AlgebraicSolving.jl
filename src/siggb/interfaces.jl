@@ -1,4 +1,4 @@
-function input_setup(sys::Vector{<:MPolyRingElem})
+function input_setup(sys::Vector{<:MPolyRingElem}, mod_ord::Symbol=:DPOT)
 
     if isempty(sys)
         error("Input system is empty.")
@@ -18,10 +18,12 @@ function input_setup(sys::Vector{<:MPolyRingElem})
         if deg > typemax(Exp)
             error("input degrees too large.")
         end
-        degs[i] = Exp(deg)
-        for m in exponent_vectors(f)
-            if sum(m) != deg
-                error("input system must be homogeneous.")
+        if mod_ord == :DPOT
+            degs[i] = Exp(deg)
+            for m in exponent_vectors(f)
+                if sum(m) != deg
+                    error("input system must be homogeneous.")
+                end
             end
         end
     end

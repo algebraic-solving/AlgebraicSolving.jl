@@ -12,6 +12,8 @@ const ColIdx = UInt32
 const Coeff = UInt32
 # 64 bit buffer
 const Cbuf = UInt64
+# module order
+const ModOrd = Symbol
 
 struct Monomial{N}
     deg::Exp
@@ -65,7 +67,6 @@ mutable struct Basis{N}
     syz_size::Int
 end
 
-# TODO: should these be stored in a more vectorized way?
 mutable struct SPair{N}
     top_sig::Sig{N}
     bot_sig::Sig{N}

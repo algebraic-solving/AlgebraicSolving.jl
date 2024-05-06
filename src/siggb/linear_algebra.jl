@@ -2,7 +2,7 @@ function echelonize!(matrix::MacaulayMatrix,
                      tags::Tags,
                      ind_order::IndOrder,
                      char::Val{Char},
-                     shift::Val{Shift};
+                     shift::Val{Shift},
                      trace::Bool=true) where {Char, Shift}
 
     arit_ops = 0

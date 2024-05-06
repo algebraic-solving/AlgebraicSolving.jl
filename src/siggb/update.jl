@@ -10,8 +10,8 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       syz_queue::Vector{SyzInfo};
-                       kwargs...) where {N, Char}
+                       syz_queue::Vector{SyzInfo},
+                       trace::Bool=false) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
@@ -42,7 +42,7 @@ function update_siggb!(basis::Basis,
             added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
                                          row, coeffs,
                                          new_sig, new_sig_mask, parent_ind,
-                                         tr, ind_order, tags; kwargs...)
+                                         tr, ind_order, tags, trace)
         end
     end
 
@@ -64,7 +64,7 @@ function add_basis_elem!(basis::Basis{N},
                          parent_ind::Int,
                          tr::Tracer,
                          ind_order::IndOrder,
-                         tags::Tags;
+                         tags::Tags,
                          trace::Bool=true) where N
 
 
@@ -344,8 +344,14 @@ function gettag(tags::Tags, i::Integer)
     return get(tags, SigIndex(i), :seq)
 end
 
-function sort_pairset_by_degree!(pairset::Pairset, from::Int, sz::Int)
-    ordr = Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
+function sort_pairset!(pairset::Pairset, from::Int, sz::Int,
+                       mord::ModOrd)
+    ordr = if mord == :DPOT
+        Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
+    elseif mord == :POT
+        Base.Sort.ord(isless, p -> (index(p.top_sig), monomial(p.top_sig).deg),
+                      false, Base.Sort.Forward)
+    end
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 
 end
 
