@@ -200,18 +200,13 @@ function process_syzygies!(basis::Basis{N},
             # construct cofactor of zero reduction and ins in hashtable
             mat_ind = length(tr.mats)
             @info "constructing module"
-            cofac = construct_module(new_sig, basis,
-                                     basis_ht,
-                                     mat_ind, tr,
-                                     vchar,
-                                     ind_order,
-                                     new_idx)
-            sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
-                       lt = lt_drl, rev = true)
+            cofac = construct_module_wrap(new_sig, basis,
+                                          basis_ht,
+                                          mat_ind, tr,
+                                          vchar,
+                                          ind_order,
+                                          new_idx)
             cofac_coeffs, cofac_mons_hashed = cofac
-
-            # normalize coefficients
-            normalize_cfs!(cofac_coeffs, vchar)
 
             # find order index
             sat_inds = findall(tag -> tag == :sat, tags)

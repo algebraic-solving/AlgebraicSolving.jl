@@ -591,11 +591,11 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
                 proc_info[cofac_ind] = true
                 continue
             end
-            tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module((syz_ind, syz_mon), basis,
-                                                                           basis_ht,
-                                                                           tr_ind,
-                                                                           tr, char,
-                                                                           ind_order, cofac_ind)
+            tim = @elapsed cofac_coeffs, cofac_mons_hsh = construct_module_wrap((syz_ind, syz_mon), basis,
+                                                                                basis_ht,
+                                                                                tr_ind,
+                                                                                tr, char,
+                                                                                ind_order, cofac_ind)
             timer.module_time += tim
             proc_info[cofac_ind] = true
             if isempty(cofac_coeffs)
@@ -613,14 +613,6 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
         if found_zd
             break
         end    
-    end
-
-    if found_zd
-        sort_poly!((zd_coeffs, zd_mons_hsh),
-                   by = midx -> basis_ht.exponents[midx],
-                   lt = lt_drl, rev = true)
-        # normalize cofac coefficients
-        normalize_cfs!(zd_coeffs, char)
     end
 
     deleteat!(syz_queue, to_del)

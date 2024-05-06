@@ -1,3 +1,30 @@
+function construct_module_wrap(sig::Sig{N},
+                               basis::Basis{N},
+                               basis_ht::MonomialHashtable{N},
+                               mat_index::Int,
+                               tr::Tracer,
+                               vchar::Val{Char},
+                               ind_ord::IndOrder,
+                               idx::SigIndex) where {N, Char}
+
+    cofac_coeffs, cofac_mons_hsh = construct_module(sig, basis,
+                                                    basis_ht,
+                                                    mat_index,
+                                                    tr, vchar,
+                                                    ind_ord, idx)
+
+    if !isempty(cofac_coeffs)
+        sort_poly!((cofac_coeffs, cofac_mons_hsh),
+                   by = midx -> basis_ht.exponents[midx],
+                   lt = lt_drl, rev = true)
+        # normalize cofac coefficients
+        normalize_cfs!(cofac_coeffs, vchar)
+    end
+
+    return cofac_coeffs, cofac_mons_hsh
+end
+
+    
 function construct_module(basis::Basis{N},
                           basis_ht::MonomialHashtable{N},
                           basis_index::Int,
@@ -129,35 +156,4 @@ function construct_module_core(sig::Sig{N},
     mul_by_coeff!(res_mod_cfs, diag_coeff, vchar)
 
     return res_mod_cfs, res_mod_mns
-end
-
-# functions for polynomials
-function mul_by_mon(mons::Vector{M},
-                    mon::M) where {M <: Monomial}
-
-    mons_res = Vector{M}(undef, length(mons))
-    @inbounds for i in 1:length(mons)
-        mons_res[i] = mul(mon, mons[i])
-    end
-    return mons_res
-end
-
-function mul_by_coeff(coeffs::Vector{Coeff},
-                      c::Coeff,
-                      vchar::Val{Char}) where Char 
-
-    coeffs_res = Vector{Coeff}(undef, length(coeffs))
-    @inbounds for i in 1:length(coeffs)
-        coeffs_res[i] = mul(c, coeffs[i], vchar)
-    end
-    return coeffs_res
-end
-
-function mul_by_coeff!(coeffs::Vector{Coeff},
-                       c::Coeff,
-                       vchar::Val{Char}) where Char 
-
-    @inbounds for i in 1:length(coeffs)
-        coeffs[i] = mul(c, coeffs[i], vchar)
-    end
 end

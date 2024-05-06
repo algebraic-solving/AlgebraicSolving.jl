@@ -224,6 +224,36 @@ function add_pols(coeffs1::Vector{Coeff},
     return coeffs_res, mons_res
 end
 
+function mul_by_mon(mons::Vector{M},
+                    mon::M) where {M <: Monomial}
+
+    mons_res = Vector{M}(undef, length(mons))
+    @inbounds for i in 1:length(mons)
+        mons_res[i] = mul(mon, mons[i])
+    end
+    return mons_res
+end
+
+function mul_by_coeff(coeffs::Vector{Coeff},
+                      c::Coeff,
+                      vchar::Val{Char}) where Char 
+
+    coeffs_res = Vector{Coeff}(undef, length(coeffs))
+    @inbounds for i in 1:length(coeffs)
+        coeffs_res[i] = mul(c, coeffs[i], vchar)
+    end
+    return coeffs_res
+end
+
+function mul_by_coeff!(coeffs::Vector{Coeff},
+                       c::Coeff,
+                       vchar::Val{Char}) where Char 
+
+    @inbounds for i in 1:length(coeffs)
+        coeffs[i] = mul(c, coeffs[i], vchar)
+    end
+end
+
 #-------------------------#
 
 # for readibility
