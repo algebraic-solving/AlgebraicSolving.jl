@@ -84,9 +84,10 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
-        siggb!(basis, pairset, basis_ht, char, shift,
-               tags, ind_order, tr, degbound,
-               mod_ord, true)
+        _, arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
+                             tags, ind_order, tr, degbound,
+                             mod_ord, true)
+        @info "$(arit_ops) total submul's"
     end
 
     # output
@@ -133,8 +134,8 @@ function sig_sat(sys::Vector{T}, H::Vector{T}; info_level::Int=0) where {T <: MP
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
-        added_unit = siggb!(basis, pairset, basis_ht, char, shift,
-                            tags, ind_order, tr, trace=true)
+        added_unit, _ = siggb!(basis, pairset, basis_ht, char, shift,
+                               tags, ind_order, tr, trace=true)
         # output
         R = parent(first(sys))
         eltp = typeof(first(sys))
@@ -175,22 +176,20 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
+        arit_ops = 0
         for i in 1:sysl
             @info "sequence index $(i)"
             add_unit_pair!(basis, pairset, i, basis.degs[i])
             ndeg_ins_index = i < sysl ? SigIndex(i+1) : zero(SigIndex)
-            added_unit = siggb!(basis, pairset, basis_ht, char, shift,
-                                tags, ind_order, tr, 0, :POT, true,
-                                ndeg_ins_index)
-            # if added_unit
-            #     error("alarm")
-            #     return [one(R)]
-            # end
+            added_unit, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
+                                              tags, ind_order, tr, 0, :POT, true,
+                                              ndeg_ins_index)
+            arit_ops += new_arit_ops
 
             # extract suitable random linear combinations of inserted elements
             sig_inds = (SigIndex).(collect(eachindex(ind_order.ord)))
             for idx in sig_inds
-                gettag(tags, idx) != :ndegins && continue
+                gettag(tags, idx) != :fndegins && continue
                 # check if element was inserted in previous round
                 gr_inds = filter(idx2 -> gettag(tags, idx2) == :ndeg && !cmp_ind(idx2, idx, ind_order),
                                  sig_inds)
@@ -219,7 +218,7 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
                 sort_poly!((nz_cfs, nz_mons), by = midx -> basis_ht.exponents[midx],
                            lt = lt_drl, rev = true)
                 normalize_cfs!(nz_cfs, char)
-                add_new_sequence_element!(basis, basis_ht, tr, nz_mons, nz_cfs,
+                add_new_sequence_element!(basis, basis_ht, tr, nz_cfs, nz_mons,
                                           ind_order, ind_order.max_ind+one(SigIndex),
                                           pairset, tags,
                                           new_tg = :sat)
@@ -227,8 +226,12 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
             end
             @info "------------------------------------------"
             @info "saturation step"
-            siggb!(basis, pairset, basis_ht, char, shift, tags, ind_order, tr, 0, :POT, true)
+            _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
+                                     tags, ind_order, tr, 0, :POT, true,
+                                     ndeg_ins_index)
+            arit_ops += new_arit_ops
             @info "------------------------------------------"
+            @info "$(arit_ops) total submul's"
         end
 
         # output
@@ -265,7 +268,7 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     result = with_logger(logger) do
         R = parent(first(sys))
-        timer = Timings(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        timer = new_timer()
         lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift,
                               tags, ind_order, tr, R, timer)
         @info timer
@@ -290,6 +293,7 @@ function siggb!(basis::Basis{N},
 
     # fake syz queue
     syz_queue = SyzInfo[]
+    arit_ops = 0
 
     sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
 
@@ -300,15 +304,17 @@ function siggb!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        _, compat_ind = select_normal!(pairset, basis, matrix,
-                                       basis_ht, symbol_ht, ind_order, tags,
-                                       mod_ord)
+        _, compat_ind, sigind = select_normal!(pairset, basis, matrix,
+                                               basis_ht, symbol_ht, ind_order, tags,
+                                               mod_ord)
         symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
-                     ind_order, tags, compat_ind)
+                     ind_order, tags, sigind, compat_ind,
+                     mod_ord)
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tr_mat = echelonize!(matrix, tags, ind_order, char,
-                             shift, trace)
+        tr_mat, arit_ops_new = echelonize!(matrix, tags, ind_order, char,
+                                           shift, trace)
+        arit_ops += arit_ops_new
 
         trace && push!(tr.mats, tr_mat)
 
@@ -316,11 +322,13 @@ function siggb!(basis::Basis{N},
                                    basis_ht, ind_order, tags,
                                    tr, char, syz_queue, trace,
                                    ndeg_ins_index)
-        added_unit && return true
+        if added_unit
+            return true, arit_ops
+        end
         sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
     end
 
-    return false
+    return false, arit_ops
 end
 
 #---------------- functions for splitting --------------------#
@@ -433,7 +441,7 @@ function siggb_for_split!(basis::Basis{N},
 
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tim = @elapsed tr_mat = echelonize!(matrix, tags, ind_order, char, shift)
+        tim = @elapsed tr_mat, _ = echelonize!(matrix, tags, ind_order, char, shift)
         timer.lin_alg_time += tim
 
         push!(tr.mats, tr_mat)
@@ -535,7 +543,7 @@ function split!(basis::Basis{N},
 
         # insert zd in system
         s_ind = add_new_sequence_element!(basis, basis_ht, tr,
-                                          cofac_mons_hsh, cofac_coeffs,
+                                          cofac_coeffs, cofac_mons_hsh,
                                           ind_order, ord_ind, pairset,
                                           tags, new_tg = :split)
 
@@ -755,12 +763,16 @@ function _is_gb(basis::Basis{N}, basis_ht::MonomialHashtable,
     return true
 end
 
+function new_timer()
+    return Timings(0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0)
+end
+
 function Base.show(io::IO, timer::Timings)
     @printf io "\n"
     @printf io "symbolic pp:         %.2f\n" timer.sym_pp_time
     @printf io "linear algebra:      %.2f\n" timer.lin_alg_time
     @printf io "select:              %.2f\n" timer.select_time
     @printf io "update:              %.2f\n" timer.update_time
-    @printf io "module construction: %.2f\n" timer.module_time
-    @printf io "splitting:           %.2f\n" timer.comp_lc_time
+    !iszero(timer.module_time) && @printf io "module construction: %.2f\n" timer.module_time
+    !iszero(timer.comp_lc_time) && @printf io "splitting:           %.2f\n" timer.comp_lc_time
 end

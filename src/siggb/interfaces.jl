@@ -76,8 +76,8 @@ function fill_structs!(sys_mons::Vector{Vector{MonIdx}},
         lm = basis_ht.exponents[first(mons)]
         lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
 
-        add_new_sequence_element!(basis, basis_ht, tr, mons,
-                                  coeffs, ind_order, SigIndex(i),
+        add_new_sequence_element!(basis, basis_ht, tr, coeffs, mons,
+                                  ind_order, SigIndex(i),
                                   pairset, tags, new_tg = def_tg)
     end
 
@@ -201,8 +201,8 @@ end
 function add_new_sequence_element!(basis::Basis{N},
                                    basis_ht::MonomialHashtable{N},
                                    tr::Tracer,
-                                   mons::Vector{MonIdx},
                                    coeffs::Vector{Coeff},
+                                   mons::Vector{MonIdx},
                                    ind_ord::IndOrder,
                                    ord_ind::SigIndex,
                                    pairset::Pairset{N},

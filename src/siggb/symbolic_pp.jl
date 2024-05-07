@@ -180,7 +180,7 @@ function select_normal!(pairset::Pairset{N},
         pairset.elems[i] = pairset.elems[i+npairs-l+1]
     end
     pairset.load -= npairs
-    return deg, compat_ind
+    return deg, compat_ind, sigind
 end
 
 function symbolic_pp!(basis::Basis{N},
@@ -189,7 +189,9 @@ function symbolic_pp!(basis::Basis{N},
                       symbol_ht::MonomialHashtable,
                       ind_order::IndOrder,
                       tags::Tags,
-                      compat_ind::SigIndex=zero(SigIndex)) where N
+                      sigind::SigIndex=zero(SigIndex),
+                      compat_ind::SigIndex=zero(SigIndex),
+                      mod_ord::Symbol=:DPOT) where N
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
@@ -229,7 +231,10 @@ function symbolic_pp!(basis::Basis{N},
         j = basis.basis_offset 
         @label target
         # find element in basis which divmask divides divmask of monomial
-        @inbounds while j <= basis.basis_load && !basis.is_red[j] && !divch(basis.lm_masks[j], divm)
+        @inbounds while (j <= basis.basis_load
+                         && !basis.is_red[j]
+                         && !divch(basis.lm_masks[j], divm)
+                         && (mod_ord != :POT || cmp_ind(index(basis.sigs[j]), sigind, ind_order)))
             j += 1
         end
 

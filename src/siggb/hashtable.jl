@@ -21,42 +21,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-mutable struct Hashvalue
-    hash::MonHash
-    divmask::DivMask
-end
-
 function copy_hashvalue(x::Hashvalue)
     Hashvalue(x.hash, x.divmask)
 end
-
-# Hashtable designed to store monomials
-mutable struct MonomialHashtable{N}
-    exponents::Vector{Monomial{N}}
-
-    # for buffering exponent vectors during certain operations
-    buffer::MVector{N, Exp}
-
-    # maps exponent hash to its position in exponents array
-    hashtable::Vector{MonIdx}
-
-    # stores hashes, division masks,
-    # and other valuable info
-    # for each hashtable enrty
-    hashdata::Vector{Hashvalue}
-
-    #= Monom divisibility =#
-    # divisor map to check divisibility faster
-    divmap::Vector{UInt32}
-    # bits per div variable
-    ndivbits::Int
-
-    size::Int
-    # elements added
-    load::Int
-end
-
-#------------------------------------------------------------------------------
 
 # Returns the next look-up position in the table 
 function nexthashindex(h::MonHash, j::MonHash, mod::MonHash)

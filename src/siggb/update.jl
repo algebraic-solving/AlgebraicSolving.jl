@@ -45,10 +45,12 @@ function update_siggb!(basis::Basis,
                                          tr, ind_order, tags, trace)
         end
     end
-    @inbounds process_syzygies!(basis, basis_ht, pairset,
-                                matrix.sigs[syz_inds],
-                                tags, ind_order, tr, vchar,
-                                ndeg_ins_index)
+    if !isempty(syz_inds)
+        @inbounds process_syzygies!(basis, basis_ht, pairset,
+                                    matrix.sigs[syz_inds],
+                                    tags, ind_order, tr, vchar,
+                                    ndeg_ins_index)
+    end
 
     if new_basis_c != 0 || new_syz_c != 0
         @info "$(new_basis_c) new, $(new_syz_c) zero"
@@ -153,7 +155,9 @@ function process_syzygies!(basis::Basis{N},
                            vchar::Val{Char},
                            ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char}
 
-    for new_sig in syz_sigs
+    cofacs = Polynomial[]
+
+    @inbounds for (i, new_sig) in enumerate(syz_sigs)
         new_sig_mask = (index(new_sig), divmask(monomial(new_sig), basis_ht.divmap, basis_ht.ndivbits))
         new_idx = index(new_sig_mask)
         tag = gettag(tags, new_idx)
@@ -194,36 +198,57 @@ function process_syzygies!(basis::Basis{N},
         # remove pairs that became rewriteable in previous loop
         remove_red_pairs!(pairset)
 
-        # insert cofactors in saturation computation
+        # insert cofactors in saturation/ndeg computation
         if tag in [:sat, :ndeg]
-            @info "inserting cofactor from saturation computation"
             # construct cofactor of zero reduction and ins in hashtable
             mat_ind = length(tr.mats)
             @info "constructing module"
-            cofac = construct_module_wrap(new_sig, basis,
-                                          basis_ht,
-                                          mat_ind, tr,
-                                          vchar,
-                                          ind_order,
-                                          new_idx)
-            cofac_coeffs, cofac_mons_hashed = cofac
-
-            # find order index
-            sat_inds = findall(tag -> tag == :sat, tags)
-            if tag == :sat
-                if iszero(ndeg_ins_index)
-                    ord_ind, _ = findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)
-                else
-                    ord_ind = ind_order.ord[ndeg_ins_index]
-                end
+            cofac = construct_module(new_sig, basis,
+                                     basis_ht,
+                                     mat_ind, tr,
+                                     vchar,
+                                     ind_order,
+                                     new_idx)
+            if isempty(cofacs)
+                push!(cofacs, cofac)
             else
-                ord_ind = ind_order.ord[new_idx]
+                cofacs[1] = add_pols(cofac..., cofacs[1]..., vchar, rand(one(Coeff):Coeff(Char)))
+                sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
+                           lt = lt_drl, rev = true)
+                normalize_cfs!(cofac[1], vchar)
+                push!(cofacs, cofac)
             end
-            add_new_sequence_element!(basis, basis_ht, tr, cofac_mons_hashed,
-                                      cofac_coeffs,
-                                      ind_order, ord_ind, pairset, tags,
-                                      new_tg = tag == :sat ? :satins : :ndegins)
         end
+    end
+
+    isempty(cofacs) && return
+    syz_ind = index(first(syz_sigs))
+    @assert all(sig -> index(sig) == syz_ind, syz_sigs)
+    tag = gettag(tags, index(first(syz_sigs)))
+    for (i, cofac) in enumerate(cofacs)
+        ord_ind = if tag == :sat
+            if iszero(ndeg_ins_index)
+                sat_inds = findall(tag -> tag == :sat, tags)
+                findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)[1]
+            else
+                ind_order.ord[ndeg_ins_index]
+            end
+        else
+            ind_order.ord[syz_ind]
+        end
+        if isone(i)
+            sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
+                       lt = lt_drl, rev = true)
+            normalize_cfs!(cofac[1], vchar)
+        end
+        new_tg = if tag == :sat
+            isone(i) ? :fsatins : :satins
+        else
+            isone(i) ? :fndegins : :ndegins
+        end
+        add_new_sequence_element!(basis, basis_ht, tr, cofac...,
+                                  ind_order, ord_ind, pairset, tags,
+                                  new_tg = new_tg)
     end
 end
 

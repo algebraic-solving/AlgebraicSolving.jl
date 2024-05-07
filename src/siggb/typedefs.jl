@@ -22,6 +22,38 @@ end
 function monomial(exps::SV) where {N, SV <: StaticArray{Tuple{N}}}
     return Monomial{N}(sum(exps), exps)
 end
+
+mutable struct Hashvalue
+    hash::MonHash
+    divmask::DivMask
+end
+
+# Hashtable designed to store monomials
+mutable struct MonomialHashtable{N}
+    exponents::Vector{Monomial{N}}
+
+    # for buffering exponent vectors during certain operations
+    buffer::MVector{N, Exp}
+
+    # maps exponent hash to its position in exponents array
+    hashtable::Vector{MonIdx}
+
+    # stores hashes, division masks,
+    # and other valuable info
+    # for each hashtable enrty
+    hashdata::Vector{Hashvalue}
+
+    #= Monom divisibility =#
+    # divisor map to check divisibility faster
+    divmap::Vector{UInt32}
+    # bits per div variable
+    ndivbits::Int
+
+    size::Int
+    # elements added
+    load::Int
+end
+
 const Sig{N} = Tuple{SigIndex, Monomial{N}}
 const MaskSig = Tuple{SigIndex, DivMask}
 
@@ -192,6 +224,7 @@ mutable struct Timings
     lin_alg_time::Float32
     select_time::Float32
     update_time::Float32
+    arit_ops::Int64
     module_time::Float32
     comp_lc_time::Float32
 end

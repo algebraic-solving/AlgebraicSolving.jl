@@ -170,7 +170,9 @@ function add_pols(coeffs1::Vector{Coeff},
                   mons1::Vector{MonIdx},
                   coeffs2::Vector{Coeff},
                   mons2::Vector{MonIdx},
-                  vch::Val{Char}) where {Char}
+                  vch::Val{Char},
+                  scalar1::Coeff=one(Coeff),
+                  scalar2::Coeff=one(Coeff)) where {Char}
 
     l1 = length(mons1)
     l2 = length(mons2)
@@ -186,16 +188,18 @@ function add_pols(coeffs1::Vector{Coeff},
         m2 = mons2[ind2]
         if m1 == m2
             mons_res[new_l] = m1
-            coeffs_res[new_l] = add(coeffs1[ind1], coeffs2[ind2], vch)
+            coeffs_res[new_l] = add(mul(scalar1, coeffs1[ind1], vch),
+                                    mul(scalar2, coeffs2[ind2], vch),
+                                    vch)
             ind1 += 1
             ind2 += 1
         elseif m1 < m2
             mons_res[new_l] = m1
-            coeffs_res[new_l] = coeffs1[ind1]
+            coeffs_res[new_l] = mul(scalar1, coeffs1[ind1], vch)
             ind1 += 1
         else
             mons_res[new_l] = m2
-            coeffs_res[new_l] = coeffs2[ind2]
+            coeffs_res[new_l] = mul(scalar2, coeffs2[ind2], vch)
             ind2 += 1
         end
     end
@@ -203,14 +207,14 @@ function add_pols(coeffs1::Vector{Coeff},
     while ind1 <= l1
         new_l += 1
         mons_res[new_l] = mons1[ind1]
-        coeffs_res[new_l] = coeffs1[ind1]
+        coeffs_res[new_l] = mul(scalar1, coeffs1[ind1], vch)
         ind1 += 1
     end
 
     while ind2 <= l2 
         new_l += 1
         mons_res[new_l] = mons2[ind2]
-        coeffs_res[new_l] = coeffs2[ind2]
+        coeffs_res[new_l] = mul(scalar2, coeffs2[ind2], vch)
         ind2 += 1
     end
 
