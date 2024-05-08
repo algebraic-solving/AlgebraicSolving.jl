@@ -200,7 +200,7 @@ function process_syzygies!(basis::Basis{N},
 
         # insert cofactors in saturation/ndeg computation
         if tag in [:sat, :ndeg]
-            # construct cofactor of zero reduction and ins in hashtable
+            # construct cofactors of zero reduction and ins in hashtable
             mat_ind = length(tr.mats)
             @info "constructing module"
             cofac = construct_module(new_sig, basis,
@@ -221,6 +221,7 @@ function process_syzygies!(basis::Basis{N},
         end
     end
 
+    # insert cofactors in system
     isempty(cofacs) && return
     syz_ind = index(first(syz_sigs))
     @assert all(sig -> index(sig) == syz_ind, syz_sigs)
