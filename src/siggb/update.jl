@@ -11,6 +11,7 @@ function update_siggb!(basis::Basis,
                        tr::Tracer,
                        vchar::Val{Char},
                        syz_queue::Vector{SyzInfo},
+                       conn_indices::IndConn,
                        trace::Bool=false,
                        ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char}
 
@@ -49,6 +50,7 @@ function update_siggb!(basis::Basis,
         @inbounds process_syzygies!(basis, basis_ht, pairset,
                                     matrix.sigs[syz_inds],
                                     tags, ind_order, tr, vchar,
+                                    conn_indices,
                                     ndeg_ins_index)
     end
 
@@ -153,9 +155,25 @@ function process_syzygies!(basis::Basis{N},
                            ind_order::IndOrder,
                            tr::Tracer,
                            vchar::Val{Char},
+                           conn_indices::IndConn,
                            ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char}
 
     cofacs = Polynomial[]
+
+    if length(unique([index(sig) for sig in syz_sigs])) != 1
+        ids = unique([index(sig) for sig in syz_sigs])
+        println((Int).(unique(ids)))
+        println((Int).([ind_order.ord[i] for i in ids]))
+        error("oh no")
+    end
+        
+
+    # @inbounds for i in 1:length(syz_sigs)
+    #     syz_sig = syz_sigs[i]
+    #     for idx in get(conn_indices, index(syz_sig), SigIndex[])
+    #         push!(syz_sigs, (idx, monomial(syz_sig)))
+    #     end
+    # end
 
     @inbounds for (i, new_sig) in enumerate(syz_sigs)
         new_sig_mask = (index(new_sig), divmask(monomial(new_sig), basis_ht.divmap, basis_ht.ndivbits))
@@ -226,6 +244,7 @@ function process_syzygies!(basis::Basis{N},
     syz_ind = index(first(syz_sigs))
     @assert all(sig -> index(sig) == syz_ind, syz_sigs)
     tag = gettag(tags, index(first(syz_sigs)))
+    new_f_idx = zero(SigIndex)
     for (i, cofac) in enumerate(cofacs)
         ord_ind = if tag == :sat
             if iszero(ndeg_ins_index)
@@ -247,9 +266,15 @@ function process_syzygies!(basis::Basis{N},
         else
             isone(i) ? :fndegins : :ndegins
         end
-        add_new_sequence_element!(basis, basis_ht, tr, cofac...,
-                                  ind_order, ord_ind, pairset, tags,
-                                  new_tg = new_tg)
+        new_ind = add_new_sequence_element!(basis, basis_ht, tr, cofac...,
+                                            ind_order, ord_ind, pairset, tags,
+                                            new_tg = new_tg)
+        if isone(i)
+            new_f_idx = new_ind
+            conn_indices[new_f_idx] = SigIndex[]
+        else
+            push!(conn_indices[new_f_idx], new_ind)
+        end
     end
 end
 
@@ -332,16 +357,16 @@ function update_pairset!(pairset::Pairset{N},
                                       basis_ht.ndivbits)
 
         # check both pair sigs against non-trivial syzygies
-        rewriteable_syz(basis, new_pair_sig,
-                        new_pair_sig_mask, tags) && continue
-        rewriteable_syz(basis, basis_pair_sig,
-                        basis_pair_sig_mask, tags) && continue
+        # rewriteable_syz(basis, new_pair_sig,
+        #                 new_pair_sig_mask, tags) && continue
+        # rewriteable_syz(basis, basis_pair_sig,
+        #                 basis_pair_sig_mask, tags) && continue
 
         # check both pair signatures against koszul syzygies
-        rewriteable_koszul(basis, basis_ht, new_pair_sig,
-                           new_pair_sig_mask, ind_order, tags) && continue
-        rewriteable_koszul(basis, basis_ht, basis_pair_sig,
-                           basis_pair_sig_mask, ind_order, tags) && continue
+        # rewriteable_koszul(basis, basis_ht, new_pair_sig,
+        #                    new_pair_sig_mask, ind_order, tags) && continue
+        # rewriteable_koszul(basis, basis_ht, basis_pair_sig,
+        #                    basis_pair_sig_mask, ind_order, tags) && continue
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin
@@ -381,7 +406,8 @@ function sort_pairset!(pairset::Pairset, from::Int, sz::Int,
     ordr = if mord == :DPOT
         Base.Sort.ord(isless, p -> p.deg, false, Base.Sort.Forward)
     elseif mord == :POT
-        Base.Sort.ord(isless, p -> (ind_ord.ord[index(p.top_sig)], monomial(p.top_sig).deg),
+        Base.Sort.ord(isless, p -> (ind_ord.ord[index(p.top_sig)],
+                                    monomial(p.top_sig).deg),
                       false, Base.Sort.Forward)
     end
     sort!(pairset.elems, from, from+sz, def_sort_alg, ordr) 

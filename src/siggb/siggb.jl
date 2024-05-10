@@ -177,13 +177,14 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
         arit_ops = 0
+        ind_conn = IndConn()
         for i in 1:sysl
             @info "sequence index $(i)"
             add_unit_pair!(basis, pairset, i, basis.degs[i])
             ndeg_ins_index = i < sysl ? SigIndex(i+1) : zero(SigIndex)
             added_unit, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
                                               tags, ind_order, tr, 0, :POT, true,
-                                              ndeg_ins_index)
+                                              ndeg_ins_index, ind_conn)
             arit_ops += new_arit_ops
 
             # extract suitable random linear combinations of inserted elements
@@ -228,7 +229,7 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
             @info "saturation step"
             _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
                                      tags, ind_order, tr, 0, :POT, true,
-                                     ndeg_ins_index)
+                                     ndeg_ins_index, ind_conn)
             arit_ops += new_arit_ops
             @info "------------------------------------------"
             @info "$(arit_ops) total submul's"
@@ -289,7 +290,8 @@ function siggb!(basis::Basis{N},
                 degbound::Int=0,
                 mod_ord::Symbol=:DPOT,
                 trace::Bool=false,
-                ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char, Shift}
+                ndeg_ins_index::SigIndex=zero(SigIndex),
+                conn_indices::IndConn=IndConn()) where {N, Char, Shift}
 
     # fake syz queue
     syz_queue = SyzInfo[]
@@ -320,7 +322,8 @@ function siggb!(basis::Basis{N},
 
         added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
                                    basis_ht, ind_order, tags,
-                                   tr, char, syz_queue, trace,
+                                   tr, char, syz_queue, conn_indices,
+                                   trace,
                                    ndeg_ins_index)
         if added_unit
             return true, arit_ops

@@ -181,6 +181,9 @@ const Tags = Dict{SigIndex, Symbol}
 # For syzygy processing during splitting
 const SyzInfo = Tuple{SigIndex, Dict{SigIndex, Bool}}
 
+# For syzygy processing in nondegenerate locus
+const IndConn = Dict{SigIndex, Vector{SigIndex}}
+
 # For output of decomp algorithms
 abstract type AffineCell end
 

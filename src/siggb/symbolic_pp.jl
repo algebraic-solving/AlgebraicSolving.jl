@@ -15,15 +15,16 @@ function select_normal!(pairset::Pairset{N},
     compat_ind = zero(SigIndex)
     dont_sel = Int[]
     for i in 1:pairset.load
+        pe = pairset.elems[i]
         if deg == -1 && iszero(sigind)
-            deg = pairset.elems[i].deg
-            sigind = index(pairset.elems[i].top_sig)
+            deg = mod_ord == :DPOT ? pe.deg : monomial(pe.top_sig).deg
+            sigind = index(pe.top_sig)
             npairs += 1
             continue
         end
-        if pairset.elems[i].deg == deg && (mod_ord != :POT || index(pairset.elems[i].top_sig) == sigind)
+        if should_select(pairset, i, deg, sigind, mod_ord)
             npairs += 1
-            top_s_idx = index(pairset.elems[i].top_sig)
+            top_s_idx = index(pe.top_sig)
             if iszero(compat_ind) && gettag(tags, top_s_idx) == :sat
                 compat_ind = top_s_idx
             elseif are_incompat(top_s_idx, compat_ind, ind_order)
@@ -165,7 +166,7 @@ function select_normal!(pairset::Pairset{N},
         @info if mod_ord == :DPOT
             "selected $(npairs) pairs, degree $(deg)"
         else
-            "selected $(npairs) pairs, index $(sigind), order index $(ind_order.ord[sigind]), tag $(gettag(tags, sigind)), degree $(deg)"
+            "selected $(npairs) pairs, index $(sigind), order index $(ind_order.ord[sigind]), tag $(gettag(tags, sigind)), sig degree $(deg)"
         end
         @info "$(added_to_matrix) non-rewriteable critical signatures added to matrix"
     end
@@ -231,14 +232,28 @@ function symbolic_pp!(basis::Basis{N},
         j = basis.basis_offset 
         @label target
         # find element in basis which divmask divides divmask of monomial
-        @inbounds while (j <= basis.basis_load
-                         && !basis.is_red[j]
-                         && !divch(basis.lm_masks[j], divm)
-                         && (mod_ord != :POT || cmp_ind(index(basis.sigs[j]), sigind, ind_order)))
+        @inbounds while j <= basis.basis_load && !divch(basis.lm_masks[j], divm)
             j += 1
         end
 
         if j <= basis.basis_load
+            if basis.is_red[j]
+                j += 1
+                @goto target
+            end
+
+            cand_sig = basis.sigs[j]
+            if !iszero(compat_ind) && are_incompat(index(cand_sig),
+                                                   compat_ind, ind_order)
+                j += 1
+                @goto target
+            end
+
+            if mod_ord == :POT && !cmp_ind(index(cand_sig), sigind, ind_order)
+                j += 1
+                @goto target
+            end
+            
             @inbounds red_exp = leading_monomial(basis, ht, j)
 
             # actual divisibility check
@@ -247,19 +262,14 @@ function symbolic_pp!(basis::Basis{N},
                 @goto target
             end
 
-            cand_sig = basis.sigs[j]
-            if !iszero(compat_ind) && are_incompat(index(cand_sig), compat_ind, ind_order)
-                j += 1
-                @goto target
-            end
-            
             mul_cand_sig = (index(cand_sig),
                             mul(monomial(mult2), monomial(cand_sig)))
             cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
                                     ht.ndivbits)
 
             # check if new reducer sig is smaller than possible previous
-            if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig, ind_order)
+            if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig,
+                                          ind_order)
                 j += 1
                 @goto target
             end
@@ -287,6 +297,8 @@ function symbolic_pp!(basis::Basis{N},
             if iszero(compat_ind) && gettag(tags, index(mul_red_sig)) == :sat
                 compat_ind = index(mul_red_sig)
             end
+            @assert ind_order.ord[index(mul_red_sig)] <= ind_order.ord[sigind]
+            # println("REDUCER SIG $(mul_red_sig)")
             @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
                                                       red_ind, symbol_ht,
                                                       ht, mm,
@@ -415,4 +427,21 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
         matrix.nrows += 1
     end
     return first(matrix.rows[row_ind])
+end
+
+# check if element i from pairset should be selected
+function should_select(pairset::Pairset,
+                       i::Int,
+                       deg::Exp,
+                       idx::SigIndex,
+                       mod_ord::Symbol)
+
+    if mod_ord == :DPOT
+        return pairset.elems[i].deg == deg
+    elseif mod_ord == :POT
+        sig = pairset.elems[i].top_sig
+        return index(sig) == idx && monomial(sig).deg == deg
+    else
+        error("unrecognized module order")
+    end
 end
