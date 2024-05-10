@@ -160,20 +160,12 @@ function process_syzygies!(basis::Basis{N},
 
     cofacs = Polynomial[]
 
-    if length(unique([index(sig) for sig in syz_sigs])) != 1
-        ids = unique([index(sig) for sig in syz_sigs])
-        println((Int).(unique(ids)))
-        println((Int).([ind_order.ord[i] for i in ids]))
-        error("oh no")
+    @inbounds for i in 1:length(syz_sigs)
+        syz_sig = syz_sigs[i]
+        for idx in get(conn_indices, index(syz_sig), SigIndex[])
+            push!(syz_sigs, (idx, monomial(syz_sig)))
+        end
     end
-        
-
-    # @inbounds for i in 1:length(syz_sigs)
-    #     syz_sig = syz_sigs[i]
-    #     for idx in get(conn_indices, index(syz_sig), SigIndex[])
-    #         push!(syz_sigs, (idx, monomial(syz_sig)))
-    #     end
-    # end
 
     @inbounds for (i, new_sig) in enumerate(syz_sigs)
         new_sig_mask = (index(new_sig), divmask(monomial(new_sig), basis_ht.divmap, basis_ht.ndivbits))
