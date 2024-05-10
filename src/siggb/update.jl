@@ -1,5 +1,10 @@
 # updating the pairset and basis
 
+# TODO:
+# from update siggb return syz indices with appropriate tag
+# do cofactor insertion in appropriate function
+# add "connected syzygies" in that function too?
+
 # add new reduced rows to basis/syzygies
 function update_siggb!(basis::Basis,
                        matrix::MacaulayMatrix,
@@ -20,8 +25,6 @@ function update_siggb!(basis::Basis,
     toadd = matrix.toadd[1:matrix.toadd_length]
     added_unit = false
 
-    syz_inds = Int[]
-
     @inbounds for i in toadd
         # determine if row is zero
         row = matrix.rows[i]
@@ -32,9 +35,8 @@ function update_siggb!(basis::Basis,
                                          basis_ht.ndivbits))
         if isempty(row)
             new_syz_c += 1
-
+            process_syzygy!(basis, new_sig, new_sig_mask, pairset, tr)
             push!(syz_queue, (basis.syz_load+1, Dict{SigIndex, Bool}()))
-            push!(syz_inds, i)
         else
             new_basis_c += 1
             coeffs = matrix.coeffs[i]
@@ -44,13 +46,6 @@ function update_siggb!(basis::Basis,
                                          new_sig, new_sig_mask, parent_ind,
                                          tr, ind_order, tags)
         end
-    end
-    if !isempty(syz_inds)
-        @inbounds process_syzygies!(basis, basis_ht, pairset,
-                                    matrix.sigs[syz_inds],
-                                    tags, ind_order, tr, vchar,
-                                    conn_indices,
-                                    ndeg_ins_index)
     end
 
     if new_basis_c != 0 || new_syz_c != 0
@@ -136,17 +131,52 @@ function add_basis_elem!(basis::Basis{N},
     return false
 end
 
-function process_syzygies!(basis::Basis{N},
-                           basis_ht::MonomialHashtable,
-                           pairset::Pairset,
-                           syz_sigs::Vector{Sig{N}},
-                           tags::Tags,
-                           ind_order::IndOrder,
-                           tr::Tracer,
-                           vchar::Val{Char},
-                           conn_indices::IndConn,
-                           ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char}
+function process_syzygy!(basis::Basis,
+                         new_sig::Sig,
+                         new_sig_mask::MaskSig,
+                         pairset::Pairset,
+                         tr::Tracer) 
 
+    new_idx = index(new_sig_mask)
+    
+    new_sig_mon = monomial(new_sig)
+
+    # make sure we have enough space
+    if basis.syz_load == basis.syz_size
+        basis.syz_size *= 2
+        resize!(basis.syz_sigs, basis.syz_size)
+        resize!(basis.syz_masks, basis.syz_size)
+    end
+    
+    # add new syz sig
+    l = basis.syz_load + 1
+    basis.syz_sigs[l] = monomial(new_sig)
+    basis.syz_masks[l] = new_sig_mask
+    basis.syz_load += 1
+
+    # add info to tracer
+    store_syz!(tr)
+
+    # kill pairs with known syz signature
+    @inbounds for j in 1:pairset.load
+        p = pairset.elems[j]
+        cond = index(p.top_sig) == new_idx
+        if cond && divch(new_sig_mon, monomial(p.top_sig),
+                         new_sig_mask[2], p.top_sig_mask)
+            pairset.elems[j].top_index = 0
+        end
+        cond = index(p.bot_sig) == new_idx
+        if cond && divch(new_sig_mon, monomial(p.bot_sig),
+                         new_sig_mask[2], p.bot_sig_mask)
+            pairset.elems[j].top_index = 0
+        end
+    end
+
+    # remove pairs that became rewriteable in previous loop
+    remove_red_pairs!(pairset)
+end
+
+function insert_syz_cofacs!()
     cofacs = Polynomial[]
 
     @inbounds for i in 1:length(syz_sigs)
@@ -156,67 +186,25 @@ function process_syzygies!(basis::Basis{N},
         end
     end
 
-    @inbounds for (i, new_sig) in enumerate(syz_sigs)
-        new_sig_mask = (index(new_sig), divmask(monomial(new_sig), basis_ht.divmap, basis_ht.ndivbits))
-        new_idx = index(new_sig_mask)
-        tag = gettag(tags, new_idx)
-        
-        new_sig_mon = monomial(new_sig)
-
-        # make sure we have enough space
-        if basis.syz_load == basis.syz_size
-            basis.syz_size *= 2
-            resize!(basis.syz_sigs, basis.syz_size)
-            resize!(basis.syz_masks, basis.syz_size)
-        end
-        
-        # add new syz sig
-        l = basis.syz_load + 1
-        basis.syz_sigs[l] = monomial(new_sig)
-        basis.syz_masks[l] = new_sig_mask
-        basis.syz_load += 1
-
-        # add info to tracer
-        store_syz!(tr)
-
-        # kill pairs with known syz signature
-        @inbounds for j in 1:pairset.load
-            p = pairset.elems[j]
-            cond = index(p.top_sig) == new_idx
-            if cond && divch(new_sig_mon, monomial(p.top_sig),
-                             new_sig_mask[2], p.top_sig_mask)
-                pairset.elems[j].top_index = 0
-            end
-            cond = index(p.bot_sig) == new_idx
-            if cond && divch(new_sig_mon, monomial(p.bot_sig),
-                             new_sig_mask[2], p.bot_sig_mask)
-                pairset.elems[j].top_index = 0
-            end
-        end
-
-        # remove pairs that became rewriteable in previous loop
-        remove_red_pairs!(pairset)
-
-        # construct cofactors of zero reduction and ins in hashtable
-        if tag in [:sat, :ndeg]
-            mat_ind = length(tr.mats)
-            @info "constructing module"
-            cofac = construct_module(new_sig, basis,
-                                     basis_ht,
-                                     mat_ind, tr,
-                                     vchar,
-                                     ind_order,
-                                     new_idx)
-            if isempty(cofacs)
-                push!(cofacs, cofac)
-            else
-                cofacs[1] = add_pols(cofac..., cofacs[1]...,
-                                     vchar, rand(one(Coeff):Coeff(Char)))
-                sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
-                           lt = lt_drl, rev = true)
-                normalize_cfs!(cofac[1], vchar)
-                push!(cofacs, cofac)
-            end
+    # construct cofactors of zero reduction and ins in hashtable
+    if tag in [:sat, :ndeg]
+        mat_ind = length(tr.mats)
+        @info "constructing module"
+        cofac = construct_module(new_sig, basis,
+                                 basis_ht,
+                                 mat_ind, tr,
+                                 vchar,
+                                 ind_order,
+                                 new_idx)
+        if isempty(cofacs)
+            push!(cofacs, cofac)
+        else
+            cofacs[1] = add_pols(cofac..., cofacs[1]...,
+                                 vchar, rand(one(Coeff):Coeff(Char)))
+            sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
+                       lt = lt_drl, rev = true)
+            normalize_cfs!(cofac[1], vchar)
+            push!(cofacs, cofac)
         end
     end
 
@@ -337,18 +325,6 @@ function update_pairset!(pairset::Pairset{N},
         basis_pair_sig_mask = divmask(basis_pair_sig_mon,
                                       basis_ht.divmap,
                                       basis_ht.ndivbits)
-
-        # check both pair sigs against non-trivial syzygies
-        # rewriteable_syz(basis, new_pair_sig,
-        #                 new_pair_sig_mask, tags) && continue
-        # rewriteable_syz(basis, basis_pair_sig,
-        #                 basis_pair_sig_mask, tags) && continue
-
-        # check both pair signatures against koszul syzygies
-        # rewriteable_koszul(basis, basis_ht, new_pair_sig,
-        #                    new_pair_sig_mask, ind_order, tags) && continue
-        # rewriteable_koszul(basis, basis_ht, basis_pair_sig,
-        #                    basis_pair_sig_mask, ind_order, tags) && continue
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin

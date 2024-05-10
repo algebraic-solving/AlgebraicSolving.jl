@@ -1,3 +1,8 @@
+# TODO:
+# insert elems in nondeg one by one
+# divmask at random two times (for example)?
+
+
 # sizes for initialization
 const init_ht_size = 2^17
 const init_basis_size = 10000
