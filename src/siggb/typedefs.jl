@@ -149,8 +149,24 @@ mutable struct MacaulayMatrix{N}
     toadd_length::Int
 end
 
+abstract type Tracer end
+
+struct NoTracer <: Tracer end
+
+mutable struct SigTracer <: Tracer
+    mats::Vector{TracerMatrix}
+    basis_ind_to_mat::Vector{Int}
+    syz_ind_to_mat::Vector{Int}
+    load::Int
+    size::Int
+end
+
+abstract type TracerMatrix end
+
+struct NoTracerMatrix <: TracerMatrix end
+
 # struct to remember the row reductions we did
-mutable struct TracerMatrix
+mutable struct SigTracerMatrix
     # first index row index, second one rewr ind
     rows::Dict{Sig, Tuple{Int, Int}}
     # if row i has been added to basis
@@ -160,13 +176,6 @@ mutable struct TracerMatrix
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
 end
 
-mutable struct Tracer
-    mats::Vector{TracerMatrix}
-    basis_ind_to_mat::Vector{Int}
-    syz_ind_to_mat::Vector{Int}
-    load::Int
-    size::Int
-end
 
 # For Index ordering
 mutable struct IndOrder

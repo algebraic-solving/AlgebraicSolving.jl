@@ -58,7 +58,8 @@ end
 function fill_structs!(sys_mons::Vector{Vector{MonIdx}},
                        sys_coeffs::Vector{Vector{Coeff}},
                        basis_ht::MonomialHashtable{N};
-                       def_tg::Symbol=:seq) where N
+                       def_tg::Symbol=:seq,
+                       trace::Val{Bl}=Val(false)) where {N, Bl}
 
     # initialize basis
     sysl = length(sys_mons)
@@ -68,7 +69,7 @@ function fill_structs!(sys_mons::Vector{Vector{MonIdx}},
     ind_order = IndOrder(SigIndex[],
                          Dict{Tuple{SigIndex, SigIndex}, Bool}(),
                          zero(SigIndex))
-    tr = new_tracer()
+    tr = Bl ? new_tracer() : NoTracer()
 
     @inbounds for i in 1:sysl
         mons = sys_mons[i]
@@ -200,7 +201,7 @@ end
 
 function add_new_sequence_element!(basis::Basis{N},
                                    basis_ht::MonomialHashtable{N},
-                                   tr::Tracer,
+                                   tr::SigTracer,
                                    coeffs::Vector{Coeff},
                                    mons::Vector{MonIdx},
                                    ind_ord::IndOrder,
@@ -232,7 +233,7 @@ end
 
 function make_room_new_input_el!(basis::Basis,
                                  pairset::Pairset,
-                                 tr::Tracer)
+                                 tr::SigTracer)
 
     # this whole block just shifts the basis to the right
     # to make room for new input elements

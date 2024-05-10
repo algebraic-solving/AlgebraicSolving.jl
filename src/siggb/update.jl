@@ -12,7 +12,6 @@ function update_siggb!(basis::Basis,
                        vchar::Val{Char},
                        syz_queue::Vector{SyzInfo},
                        conn_indices::IndConn,
-                       trace::Bool=false,
                        ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char}
 
     new_basis_c = 0
@@ -43,7 +42,7 @@ function update_siggb!(basis::Basis,
             added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
                                          row, coeffs,
                                          new_sig, new_sig_mask, parent_ind,
-                                         tr, ind_order, tags, trace)
+                                         tr, ind_order, tags)
         end
     end
     if !isempty(syz_inds)
@@ -129,18 +128,8 @@ function add_basis_elem!(basis::Basis{N},
     basis.basis_load = l
 
     # update tracer info
-    if trace
-        if tr.load >= tr.size
-            tr.size *= 2
-            resize!(tr.basis_ind_to_mat, tr.size)
-        end
-        tr_mat = last(tr.mats)
-        row_ind, _ = tr_mat.rows[new_sig]
-        tr_mat.is_basis_row[row_ind] = l
-        @inbounds tr.basis_ind_to_mat[l] = length(tr.mats)
-        tr.load += 1
-    end
-
+    store_basis_elem!(tr, new_sig, l)
+    
     # build new pairs
     update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
 
@@ -188,7 +177,7 @@ function process_syzygies!(basis::Basis{N},
         basis.syz_load += 1
 
         # add info to tracer
-        push!(tr.syz_ind_to_mat, length(tr.mats)) 
+        store_syz!(tr)
 
         # kill pairs with known syz signature
         @inbounds for j in 1:pairset.load
@@ -208,9 +197,8 @@ function process_syzygies!(basis::Basis{N},
         # remove pairs that became rewriteable in previous loop
         remove_red_pairs!(pairset)
 
-        # insert cofactors in saturation/ndeg computation
+        # construct cofactors of zero reduction and ins in hashtable
         if tag in [:sat, :ndeg]
-            # construct cofactors of zero reduction and ins in hashtable
             mat_ind = length(tr.mats)
             @info "constructing module"
             cofac = construct_module(new_sig, basis,
@@ -222,7 +210,8 @@ function process_syzygies!(basis::Basis{N},
             if isempty(cofacs)
                 push!(cofacs, cofac)
             else
-                cofacs[1] = add_pols(cofac..., cofacs[1]..., vchar, rand(one(Coeff):Coeff(Char)))
+                cofacs[1] = add_pols(cofac..., cofacs[1]...,
+                                     vchar, rand(one(Coeff):Coeff(Char)))
                 sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
                            lt = lt_drl, rev = true)
                 normalize_cfs!(cofac[1], vchar)
@@ -259,7 +248,8 @@ function process_syzygies!(basis::Basis{N},
             isone(i) ? :fndegins : :ndegins
         end
         new_ind = add_new_sequence_element!(basis, basis_ht, tr, cofac...,
-                                            ind_order, ord_ind, pairset, tags,
+                                            ind_order, ord_ind, pairset,
+                                            tags,
                                             new_tg = new_tg)
         if isone(i)
             new_f_idx = new_ind

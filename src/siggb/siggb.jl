@@ -12,6 +12,7 @@ include("rewriting.jl")
 include("update.jl")
 include("symbolic_pp.jl")
 include("linear_algebra.jl")
+include("tracer.jl")
 include("module.jl")
 include("normalform.jl")
 include("affine_cells.jl")
@@ -86,7 +87,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
     with_logger(logger) do
         _, arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
                              tags, ind_order, tr, degbound,
-                             mod_ord, true)
+                             mod_ord)
         @info "$(arit_ops) total submul's"
     end
 
@@ -289,7 +290,6 @@ function siggb!(basis::Basis{N},
                 tr::Tracer,
                 degbound::Int=0,
                 mod_ord::Symbol=:DPOT,
-                trace::Bool=false,
                 ndeg_ins_index::SigIndex=zero(SigIndex),
                 conn_indices::IndConn=IndConn()) where {N, Char, Shift}
 
@@ -314,11 +314,9 @@ function siggb!(basis::Basis{N},
                      mod_ord)
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tr_mat, arit_ops_new = echelonize!(matrix, tags, ind_order, char,
-                                           shift, trace)
+        arit_ops_new = echelonize!(matrix, tags, ind_order, char,
+                                   shift, trace)
         arit_ops += arit_ops_new
-
-        trace && push!(tr.mats, tr_mat)
 
         added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
                                    basis_ht, ind_order, tags,
@@ -343,7 +341,7 @@ function sig_decomp!(basis::Basis{N},
                      shift::Val{Shift},
                      tags::Tags,
                      ind_order::IndOrder,
-                     tr::Tracer,
+                     tr::SigTracer,
                      R::MPolyRing,
                      timer::Timings) where {N, Char, Shift}
 
@@ -402,7 +400,7 @@ function siggb_for_split!(basis::Basis{N},
                           tags::Tags,
                           ind_order::IndOrder,
                           basis_ht::MonomialHashtable,
-                          tr::Tracer,
+                          tr::SigTracer,
                           syz_queue::Vector{SyzInfo},
                           char::Val{Char},
                           shift::Val{Shift},
@@ -444,10 +442,8 @@ function siggb_for_split!(basis::Basis{N},
 
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tim = @elapsed tr_mat, _ = echelonize!(matrix, tags, ind_order, char, shift)
+        tim = @elapsed echelonize!(matrix, tags, ind_order, char, shift)
         timer.lin_alg_time += tim
-
-        push!(tr.mats, tr_mat)
 
         time = @elapsed update_siggb!(basis, matrix, pairset,
                                       symbol_ht, basis_ht,
@@ -505,7 +501,7 @@ function split!(basis::Basis{N},
                 basis_ht::MonomialHashtable{N},
                 cofac_mons_hsh::Vector{MonIdx},
                 cofac_coeffs::Vector{Coeff},
-                tr::Tracer,
+                tr::SigTracer,
                 pairset::Pairset{N},
                 zd_ind::SigIndex,
                 tags::Tags,
@@ -569,7 +565,7 @@ end
 function process_syz_for_split!(syz_queue::Vector{SyzInfo},
                                 basis_ht::MonomialHashtable,
                                 basis::Basis{N},
-                                tr::Tracer,
+                                tr::SigTracer,
                                 ind_order::IndOrder,
                                 char::Val{Char},
                                 lc_set::AffineCell,
