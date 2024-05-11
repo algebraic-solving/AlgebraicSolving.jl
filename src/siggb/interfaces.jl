@@ -201,7 +201,7 @@ end
 
 function add_new_sequence_element!(basis::Basis{N},
                                    basis_ht::MonomialHashtable{N},
-                                   tr::SigTracer,
+                                   tr::Tracer,
                                    coeffs::Vector{Coeff},
                                    mons::Vector{MonIdx},
                                    ind_ord::IndOrder,
@@ -233,7 +233,7 @@ end
 
 function make_room_new_input_el!(basis::Basis,
                                  pairset::Pairset,
-                                 tr::SigTracer)
+                                 tr::Tracer)
 
     # this whole block just shifts the basis to the right
     # to make room for new input elements
@@ -269,9 +269,6 @@ function make_room_new_input_el!(basis::Basis,
             basis.mod_rep_known[i] = basis.mod_rep_known[i-shift]
             basis.mod_reps[i] = basis.mod_reps[i-shift]
 
-            # adjust tracer
-            tr.basis_ind_to_mat[i] = tr.basis_ind_to_mat[i-shift]
-            
             # adjust rewrite tree
             rnodes = basis.rewrite_nodes[i-shift+1]
             if rnodes[2] >= old_offset + 1
@@ -284,19 +281,7 @@ function make_room_new_input_el!(basis::Basis,
         end
 
         # adjust tracer
-        for mat in tr.mats
-            for i in keys(mat.rows)
-                v = mat.rows[i]
-                if v[2] >= old_offset
-                    mat.rows[i] = (v[1], v[2] + shift)
-                end
-            end
-            for (i, v) in pairs(mat.is_basis_row)
-                if v >= old_offset
-                    mat.is_basis_row[i] = v + shift
-                end
-            end
-        end
+        shift_tracer!(tr, shift, old_offset)
 
         # adjust pairset
         for i in 1:pairset.load

@@ -297,8 +297,6 @@ function symbolic_pp!(basis::Basis{N},
             if iszero(compat_ind) && gettag(tags, index(mul_red_sig)) == :sat
                 compat_ind = index(mul_red_sig)
             end
-            @assert ind_order.ord[index(mul_red_sig)] <= ind_order.ord[sigind]
-            # println("REDUCER SIG $(mul_red_sig)")
             @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
                                                       red_ind, symbol_ht,
                                                       ht, mm,

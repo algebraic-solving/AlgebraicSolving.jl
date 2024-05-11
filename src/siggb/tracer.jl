@@ -50,7 +50,7 @@ end
 function store_row_op!(tr_mat::SigTracerMatrix,
                        row_ind::Int,
                        pividx::Int,
-                       a::Coeff)
+                       a::Cbuf)
     
     tr_mat.col_inds_and_coeffs[row_ind][n_row_subs] = (pividx, a)
 end
@@ -81,7 +81,29 @@ function store_syz!(tr::SigTracer)
 
     push!(tr.syz_ind_to_mat, length(tr.mats)) 
 end
-                    
+
+function shift_tracer!(tr::SigTracer, shift::Int,
+                       old_offset::Int,
+                       basis::Basis)
+
+    for i in basis.basis_load:-1:basis.basis_offset
+        tr.basis_ind_to_mat[i] = tr.basis_ind_to_mat[i-shift]
+    end
+
+    for mat in tr.mats
+        for i in keys(mat.rows)
+            v = mat.rows[i]
+            if v[2] >= old_offset
+                mat.rows[i] = (v[1], v[2] + shift)
+            end
+        end
+        for (i, v) in pairs(mat.is_basis_row)
+            if v >= old_offset
+                mat.is_basis_row[i] = v + shift
+            end
+        end
+    end
+end                    
 
 # dummy methods if we don't want to trace
 function new_tr_mat(nrows::Int,
@@ -109,7 +131,7 @@ end
 function store_row_op!(tr_mat::NoTracerMatrix,
                        row_ind::Int,
                        pividx::Int,
-                       a::Coeff)
+                       a::Cbuf)
 
     return
 end
@@ -129,6 +151,13 @@ function store_basis_elem!(tr::NoTracer,
 end
 
 function store_syz!(tr::NoTracer)
+
+    return
+end
+
+function shift_tracer!(tr::NoTracer, shift::Int,
+                       old_offset::Int,
+                       basis::Basis)
 
     return
 end

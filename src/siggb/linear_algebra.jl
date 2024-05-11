@@ -37,7 +37,7 @@ function echelonize!(matrix::MacaulayMatrix,
         row_cols = matrix.rows[row_ind]
         l_col_idx = hash2col[first(row_cols)]
         if pivots[l_col_idx] == row_ind
-            trace && resize!(row_ops, 0)
+            resize_tracer_row_ops!(tr_mat, row_ind, 0)
             continue
         # check if the row can be top reduced
         elseif !iszero(pivots[l_col_idx]) && rev_sigorder[pivots[l_col_idx]] < i

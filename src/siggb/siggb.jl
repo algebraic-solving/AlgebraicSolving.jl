@@ -320,13 +320,12 @@ function siggb!(basis::Basis{N},
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
         arit_ops_new = echelonize!(matrix, tags, ind_order, char,
-                                   shift, trace)
+                                   shift, tr)
         arit_ops += arit_ops_new
 
         added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
                                    basis_ht, ind_order, tags,
                                    tr, char, syz_queue, conn_indices,
-                                   trace,
                                    ndeg_ins_index)
         if added_unit
             return true, arit_ops

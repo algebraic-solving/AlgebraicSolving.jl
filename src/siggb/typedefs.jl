@@ -149,18 +149,6 @@ mutable struct MacaulayMatrix{N}
     toadd_length::Int
 end
 
-abstract type Tracer end
-
-struct NoTracer <: Tracer end
-
-mutable struct SigTracer <: Tracer
-    mats::Vector{TracerMatrix}
-    basis_ind_to_mat::Vector{Int}
-    syz_ind_to_mat::Vector{Int}
-    load::Int
-    size::Int
-end
-
 abstract type TracerMatrix end
 
 struct NoTracerMatrix <: TracerMatrix end
@@ -176,6 +164,17 @@ mutable struct SigTracerMatrix
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
 end
 
+abstract type Tracer end
+
+struct NoTracer <: Tracer end
+
+mutable struct SigTracer <: Tracer
+    mats::Vector{SigTracerMatrix}
+    basis_ind_to_mat::Vector{Int}
+    syz_ind_to_mat::Vector{Int}
+    load::Int
+    size::Int
+end
 
 # For Index ordering
 mutable struct IndOrder
