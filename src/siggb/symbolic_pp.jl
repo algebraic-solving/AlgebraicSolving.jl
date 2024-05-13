@@ -57,16 +57,12 @@ function select_normal!(pairset::Pairset{N},
         # for each unique pair signature
         curr_top_sig = pair.top_sig
 
-        rewriteable_syz(basis, curr_top_sig, pair.top_sig_mask, tags) && continue
-        rewriteable_koszul(basis, ht,
-                           curr_top_sig, pair.top_sig_mask,
-                           ind_order, tags) && continue
-
-        rewr_ind = find_canonical_rewriter(basis, pair.top_sig,
+        rewr_ind = find_canonical_rewriter(basis, curr_top_sig,
                                            pair.top_sig_mask)
 
         pair_with_rewr_ind = 0
         for j in i:npairs
+            skip[j] && continue
             pair2 = pairset.elems[j]
             if pair2.top_sig == curr_top_sig
                 skip[j] = true
@@ -117,8 +113,8 @@ function select_normal!(pairset::Pairset{N},
                         !lt_pot(pair2.bot_sig, curr_top_sig, ind_order) && continue
                         new_red = false
                         if !iszero(pair2.bot_index)
-                            rewriteable(basis, ht, pair2.bot_index, pair2.bot_sig,
-                                        pair2.bot_sig_mask, ind_order, tags) && continue
+                            rewriteable_basis(basis, pair2.bot_index, pair2.bot_sig,
+                                              pair2.bot_sig_mask, tags) && continue
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
                                           monomial(basis.sigs[ind]))

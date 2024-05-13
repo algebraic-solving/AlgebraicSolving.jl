@@ -193,6 +193,7 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
                                           pairset, tags,
                                           new_tg = :sat)
                 make_sat_incompat!(tags, ind_order)
+                sort_sat!(tags, ind_order, basis)
             end
             @info "------------------------------------------"
             @info "saturation step"
@@ -210,6 +211,12 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
                     remask!(basis_ht, basis, pairset)
                 end
             end
+        end
+
+        sig_inds = collect(1:length(ind_order.ord))
+        sort!(sig_inds, by = idx -> ind_order.ord[idx])
+        for i in sig_inds
+            println((gettag(tags, i), i))
         end
 
         # output
@@ -633,6 +640,17 @@ function make_sat_incompat!(tags::Tags, ind_order::IndOrder)
             (gettag(tags, idx2) != :sat || idx2 <= idx) && continue
             ind_order.incompat[(idx, idx2)] = true
         end
+    end
+end
+
+function sort_sat!(tags::Tags, ind_order::IndOrder, basis::Basis)
+    sat_inds = filter(idx -> gettag(tags, idx) == :sat,
+                      1:length(ind_order.ord))
+    @inbounds sat_ord_inds = ind_order.ord[sat_inds]
+    sort!(sat_ord_inds)
+    sort!(sat_inds, by = idx -> basis.degs[idx])
+    @inbounds for (i, idx) in enumerate(sat_inds)
+        ind_order.ord[idx] = sat_ord_inds[i]
     end
 end
 

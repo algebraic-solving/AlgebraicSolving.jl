@@ -260,9 +260,11 @@ function update_pairset!(pairset::Pairset{N},
     new_sig_idx = index(basis.sigs[new_basis_idx])
 
     # check existing pairs for rewriteability against element
-    # at new_basis_idx
+    # at new_basis_idx and for koszul rewriteability
     @inbounds bmask = basis.sigmasks[new_basis_idx]
     @inbounds parent_ind = basis.rewrite_nodes[new_basis_idx+1][2]
+    @inbounds new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
+    @inbounds new_lm_msk = basis.lm_masks[new_basis_idx]
     @inbounds for i in 1:pairset.load
         p = pairset.elems[i]
         if p.top_index == parent_ind-1
@@ -271,11 +273,23 @@ function update_pairset!(pairset::Pairset{N},
                 pairset.elems[i].top_index = 0
                 continue
             end
+            if ind_order.ord[new_sig_idx] < index(p.top_sig)
+                if divch(lm, monomial(p.top_sig), new_lm_msk, p.top_sig_mask)
+                    pairset.elems[i].top_index = 0
+                    continue
+                end
+            end
         end
         if p.bot_index == parent_ind-1
             if divch(new_sig_mon, monomial(p.bot_sig),
                      mask(bmask), p.bot_sig_mask)
                 pairset.elems[i].top_index = 0
+            end
+            if ind_order.ord[new_sig_idx] < index(p.bot_sig)
+                if divch(lm, monomial(p.bot_sig), new_lm_msk, p.bot_sig_mask)
+                    pairset.elems[i].top_index = 0
+                    continue
+                end
             end
         end
     end
@@ -288,7 +302,6 @@ function update_pairset!(pairset::Pairset{N},
     resize_pairset!(pairset, num_new_pairs)
 
     new_sig_ratio = basis.sigratios[new_basis_idx]
-    new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
     # pair construction loop
     @inbounds for i in basis.basis_offset:(new_basis_idx - 1)
 
@@ -322,6 +335,15 @@ function update_pairset!(pairset::Pairset{N},
         basis_pair_sig_mask = divmask(basis_pair_sig_mon,
                                       basis_ht.divmap,
                                       basis_ht.ndivbits)
+
+        rewriteable_syz(basis, new_pair_sig,
+                        new_pair_sig_mask, tags) && continue
+        rewriteable_syz(basis, basis_pair_sig,
+                        basis_pair_sig_mask, tags) && continue
+        rewriteable_koszul(basis, basis_ht, new_pair_sig,
+                           new_pair_sig_mask, ind_order, tags) && continue
+        rewriteable_koszul(basis, basis_ht, basis_pair_sig,
+                           basis_pair_sig_mask, ind_order, tags) && continue
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin
