@@ -274,7 +274,7 @@ function update_pairset!(pairset::Pairset{N},
                 continue
             end
             if ind_order.ord[new_sig_idx] < index(p.top_sig)
-                if divch(lm, monomial(p.top_sig), new_lm_msk, p.top_sig_mask)
+                if divch(new_lm, monomial(p.top_sig), new_lm_msk, p.top_sig_mask)
                     pairset.elems[i].top_index = 0
                     continue
                 end
@@ -286,7 +286,7 @@ function update_pairset!(pairset::Pairset{N},
                 pairset.elems[i].top_index = 0
             end
             if ind_order.ord[new_sig_idx] < index(p.bot_sig)
-                if divch(lm, monomial(p.bot_sig), new_lm_msk, p.bot_sig_mask)
+                if divch(new_lm, monomial(p.bot_sig), new_lm_msk, p.bot_sig_mask)
                     pairset.elems[i].top_index = 0
                     continue
                 end
