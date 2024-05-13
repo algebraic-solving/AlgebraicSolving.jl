@@ -58,11 +58,11 @@ end
 function fill_structs!(sys_mons::Vector{Vector{MonIdx}},
                        sys_coeffs::Vector{Vector{Coeff}},
                        basis_ht::MonomialHashtable{N};
+                       sysl::Int=length(sys_mons),
                        def_tg::Symbol=:seq,
                        trace::Val{Bl}=Val(false)) where {N, Bl}
 
     # initialize basis
-    sysl = length(sys_mons)
     basis = new_basis(init_basis_size, init_syz_size, sysl, Val(N))
     pairset = init_pairset(Val(N))
     tags = Tags()
@@ -71,7 +71,7 @@ function fill_structs!(sys_mons::Vector{Vector{MonIdx}},
                          zero(SigIndex))
     tr = Bl ? new_tracer() : NoTracer()
 
-    @inbounds for i in 1:sysl
+    @inbounds for i in 1:length(sys_mons)
         mons = sys_mons[i]
         coeffs = sys_coeffs[i]
         lm = basis_ht.exponents[first(mons)]
@@ -281,7 +281,7 @@ function make_room_new_input_el!(basis::Basis,
         end
 
         # adjust tracer
-        shift_tracer!(tr, shift, old_offset)
+        shift_tracer!(tr, shift, old_offset, basis)
 
         # adjust pairset
         for i in 1:pairset.load

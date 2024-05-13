@@ -1,8 +1,3 @@
-# TODO:
-# insert elems in nondeg one by one
-# divmask at random two times (for example)?
-
-
 # sizes for initialization
 const init_ht_size = 2^17
 const init_basis_size = 10000
@@ -115,85 +110,53 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
     return outp
 end
 
-function sig_sat(sys::Vector{T}, H::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
-
-    full_sys = vcat(sys, H)
-    
-    # data structure setup/conversion
-    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(full_sys)
-
-    # fill basis, pairset, tags
-    basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht)
-
-    # set tag for sats
-    sysl = length(full_sys)
-    for idx in length(sys)+1:sysl
-        tags[idx] = :sat
-    end
-    make_sat_incompat!(tags, ind_order)
-
-    # compute divmasks
-    fill_divmask!(basis_ht)
-    @inbounds for i in 1:sysl
-        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
-    end
-
-    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
-    with_logger(logger) do
-        added_unit, _ = siggb!(basis, pairset, basis_ht, char, shift,
-                               tags, ind_order, tr, trace=true)
-        # output
-        R = parent(first(sys))
-        eltp = typeof(first(sys))
-        outp = eltp[]
-        if added_unit
-            push!(outp, one(R))
-        else
-            @inbounds for i in basis.basis_offset:basis.basis_load
-                gettag(tags, index(basis.sigs[i])) == :sat && continue
-                pol = convert_to_pol(R,
-                                     [basis_ht.exponents[m] for m in basis.monomials[i]],
-                                     basis.coefficients[i])
-                push!(outp, pol)
-            end
-        end
-        return outp
-    end
-end
-
 function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
 
     # data structure setup/conversion
-    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys, :POT)
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup([sys[1]], :POT)
 
     # fill basis, pairset, tags
-    basis, _, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht, def_tg=:ndeg)
+    sysl = length(sys)
+    basis, _, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs,
+                                                  basis_ht,
+                                                  sysl=sysl,
+                                                  def_tg=:ndeg, trace=Val(true))
     R = parent(first(sys))
     nvrs = ngens(R)
     r_char = characteristic(R)
     pairset = init_pairset(Val(nvrs))
 
     # compute divmasks
-    fill_divmask!(basis_ht)
-    sysl = length(sys)
-    @inbounds for i in 1:sysl
-        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
-    end
+    remask!(basis_ht, basis, pairset)
+    remask_cnt = 2
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
         arit_ops = 0
-        ind_conn = IndConn()
         for i in 1:sysl
             @info "sequence index $(i)"
-            add_unit_pair!(basis, pairset, i, basis.degs[i])
-            ndeg_ins_index = i < sysl ? SigIndex(i+1) : zero(SigIndex)
-            added_unit, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                                              tags, ind_order, tr, 0, :POT, true,
-                                              ndeg_ins_index, ind_conn)
+
+            # add sequence element to data structures
+            if i > 1
+                cfs, mns = convert_to_ht(sys[i], basis_ht, char,
+                                         by = eidx -> basis_ht.exponents[eidx],
+                                         lt = lt_drl, rev = true)
+                idl_inds = filter(idx -> gettag(tags, idx) != :sat,
+                                  1:length(ind_order.ord))
+                ord_ind = maximum(idx -> ind_order.ord[idx], idl_inds) + one(SigIndex)
+                add_new_sequence_element!(basis, basis_ht, tr, cfs, mns,
+                                          ind_order, ord_ind, pairset, tags,
+                                          new_tg = :ndeg)
+            else
+                add_unit_pair!(basis, pairset, i, basis.degs[i])
+            end
+
+            # run sig gb computation with newly added element
+            _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
+                                     tags, ind_order, tr, 0, :POT)
             arit_ops += new_arit_ops
 
-            # extract suitable random linear combinations of inserted elements
+            # extract suitable random linear combinations of inserted elements for cleaning
             sig_inds = (SigIndex).(collect(eachindex(ind_order.ord)))
             for idx in sig_inds
                 gettag(tags, idx) != :fndegins && continue
@@ -234,11 +197,19 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
             @info "------------------------------------------"
             @info "saturation step"
             _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                                     tags, ind_order, tr, 0, :POT, true,
-                                     ndeg_ins_index, ind_conn)
+                                     tags, ind_order, tr, 0, :POT)
             arit_ops += new_arit_ops
             @info "------------------------------------------"
             @info "$(arit_ops) total submul's"
+
+            # remask with 50 perc. probability
+            if remask_cnt > 0
+                if isone(rand([0,1]))
+                    @info "recomputing divmasks"
+                    remask_cnt -= 1
+                    remask!(basis_ht, basis, pairset)
+                end
+            end
         end
 
         # output
@@ -294,9 +265,7 @@ function siggb!(basis::Basis{N},
                 ind_order::IndOrder,
                 tr::Tracer,
                 degbound::Int=0,
-                mod_ord::Symbol=:DPOT,
-                ndeg_ins_index::SigIndex=zero(SigIndex),
-                conn_indices::IndConn=IndConn()) where {N, Char, Shift}
+                mod_ord::Symbol=:DPOT) where {N, Char, Shift}
 
     # fake syz queue
     syz_queue = SyzInfo[]
@@ -325,8 +294,7 @@ function siggb!(basis::Basis{N},
 
         added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
                                    basis_ht, ind_order, tags,
-                                   tr, char, syz_queue, conn_indices,
-                                   ndeg_ins_index)
+                                   tr, char, syz_queue)
         if added_unit
             return true, arit_ops
         end

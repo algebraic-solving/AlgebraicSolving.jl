@@ -30,14 +30,12 @@ function echelonize!(matrix::MacaulayMatrix,
         # store tracer data
         row_sig = matrix.sigs[row_ind]
         add_row!(tr_mat, row_sig, row_ind,
-                 matrix.parent_inds[row_ind],
-                 i)
+                 matrix.parent_inds[row_ind])
 
         does_red = false
         row_cols = matrix.rows[row_ind]
         l_col_idx = hash2col[first(row_cols)]
         if pivots[l_col_idx] == row_ind
-            resize_tracer_row_ops!(tr_mat, row_ind, 0)
             continue
         # check if the row can be top reduced
         elseif !iszero(pivots[l_col_idx]) && rev_sigorder[pivots[l_col_idx]] < i
@@ -51,7 +49,6 @@ function echelonize!(matrix::MacaulayMatrix,
 
         if !does_red
             pivots[l_col_idx] = row_ind
-            resize_tracer_row_ops!(tr_mat, row_ind, 0)
             continue
         end
 
@@ -63,7 +60,6 @@ function echelonize!(matrix::MacaulayMatrix,
         end
         
         # do the reduction
-        n_row_subs = 0
         @inbounds for j in 1:matrix.ncols
             a = buffer[j] % Char
             iszero(a) && continue
@@ -77,7 +73,6 @@ function echelonize!(matrix::MacaulayMatrix,
                 continue
             end
 
-            n_row_subs += 1
             store_row_op!(tr_mat, row_ind, pividx, a)
 
             # subtract a*rows[pivots[j]] from buffer
@@ -88,9 +83,6 @@ function echelonize!(matrix::MacaulayMatrix,
                                           pivcoeffs, shift)
             arit_ops += arit_ops_new
         end
-
-        # finalize tracer row, add it to tracer matrix
-        resize_tracer_row_ops!(tr_mat, row_ind, n_row_subs)
 
         new_row_length = 0
         @inbounds for j in 1:matrix.ncols

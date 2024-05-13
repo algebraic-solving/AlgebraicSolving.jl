@@ -437,3 +437,31 @@ function insert_in_basis_hash_table_pivots!(
 
     nothing
 end
+
+# remask all global data
+function remask!(ht::MonomialHashtable{N},
+                 basis::Basis{N},
+                 pairset::Pairset{N}) where N
+
+    fill_divmask!(ht)
+
+    @inbounds for i in 1:basis.basis_load
+        basis.input_load < i < basis.basis_offset && continue
+        basis.lm_masks[i] = ht.hashdata[basis.monomials[i][1]].divmask
+        bm = basis.sigs[i]
+        basis.sigmasks[i] = (index(bm), divmask(monomial(bm), ht.divmap,
+                                                ht.ndivbits))
+    end
+
+    @inbounds for i in 1:basis.syz_load
+        bs = basis.syz_sigs[i]
+        bsm = basis.syz_masks[i]
+        basis.syz_masks[i] = (index(bsm), divmask(bs, ht.divmap, ht.ndivbits))
+    end
+
+    @inbounds for i in 1:pairset.load
+        p = pairset.elems[i]
+        p.top_sig_mask = divmask(monomial(p.top_sig), ht.divmap, ht.ndivbits)
+        p.bot_sig_mask = divmask(monomial(p.bot_sig), ht.divmap, ht.ndivbits)
+    end
+end

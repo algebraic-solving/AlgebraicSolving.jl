@@ -18,8 +18,8 @@ function new_tr_mat(nrows::Int,
     res = SigTracerMatrix(Dict{Sig, Tuple{Int, Int, Bool}}(),
                           Dict{Int, Int}(),
                           Dict{Int, Sig}(),
-                          tr_diagonal,
-                          tr_mat_data)
+                          diag,
+                          mat_data)
     push!(tr.mats, res)
     return res
 end
@@ -27,24 +27,16 @@ end
 function add_row!(tr_mat::SigTracerMatrix,
                   sig::Sig,
                   row_ind::Int,
-                  parent_ind::Int,
-                  nred::Int)
+                  parent_ind::Int)
 
-    tr_mat.rows[row_sig] = (row_ind, parent_ind)
+    tr_mat.rows[sig] = (row_ind, parent_ind)
 
     # allocate a row for the tracer matrix
     # at most we subtract (i-1) other rows
-    row_ops = Vector{Tuple{Int, Coeff}}(undef, nred - 1)
+    row_ops = Tuple{Int, Coeff}[]
     tr_mat.col_inds_and_coeffs[row_ind] = row_ops
-    tr_mat.row_ind_to_sig[row_ind] = row_sig
+    tr_mat.row_ind_to_sig[row_ind] = sig
     tr_mat.diagonal[row_ind] = one(Coeff)
-end
-
-function resize_tracer_row_ops!(tr_mat::SigTracerMatrix,
-                                row_ind::Int,
-                                sz::Int)
-
-    resize!(tr_mat.col_inds_and_coeffs[row_ind], sz)
 end
 
 function store_row_op!(tr_mat::SigTracerMatrix,
@@ -52,7 +44,7 @@ function store_row_op!(tr_mat::SigTracerMatrix,
                        pividx::Int,
                        a::Cbuf)
     
-    tr_mat.col_inds_and_coeffs[row_ind][n_row_subs] = (pividx, a)
+    push!(tr_mat.col_inds_and_coeffs[row_ind], (pividx, a))
 end
 
 function store_inver!(tr_mat::SigTracerMatrix,
@@ -115,15 +107,7 @@ end
 function add_row!(tr_mat::NoTracerMatrix,
                   sig::Sig,
                   row_ind::Int,
-                  parent_ind::Int,
-                  nred::Int)
-
-    return
-end
-
-function resize_tracer_row_ops!(tr_mat::NoTracerMatrix,
-                                row_ind::Int,
-                                sz::Int)
+                  parent_ind::Int)
 
     return
 end

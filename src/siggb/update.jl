@@ -1,10 +1,5 @@
 # updating the pairset and basis
 
-# TODO:
-# from update siggb return syz indices with appropriate tag
-# do cofactor insertion in appropriate function
-# add "connected syzygies" in that function too?
-
 # add new reduced rows to basis/syzygies
 function update_siggb!(basis::Basis,
                        matrix::MacaulayMatrix,
@@ -15,15 +10,15 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       syz_queue::Vector{SyzInfo},
-                       conn_indices::IndConn,
-                       ndeg_ins_index::SigIndex=zero(SigIndex)) where {N, Char}
+                       syz_queue::Vector{SyzInfo}) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
 
     toadd = matrix.toadd[1:matrix.toadd_length]
     added_unit = false
+
+    cofac_ins_inds = Int[]
 
     @inbounds for i in toadd
         # determine if row is zero
@@ -37,6 +32,11 @@ function update_siggb!(basis::Basis,
             new_syz_c += 1
             process_syzygy!(basis, new_sig, new_sig_mask, pairset, tr)
             push!(syz_queue, (basis.syz_load+1, Dict{SigIndex, Bool}()))
+
+            # for cofactor insertion in ndeg computation
+            if gettag(tags, index(new_sig)) in [:ndeg, :sat]
+                push!(cofac_ins_inds, i)
+            end
         else
             new_basis_c += 1
             coeffs = matrix.coeffs[i]
@@ -47,6 +47,9 @@ function update_siggb!(basis::Basis,
                                          tr, ind_order, tags)
         end
     end
+
+    insert_syz_cofacs!(basis, basis_ht, matrix.sigs[cofac_ins_inds],
+                       pairset, vchar, tr, tags, ind_order)
 
     if new_basis_c != 0 || new_syz_c != 0
         @info "$(new_basis_c) new, $(new_syz_c) zero"
@@ -176,19 +179,26 @@ function process_syzygy!(basis::Basis,
     remove_red_pairs!(pairset)
 end
 
-function insert_syz_cofacs!()
-    cofacs = Polynomial[]
+function insert_syz_cofacs!(basis::Basis{N},
+                            basis_ht::MonomialHashtable{N},
+                            syz_sigs::Vector{Sig{N}},
+                            pairset::Pairset{N},
+                            vchar::Val{Char},
+                            tr::Tracer,
+                            tags::Tags,
+                            ind_order::IndOrder) where {N, Char}
 
-    @inbounds for i in 1:length(syz_sigs)
-        syz_sig = syz_sigs[i]
-        for idx in get(conn_indices, index(syz_sig), SigIndex[])
-            push!(syz_sigs, (idx, monomial(syz_sig)))
-        end
-    end
+    isempty(syz_sigs) && return
+    cofacs = Polynomial[]
+    mat_ind = length(tr.mats)
+    syz_ind = index(first(syz_sigs))
+
+    # we only use this in nondeg computation
+    @assert length(unique([index(s) for s in syz_sigs])) == 1
 
     # construct cofactors of zero reduction and ins in hashtable
-    if tag in [:sat, :ndeg]
-        mat_ind = length(tr.mats)
+    for new_sig in syz_sigs
+        new_idx = index(new_sig)
         @info "constructing module"
         cofac = construct_module(new_sig, basis,
                                  basis_ht,
@@ -209,19 +219,12 @@ function insert_syz_cofacs!()
     end
 
     # insert cofactors in system
-    isempty(cofacs) && return
-    syz_ind = index(first(syz_sigs))
-    @assert all(sig -> index(sig) == syz_ind, syz_sigs)
     tag = gettag(tags, index(first(syz_sigs)))
     new_f_idx = zero(SigIndex)
     for (i, cofac) in enumerate(cofacs)
         ord_ind = if tag == :sat
-            if iszero(ndeg_ins_index)
-                sat_inds = findall(tag -> tag == :sat, tags)
-                findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)[1]
-            else
-                ind_order.ord[ndeg_ins_index]
-            end
+            sat_inds = findall(tag -> tag == :sat, tags)
+            findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)[1]
         else
             ind_order.ord[syz_ind]
         end
@@ -239,12 +242,6 @@ function insert_syz_cofacs!()
                                             ind_order, ord_ind, pairset,
                                             tags,
                                             new_tg = new_tg)
-        if isone(i)
-            new_f_idx = new_ind
-            conn_indices[new_f_idx] = SigIndex[]
-        else
-            push!(conn_indices[new_f_idx], new_ind)
-        end
     end
 end
 
