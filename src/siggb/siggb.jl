@@ -213,12 +213,6 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
             end
         end
 
-        sig_inds = collect(1:length(ind_order.ord))
-        sort!(sig_inds, by = idx -> ind_order.ord[idx])
-        for i in sig_inds
-            println((gettag(tags, i), i))
-        end
-
         # output
         R = parent(first(sys))
         eltp = typeof(first(sys))

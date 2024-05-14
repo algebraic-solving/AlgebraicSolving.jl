@@ -64,7 +64,8 @@ end
 
     @inbounds for i in basis.basis_offset:basis.basis_load
         b_ind = index(basis.sigs[i])
-        if ind_order.ord[b_ind] < ind_order.ord[s_ind]
+        if (ind_order.ord[b_ind] < ind_order.ord[s_ind]
+            && !are_incompat(b_ind, s_ind, ind_order))
             if divch(basis.lm_masks[i], sigmask)
                 if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
                     return true
