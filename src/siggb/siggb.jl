@@ -195,6 +195,7 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
                 make_sat_incompat!(tags, ind_order)
                 sort_sat!(tags, ind_order, basis)
             end
+
             @info "------------------------------------------"
             @info "saturation step"
             _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
@@ -218,6 +219,7 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
         eltp = typeof(first(sys))
         outp = eltp[]
         @inbounds for i in basis.basis_offset:basis.basis_load
+            basis.is_red[i] && continue
             gettag(tags, index(basis.sigs[i])) == :sat && continue
             pol = convert_to_pol(R,
                                  [basis_ht.exponents[m] for m in basis.monomials[i]],

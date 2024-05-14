@@ -53,6 +53,25 @@ function find_canonical_rewriter(basis::Basis,
     return node_ind - 1
 end
 
+# function find_canonical_rewriter(basis::Basis,
+#                                  sig::Sig,
+#                                  sigmask::DivMask)
+
+#     cand = zero(Int)
+#     for i in 1:basis.basis_load
+#         basis.input_load < i < basis.basis_offset && continue
+#         basis.is_red[i] && continue
+#         bs = basis.sigs[i]
+#         if index(bs) == index(sig) && divch(monomial(bs), monomial(sig),
+#                                             mask(basis.sigmasks[i]), sigmask)
+#             if iszero(cand) || comp_sigratio(basis, i, cand)
+#                 cand = i
+#             end
+#         end
+#     end
+#     return cand
+# end
+
 @inline function rewriteable_koszul(basis::Basis,
                                     basis_ht::MonomialHashtable,
                                     sig::Sig,
@@ -97,7 +116,7 @@ end
     rat1 = basis.sigratios[ind1]
     rat2 = basis.sigratios[ind2]
     if rat1 == rat2
-        return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
+        return true
     end
     return lt_drl(rat1, rat2)
 end
