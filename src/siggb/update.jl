@@ -288,11 +288,13 @@ function update_pairset!(pairset::Pairset{N},
                 continue
             end
         end
-        if (ind_order.ord[new_sig_idx] < ind_order.ord[index(p.bot_sig)]
-            && !are_incompat(new_sig_idx, index(p.top_sig), ind_order))
-            if divch(new_lm, monomial(p.bot_sig), new_lm_msk, p.bot_sig_mask)
-                pairset.elems[i].top_index = 0
-                continue
+        if !iszero(p.bot_index)
+            if (ind_order.ord[new_sig_idx] < ind_order.ord[index(p.bot_sig)]
+                && !are_incompat(new_sig_idx, index(p.top_sig), ind_order))
+                if divch(new_lm, monomial(p.bot_sig), new_lm_msk, p.bot_sig_mask)
+                    pairset.elems[i].top_index = 0
+                    continue
+                end
             end
         end
     end
