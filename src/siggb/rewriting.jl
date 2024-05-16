@@ -110,13 +110,3 @@ function rewriteable(basis::Basis,
     rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags) && return true
     return false
 end
-
-@inline function comp_sigratio(basis::Basis, ind1::Int, ind2::Int)
-
-    rat1 = basis.sigratios[ind1]
-    rat2 = basis.sigratios[ind2]
-    if rat1 == rat2
-        return true
-    end
-    return lt_drl(rat1, rat2)
-end

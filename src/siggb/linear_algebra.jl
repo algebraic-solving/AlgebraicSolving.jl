@@ -131,7 +131,6 @@ function echelonize!(matrix::MacaulayMatrix,
 end
 
 # subtract mult
-# TODO: for module tracking we won't be able to assume that mult = buffer[bufind]
 @inline function critical_loop!(buffer::Vector{Cbuf},
                                 bufind::Int,
                                 mult::Cbuf,

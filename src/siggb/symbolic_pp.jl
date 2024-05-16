@@ -337,60 +337,6 @@ function finalize_matrix!(matrix::MacaulayMatrix,
 end
 
 # helper functions
-function initialize_matrix(::Val{N}) where {N}
-    rows = Vector{Vector{MonIdx}}(undef, 0)
-    pivots = Vector{Int}(undef, 0)
-    pivot_size = 0
-    sigs = Vector{Sig{N}}(undef, 0)
-    parent_inds = Vector{Int}(undef, 0)
-    sig_order = Vector{Int}(undef, 0)
-    col2hash = Vector{ColIdx}(undef, 0)
-    coeffs = Vector{Vector{Coeff}}(undef, 0)
-    toadd = Vector{Int}(undef, 0)
-
-    size = 0
-    nrows = 0
-    ncols = 0
-    toadd_length = 0
-
-    return MacaulayMatrix(rows, pivots, pivot_size,
-                          sigs, parent_inds, sig_order,
-                          col2hash, coeffs, size, nrows,
-                          ncols, toadd, toadd_length)
-end
-    
-# Refresh and initialize matrix for `npairs` elements
-function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
-    matrix.size = 2 * npairs
-    matrix.pivot_size = 2 * npairs
-    resize!(matrix.rows, matrix.size)
-    resize!(matrix.pivots, matrix.pivot_size)
-    for i in 1:matrix.pivot_size
-        matrix.pivots[i] = 0
-    end
-    resize!(matrix.sigs, matrix.size)
-    resize!(matrix.parent_inds, matrix.size)
-    resize!(matrix.coeffs, matrix.size)
-    resize!(matrix.toadd, matrix.size)
-    for i in 1:npairs
-        matrix.toadd[i] = 0
-    end
-    return matrix
-end
-
-# resize pivots array if needed
-@inline function resize_pivots!(matrix::MacaulayMatrix,
-                                symbol_ht::MonomialHashtable)
-    if matrix.pivot_size < symbol_ht.load 
-        pv_size = matrix.pivot_size
-        new_pv_size = 2 * (symbol_ht.load)
-        resize!(matrix.pivots, new_pv_size)
-        @inbounds for j in pv_size+1:new_pv_size 
-            matrix.pivots[j] = 0
-        end
-        matrix.pivot_size = new_pv_size
-    end
-end
     
 # helper function to write row to matrix
 function write_to_matrix_row!(matrix::MacaulayMatrix,
