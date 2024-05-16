@@ -114,7 +114,9 @@ function select_normal!(pairset::Pairset{N},
                         new_red = false
                         if !iszero(pair2.bot_index)
                             rewriteable_basis(basis, pair2.bot_index, pair2.bot_sig,
-                                              pair2.bot_sig_mask, tags) && continue
+                                              pair2.bot_sig_mask, tags,
+                                              mod_ord == :DPOT || !cmp_ind_str(index(pair2.bot_sig),
+                                                                               sigind, ind_order)) && continue
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
                                           monomial(basis.sigs[ind]))
@@ -124,10 +126,14 @@ function select_normal!(pairset::Pairset{N},
                         if new_red
                             reducer_sig = pair2.bot_sig
                             reducer_ind = pair2.bot_index
+                            if mod_ord == :POT && cmp_ind_str(index(reducer_sig), sigind, ind_order)
+                                @goto lab_add_row
+                            end
                         end
                     end
                 end
 
+                @label lab_add_row
                 add_cond = !iszero(reducer_ind)
                 if add_cond
                     mult = divide(monomial(reducer_sig),
@@ -245,7 +251,7 @@ function symbolic_pp!(basis::Basis{N},
                 @goto target
             end
 
-            if mod_ord == :POT && !cmp_ind(index(cand_sig), sigind, ind_order)
+            if mod_ord == :POT && cmp_ind_str(sigind, index(cand_sig), ind_order)
                 j += 1
                 @goto target
             end
@@ -262,6 +268,17 @@ function symbolic_pp!(basis::Basis{N},
                             mul(monomial(mult2), monomial(cand_sig)))
             cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
                                     ht.ndivbits)
+
+            # during POT computation: take reducer if its index is smaller than sigind
+            if mod_ord == :POT && cmp_ind_str(index(cand_sig), sigind, ind_order)
+                red_ind = j
+                mul_red_sig = mul_cand_sig
+                j = basis.basis_load + 1
+                @inbounds for k in 1:N
+                    mult[k] = mult2[k]
+                end
+                @goto target
+            end
 
             # check if new reducer sig is smaller than possible previous
             if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig,
@@ -306,7 +323,9 @@ end
 
 function finalize_matrix!(matrix::MacaulayMatrix,
                           symbol_ht::MonomialHashtable,
-                          ind_order::IndOrder)
+                          ind_order::IndOrder,
+                          sigind::SigIndex=zero(SigIndex),
+                          mod_ord::Symbol=:DPOT)
     
     # store indices into hashtable in a sorted way
     ncols = symbol_ht.load
@@ -332,8 +351,22 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     end
     matrix.sig_order = Vector{Int}(undef, matrix.nrows)
     # sort signatures
-    sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
-              lt = (sig1, sig2) -> lt_pot(sig1, sig2, ind_order))
+
+    lt_mat = (sig1, sig2) -> begin
+        if mod_ord == :POT
+            i1, i2 = index(sig1), index(sig2)
+            if cmp_ind_str(i1, sigind, ind_order) && cmp_ind_str(i2, sigind, ind_order)
+                true
+            else
+                lt_pot(sig1, sig2, ind_order)
+            end
+        else
+            lt_pot(sig1, sig2, ind_order)
+        end
+    end
+    
+    @inbounds sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
+                        lt = lt_mat)
 end
 
 # helper functions

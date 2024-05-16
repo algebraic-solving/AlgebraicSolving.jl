@@ -97,6 +97,61 @@ function make_room_new_input_el!(basis::Basis,
     end
 end
 
+@inline function compute_shift(i::Int, to_del::Vector{Int})
+    idx = findlast(j -> j <= i, to_del)
+    if isnothing(idx)
+        return 0
+    elseif del_indices[idx] == i
+        return -1
+    else
+        return idx
+    end
+end
+
+# WARNING: this function should only be used on basis elements
+# which will NEVER again be checked for rewriteability
+function garbage_collect!(basis::Basis{N},
+                          pairset::Pairset{N},
+                          tr::Tracer,
+                          del_indices::Vector{Int}) where N
+
+    isempty(del_indices) && return
+
+    @inbounds for (k, i) in enumerate(del_indices)
+        shift = k
+        upb = k < length(del_indices) ? del_indices[k+1]-1 : basis.basis_load
+        for j in i+1:upb
+            basis.sigs[j] = basis.sigs[j+shift]
+            basis.sigmasks[j] = basis.sigmasks[j+shift]
+            basis.sigratios[j] = basis.sigratios[j+shift]
+            basis.lm_masks[j] = basis.lm_masks[j+shift]
+            basis.monomials[j] = basis.monomials[j+shift]
+            basis.coefficients[j] = basis.coefficients[j+shift]
+            basis.is_red[j] = basis.is_red[j+shift]
+            basis.mod_rep_known[j] = basis.mod_rep_known[j+shift]
+            basis.mod_reps[j] = basis.mod_reps[j+shift]
+
+            # adjust rewrite tree, THIS BREAKS IT
+            basis.rewrite_nodes[j+1] = basis.rewrite_nodes[j+shift+1]
+
+            # adjust tracer
+            if typeof(Tracer) == SigTracer
+                tracer.basis_ind_to_mat[j] = tracer.basis_ind_to_mat[j+shift]
+            end
+        end
+    end
+
+    @inbounds for i in 1:pairset.load
+        p = pairset.elems[i]
+        shc = compute_shift(p.top_index, del_indices)
+        @assert shc != -1
+        p.top_index = i - shc
+        shc = compute_shift(p.bot_index, del_indices)
+        @assert shc != -1
+        p.bot_index = i - shc
+    end
+end
+
 function resize_basis!(basis::Basis)
     if basis.basis_load >= basis.basis_size
         basis.basis_size *= 2

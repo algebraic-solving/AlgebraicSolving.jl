@@ -253,7 +253,8 @@ function update_pairset!(pairset::Pairset{N},
                          basis_ht::MonomialHashtable,
                          new_basis_idx::Int,
                          ind_order::IndOrder,
-                         tags::Tags) where N
+                         tags::Tags,
+                         mod_ord::Symbol=:DPOT) where N
 
 
     new_sig_mon = monomial(basis.sigs[new_basis_idx])
@@ -274,7 +275,7 @@ function update_pairset!(pairset::Pairset{N},
                 continue
             end
         end
-        if (ind_order.ord[new_sig_idx] < ind_order.ord[index(p.top_sig)]
+        if (cmp_ind_str(new_sig_idx, index(p.top_sig), ind_order)
             && !are_incompat(new_sig_idx, index(p.top_sig), ind_order))
             if divch(new_lm, monomial(p.top_sig), new_lm_msk, p.top_sig_mask)
                 pairset.elems[i].top_index = 0
@@ -289,7 +290,7 @@ function update_pairset!(pairset::Pairset{N},
             end
         end
         if !iszero(p.bot_index)
-            if (ind_order.ord[new_sig_idx] < ind_order.ord[index(p.bot_sig)]
+            if (cmp_ind_str(new_sig_idx, index(p.bot_sig), ind_order)
                 && !are_incompat(new_sig_idx, index(p.top_sig), ind_order))
                 if divch(new_lm, monomial(p.bot_sig), new_lm_msk, p.bot_sig_mask)
                     pairset.elems[i].top_index = 0
@@ -342,13 +343,15 @@ function update_pairset!(pairset::Pairset{N},
                                       basis_ht.ndivbits)
 
         rewriteable_syz(basis, new_pair_sig,
-                        new_pair_sig_mask, tags) && continue
+                        new_pair_sig_mask, tags, true) && continue
         rewriteable_syz(basis, basis_pair_sig,
-                        basis_pair_sig_mask, tags) && continue
+                        basis_pair_sig_mask, tags,
+                        mod_ord == :DPOT || !cmp_ind_str(basis_sig_idx, new_sig_idx, ind_order)) && continue
         rewriteable_koszul(basis, basis_ht, new_pair_sig,
-                           new_pair_sig_mask, ind_order, tags) && continue
+                           new_pair_sig_mask, ind_order, tags, true) && continue
         rewriteable_koszul(basis, basis_ht, basis_pair_sig,
-                           basis_pair_sig_mask, ind_order, tags) && continue
+                           basis_pair_sig_mask, ind_order, tags,
+                           mod_ord == :DPOT || !cmp_ind_str(basis_sig_idx, new_sig_idx, ind_order)) && continue
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin

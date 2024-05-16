@@ -82,6 +82,14 @@ function cmp_ind(ind1::SigIndex, ind2::SigIndex,
     return ord_ind1 <= ord_ind2
 end
 
+function cmp_ind_str(ind1::SigIndex, ind2::SigIndex,
+                     ind_order::IndOrder)
+
+    ord_ind1 = ind_order.ord[ind1]
+    ord_ind2 = ind_order.ord[ind2]
+    return ord_ind1 < ord_ind2
+end
+
 function are_incompat(ind1::SigIndex, ind2::SigIndex,
                       ind_order::IndOrder)
 
