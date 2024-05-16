@@ -336,7 +336,6 @@ function finalize_matrix!(matrix::MacaulayMatrix,
               lt = (sig1, sig2) -> lt_pot(sig1, sig2, ind_order))
 end
 
-# TODO: later to optimize: mem allocations for matrix
 # helper functions
 function initialize_matrix(::Val{N}) where {N}
     rows = Vector{Vector{MonIdx}}(undef, 0)

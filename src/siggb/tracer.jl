@@ -56,15 +56,16 @@ end
 
 function store_basis_elem!(tr::SigTracer,
                            new_sig::Sig,
-                           bas_ind::Int)
+                           bas_ind::Int,
+                           bas_sz::Int)
 
-    if tr.load >= tr.size
-        tr.size *= 2
+    if tr.size != bas_sz
+        tr.size = bas_sz
         resize!(tr.basis_ind_to_mat, tr.size)
     end
     tr_mat = last(tr.mats)
-    row_ind, _ = tr_mat.rows[new_sig]
-    tr_mat.is_basis_row[row_ind] = bas_ind
+    @inbounds row_ind, _ = tr_mat.rows[new_sig]
+    @inbounds tr_mat.is_basis_row[row_ind] = bas_ind
     @inbounds tr.basis_ind_to_mat[bas_ind] = length(tr.mats)
     tr.load += 1
 end
@@ -78,6 +79,10 @@ function shift_tracer!(tr::SigTracer, shift::Int,
                        old_offset::Int,
                        basis::Basis)
 
+    if tr.size != basis.basis_size
+        tr.size = basis.basis_size
+        resize!(tr.basis_ind_to_mat, tr.size)
+    end
     for i in basis.basis_load:-1:basis.basis_offset
         tr.basis_ind_to_mat[i] = tr.basis_ind_to_mat[i-shift]
     end
@@ -129,7 +134,8 @@ end
 
 function store_basis_elem!(tr::NoTracer,
                            new_sig::Sig,
-                           bas_ind::Int)
+                           bas_ind::Int,
+                           bas_sz::Int)
 
     return
 end

@@ -193,7 +193,6 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
                                           pairset, tags,
                                           new_tg = :sat)
                 make_sat_incompat!(tags, ind_order)
-                sort_sat!(tags, ind_order, basis)
             end
 
             @info "------------------------------------------"

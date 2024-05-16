@@ -126,7 +126,7 @@ function add_basis_elem!(basis::Basis{N},
     basis.basis_load = l
 
     # update tracer info
-    store_basis_elem!(tr, new_sig, l)
+    store_basis_elem!(tr, new_sig, l, basis.basis_size)
     
     # build new pairs
     update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
