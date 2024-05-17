@@ -277,6 +277,7 @@ function siggb!(basis::Basis{N},
     sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
 
     while !iszero(pairset.load)
+        curr_ind = index(first(pairset.elems).top_sig)
         if !iszero(degbound) && first(pairset.elems).deg > degbound
             break
         end
@@ -284,7 +285,8 @@ function siggb!(basis::Basis{N},
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
         _, compat_ind, sigind = select_normal!(pairset, basis, matrix,
-                                               basis_ht, symbol_ht, ind_order, tags,
+                                               basis_ht, symbol_ht,
+                                               ind_order, tags,
                                                mod_ord)
         symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
                      ind_order, tags, sigind, compat_ind,
@@ -302,8 +304,16 @@ function siggb!(basis::Basis{N},
             return true, arit_ops
         end
         sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
+
+        if !iszero(pairset.load)
+            p_idx = index(first(pairset.elems).top_sig)
+            if mod_ord == :POT && cmp_ind_str(curr_ind, p_idx, ind_order)
+                minimize!(basis, basis_ht, curr_ind, ind_order)
+            end
+        end
     end
 
+    mod_ord == :POT && minimize!(basis, basis_ht, zero(SigIndex), ind_order)
     return false, arit_ops
 end
 

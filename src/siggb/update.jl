@@ -373,3 +373,49 @@ function update_pairset!(pairset::Pairset{N},
         pairset.load += 1
     end
 end
+
+function minimize!(basis::Basis{N},
+                   basis_ht::MonomialHashtable{N},
+                   idx_bound::SigIndex,
+                   ind_order::IndOrder) where N
+
+    @info "minimizing"
+    el_killed = 0
+
+    sz = 10000
+    min_data = Vector{Tuple{Monomial{N},
+                            DivMask,
+                            Int}}(undef, sz)
+
+    j = 1
+    @inbounds for i in basis.basis_offset:basis.basis_load
+        bsi = index(basis.sigs[i])
+        !iszero(idx_bound) && !cmp_ind_str(bsi, idx_bound, ind_order) && continue
+        if j > sz
+            sz *= 2
+            resize!(min_data, sz)
+        end
+        min_data[j] = (leading_monomial(basis, basis_ht, i),
+                       basis.lm_masks[i], i)
+        j += 1
+    end
+
+    l = j-1
+    sort!(view(min_data, 1:l),
+          by = x -> x[1],
+          lt = (m1, m2) -> m1.deg <= m2.deg) 
+
+    @inbounds for i in 1:l 
+        lm, lm_msk, bind = min_data[i]
+        basis.is_red[bind] && continue
+        for j in i+1:l
+            lm2, lm_msk2, bind2 = min_data[j]
+            basis.is_red[bind2] && continue
+            if divch(lm, lm2, lm_msk, lm_msk2)
+                el_killed += 1
+                basis.is_red[bind2] = true
+            end
+        end
+    end
+    @info "$(el_killed) elements killed"
+end

@@ -108,8 +108,7 @@ end
     end
 end
 
-# WARNING: this function should only be used on basis elements
-# which will NEVER again be checked for rewriteability
+# TODO: figure out how to maintain the rewrite tree
 function garbage_collect!(basis::Basis{N},
                           pairset::Pairset{N},
                           tr::Tracer,

@@ -266,7 +266,8 @@ function symbolic_pp!(basis::Basis{N},
 
             mul_cand_sig = (index(cand_sig),
                             mul(monomial(mult2), monomial(cand_sig)))
-            cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
+            cand_sig_mask = divmask(monomial(mul_cand_sig),
+                                    ht.divmap,
                                     ht.ndivbits)
 
             # during POT computation: take reducer if its index is smaller than sigind
@@ -288,8 +289,9 @@ function symbolic_pp!(basis::Basis{N},
             end
 
             # check if reducer is rewriteable
-            if rewriteable(basis, ht, j, mul_cand_sig, cand_sig_mask,
-                           ind_order, tags)
+            if rewriteable(basis, ht, j, mul_cand_sig,
+                           cand_sig_mask,
+                           ind_order, tags, true)
                 j += 1
                 @goto target
             end
