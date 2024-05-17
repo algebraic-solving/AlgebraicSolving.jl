@@ -292,18 +292,20 @@ function siggb!(basis::Basis{N},
                      ind_order, tags, sigind, compat_ind,
                      mod_ord)
         finalize_matrix!(matrix, symbol_ht, ind_order)
-        iszero(matrix.nrows) && continue
-        arit_ops_new = echelonize!(matrix, tags, ind_order, char,
-                                   shift, tr)
-        arit_ops += arit_ops_new
 
-        added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
-                                   basis_ht, ind_order, tags,
-                                   tr, char, syz_queue)
-        if added_unit
-            return true, arit_ops
+        if !iszero(matrix.nrows)
+            arit_ops_new = echelonize!(matrix, tags, ind_order, char,
+                                       shift, tr)
+            arit_ops += arit_ops_new
+
+            added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
+                                       basis_ht, ind_order, tags,
+                                       tr, char, syz_queue)
+            if added_unit
+                return true, arit_ops
+            end
+            sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
         end
-        sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
 
         if !iszero(pairset.load)
             p_idx = index(first(pairset.elems).top_sig)
