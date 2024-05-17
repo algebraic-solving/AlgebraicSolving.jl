@@ -97,6 +97,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
     eltp = typeof(first(sys))
     outp = Tuple{Tuple{Int, eltp}, eltp}[]
     @inbounds for i in basis.basis_offset:basis.basis_load
+        basis.is_red[i] && continue
         pol = convert_to_pol(R,
                              [basis_ht.exponents[m] for m in basis.monomials[i]],
                              basis.coefficients[i])
