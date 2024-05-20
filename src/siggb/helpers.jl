@@ -366,3 +366,22 @@ function is_homog(f)
     d = total_degree(f)
     return all(e -> sum(e) == d, exponent_vectors(f))
 end
+
+function is_gb(R::MPolyRing,
+               idx_bnd::SigIndex,
+               ind_ord::IndOrder,
+               basis::Basis{N},
+               basis_ht::MonomialHashtable{N}) where N
+
+    lms_exps = [leading_monomial(basis, basis_ht, i)
+                for i in basis.basis_offset:basis.basis_load
+                    if !basis.is_red[i] && cmp_ind(index(basis.sigs[i]),
+                                                   idx_bnd, ind_ord)]
+    base_sys = [convert_to_pol(R, [basis_ht.exponents[midx] for midx in basis.monomials[i]],
+                               basis.coefficients[i])
+                for i in 1:basis.input_load
+                    if cmp_ind(index(basis.sigs[i]), idx_bnd, ind_ord)]
+    lms = (Nemo.leading_monomial).(groebner_basis(Ideal(base_sys), complete_reduction = true))
+    lms_test = [convert_to_pol(R, [lm], [one(Coeff)]) for lm in lms_exps]
+    return all(lm -> any(lm2 -> divides(lm, lm2)[1], lms_test), lms)
+end

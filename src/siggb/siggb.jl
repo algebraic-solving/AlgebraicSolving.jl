@@ -87,7 +87,7 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
         _, arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                             tags, ind_order, tr, degbound,
+                             tags, ind_order, tr, parent(first(sys)), degbound,
                              mod_ord)
         @info "$(arit_ops) total submul's"
     end
@@ -155,7 +155,7 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
 
             # run sig gb computation with newly added element
             _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                                     tags, ind_order, tr, 0, :POT)
+                                     tags, ind_order, tr, R, 0, :POT)
             arit_ops += new_arit_ops
 
             # extract suitable random linear combinations of inserted elements for cleaning
@@ -200,7 +200,7 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
             @info "------------------------------------------"
             @info "saturation step"
             _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                                     tags, ind_order, tr, 0, :POT)
+                                     tags, ind_order, tr, R, 0, :POT)
             arit_ops += new_arit_ops
             @info "------------------------------------------"
             @info "$(arit_ops) total submul's"
@@ -268,6 +268,7 @@ function siggb!(basis::Basis{N},
                 tags::Tags,
                 ind_order::IndOrder,
                 tr::Tracer,
+                R::MPolyRing,
                 degbound::Int=0,
                 mod_ord::Symbol=:DPOT) where {N, Char, Shift}
 
@@ -301,7 +302,7 @@ function siggb!(basis::Basis{N},
 
             added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
                                        basis_ht, ind_order, tags,
-                                       tr, char, syz_queue)
+                                       tr, char, syz_queue, mod_ord)
             if added_unit
                 return true, arit_ops
             end
@@ -311,12 +312,12 @@ function siggb!(basis::Basis{N},
         if !iszero(pairset.load)
             p_idx = index(first(pairset.elems).top_sig)
             if mod_ord == :POT && cmp_ind_str(curr_ind, p_idx, ind_order)
-                minimize!(basis, basis_ht, curr_ind, ind_order)
+                minimize!(basis, basis_ht, curr_ind, ind_order, tags)
             end
         end
     end
 
-    mod_ord == :POT && minimize!(basis, basis_ht, zero(SigIndex), ind_order)
+    mod_ord == :POT && minimize!(basis, basis_ht, zero(SigIndex), ind_order, tags)
     return false, arit_ops
 end
 

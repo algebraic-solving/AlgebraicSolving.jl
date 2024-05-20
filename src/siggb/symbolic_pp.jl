@@ -115,8 +115,8 @@ function select_normal!(pairset::Pairset{N},
                         if !iszero(pair2.bot_index)
                             rewriteable_basis(basis, pair2.bot_index, pair2.bot_sig,
                                               pair2.bot_sig_mask, tags,
-                                              mod_ord == :DPOT || !cmp_ind_str(index(pair2.bot_sig),
-                                                                               sigind, ind_order)) && continue
+                                              mod_ord == :DPOT || cmp_ind(sigind, index(pair2.bot_sig),
+                                                                          ind_order)) && continue
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
                                           monomial(basis.sigs[ind]))

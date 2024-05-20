@@ -10,7 +10,8 @@ function update_siggb!(basis::Basis,
                        tags::Tags,
                        tr::Tracer,
                        vchar::Val{Char},
-                       syz_queue::Vector{SyzInfo}) where {N, Char}
+                       syz_queue::Vector{SyzInfo},
+                       mod_ord::Symbol=:DPOT) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
@@ -30,7 +31,7 @@ function update_siggb!(basis::Basis,
                                          basis_ht.ndivbits))
         if isempty(row)
             new_syz_c += 1
-            process_syzygy!(basis, new_sig, new_sig_mask, pairset, tr)
+            process_syzygy!(basis, new_sig, new_sig_mask, pairset, tr, mod_ord)
             push!(syz_queue, (basis.syz_load+1, Dict{SigIndex, Bool}()))
 
             # for cofactor insertion in ndeg computation
@@ -44,7 +45,7 @@ function update_siggb!(basis::Basis,
             added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
                                          row, coeffs,
                                          new_sig, new_sig_mask, parent_ind,
-                                         tr, ind_order, tags)
+                                         tr, ind_order, tags, mod_ord)
         end
     end
 
@@ -70,7 +71,7 @@ function add_basis_elem!(basis::Basis{N},
                          tr::Tracer,
                          ind_order::IndOrder,
                          tags::Tags,
-                         trace::Bool=true) where N
+                         mod_ord::Symbol) where N
 
 
     # make sure we have enough space
@@ -129,7 +130,7 @@ function add_basis_elem!(basis::Basis{N},
     store_basis_elem!(tr, new_sig, l, basis.basis_size)
     
     # build new pairs
-    update_pairset!(pairset, basis, basis_ht, l, ind_order, tags)
+    update_pairset!(pairset, basis, basis_ht, l, ind_order, tags, mod_ord)
 
     return false
 end
@@ -138,7 +139,8 @@ function process_syzygy!(basis::Basis,
                          new_sig::Sig,
                          new_sig_mask::MaskSig,
                          pairset::Pairset,
-                         tr::Tracer) 
+                         tr::Tracer,
+                         mod_ord::Symbol) 
 
     new_idx = index(new_sig_mask)
     
@@ -168,7 +170,7 @@ function process_syzygy!(basis::Basis,
                          new_sig_mask[2], p.top_sig_mask)
             pairset.elems[j].top_index = 0
         end
-        cond = index(p.bot_sig) == new_idx
+        cond = index(p.bot_sig) == new_idx && (mod_ord == :DPOT || index(p.bot_sig) == index(p.top_sig))
         if cond && divch(new_sig_mon, monomial(p.bot_sig),
                          new_sig_mask[2], p.bot_sig_mask)
             pairset.elems[j].top_index = 0
@@ -256,25 +258,16 @@ function update_pairset!(pairset::Pairset{N},
                          tags::Tags,
                          mod_ord::Symbol=:DPOT) where N
 
-
     new_sig_mon = monomial(basis.sigs[new_basis_idx])
     new_sig_idx = index(basis.sigs[new_basis_idx])
 
     # check existing pairs for rewriteability against element
     # at new_basis_idx and for koszul rewriteability
     @inbounds bmask = basis.sigmasks[new_basis_idx]
-    @inbounds parent_ind = basis.rewrite_nodes[new_basis_idx+1][2]
     @inbounds new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
     @inbounds new_lm_msk = basis.lm_masks[new_basis_idx]
     @inbounds for i in 1:pairset.load
         p = pairset.elems[i]
-        if p.top_index == parent_ind-1
-            if divch(new_sig_mon, monomial(p.top_sig),
-                     mask(bmask), p.top_sig_mask)
-                pairset.elems[i].top_index = 0
-                continue
-            end
-        end
         if (cmp_ind_str(new_sig_idx, index(p.top_sig), ind_order)
             && !are_incompat(new_sig_idx, index(p.top_sig), ind_order))
             if divch(new_lm, monomial(p.top_sig), new_lm_msk, p.top_sig_mask)
@@ -282,14 +275,7 @@ function update_pairset!(pairset::Pairset{N},
                 continue
             end
         end
-        if p.bot_index == parent_ind-1
-            if divch(new_sig_mon, monomial(p.bot_sig),
-                     mask(bmask), p.bot_sig_mask)
-                pairset.elems[i].top_index = 0
-                continue
-            end
-        end
-        if !iszero(p.bot_index)
+        if !iszero(p.bot_index) && (mod_ord == :DPOT || index(p.bot_sig) != index(p.top_sig))
             if (cmp_ind_str(new_sig_idx, index(p.bot_sig), ind_order)
                 && !are_incompat(new_sig_idx, index(p.top_sig), ind_order))
                 if divch(new_lm, monomial(p.bot_sig), new_lm_msk, p.bot_sig_mask)
@@ -343,15 +329,17 @@ function update_pairset!(pairset::Pairset{N},
                                       basis_ht.ndivbits)
 
         rewriteable_syz(basis, new_pair_sig,
-                        new_pair_sig_mask, tags, true) && continue
+                        new_pair_sig_mask, tags,
+                        mod_ord == :DPOT || cmp_ind(basis_sig_idx, new_sig_idx, ind_order)) && continue
         rewriteable_syz(basis, basis_pair_sig,
                         basis_pair_sig_mask, tags,
-                        mod_ord == :DPOT || !cmp_ind_str(basis_sig_idx, new_sig_idx, ind_order)) && continue
+                        mod_ord == :DPOT || cmp_ind(new_sig_idx, basis_sig_idx, ind_order)) && continue
         rewriteable_koszul(basis, basis_ht, new_pair_sig,
-                           new_pair_sig_mask, ind_order, tags, true) && continue
+                           new_pair_sig_mask, ind_order, tags,
+                           mod_ord == :DPOT || cmp_ind(basis_sig_idx, new_sig_idx, ind_order)) && continue
         rewriteable_koszul(basis, basis_ht, basis_pair_sig,
                            basis_pair_sig_mask, ind_order, tags,
-                           mod_ord == :DPOT || !cmp_ind_str(basis_sig_idx, new_sig_idx, ind_order)) && continue
+                           mod_ord == :DPOT || cmp_ind(new_sig_idx, basis_sig_idx, ind_order)) && continue
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin
@@ -377,9 +365,14 @@ end
 function minimize!(basis::Basis{N},
                    basis_ht::MonomialHashtable{N},
                    idx_bound::SigIndex,
-                   ind_order::IndOrder) where N
+                   ind_order::IndOrder,
+                   tags::Tags) where N
 
-    @info "minimizing"
+    if !iszero(idx_bound)
+        @info "minimizing up to $(ind_order.ord[idx_bound])"
+    else
+        @info "minimizing"
+    end
     el_killed = 0
 
     sz = 10000
@@ -390,7 +383,8 @@ function minimize!(basis::Basis{N},
     j = 1
     @inbounds for i in basis.basis_offset:basis.basis_load
         bsi = index(basis.sigs[i])
-        !iszero(idx_bound) && !cmp_ind_str(bsi, idx_bound, ind_order) && continue
+        !iszero(idx_bound) && cmp_ind_str(idx_bound, bsi, ind_order) && continue
+        gettag(tags, bsi) == :sat && continue
         if j > sz
             sz *= 2
             resize!(min_data, sz)
