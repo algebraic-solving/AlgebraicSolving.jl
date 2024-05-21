@@ -86,10 +86,12 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
+        timer = new_timer()
         _, arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                             tags, ind_order, tr, parent(first(sys)), degbound,
+                             tags, ind_order, tr, timer, degbound,
                              mod_ord)
         @info "$(arit_ops) total submul's"
+        @info timer
     end
 
     # output
@@ -133,6 +135,7 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
     remask_cnt = 2
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    timer = new_timer()
     with_logger(logger) do
         arit_ops = 0
         for i in 1:sysl
@@ -155,7 +158,7 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
 
             # run sig gb computation with newly added element
             _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                                     tags, ind_order, tr, R, 0, :POT)
+                                     tags, ind_order, tr, timer, 0, :POT)
             arit_ops += new_arit_ops
 
             # extract suitable random linear combinations of inserted elements for cleaning
@@ -173,13 +176,14 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
                 nz_cfs, nz_mons = Coeff[], MonIdx[]
                 for (j, syz_msk) in enumerate(basis.syz_masks[1:basis.syz_load])
                     if index(syz_msk) == idx
-                        to_add_cfs, to_add_mns = construct_module((idx, basis.syz_sigs[j]),
-                                                                  basis,
-                                                                  basis_ht,
-                                                                  tr.syz_ind_to_mat[j],
-                                                                  tr,
-                                                                  char,
-                                                                  ind_order, idx)
+                        tim = @elapsed to_add_cfs, to_add_mns = construct_module((idx, basis.syz_sigs[j]),
+                                                                                 basis,
+                                                                                 basis_ht,
+                                                                                 tr.syz_ind_to_mat[j],
+                                                                                 tr,
+                                                                                 char,
+                                                                                 ind_order, idx)
+                        timer.module_time += tim
                         mul_by_coeff!(to_add_cfs, rand(one(Coeff):Coeff(r_char-1)),
                                       char)
                         nz_cfs, nz_mons = add_pols(nz_cfs, nz_mons,
@@ -200,10 +204,9 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
             @info "------------------------------------------"
             @info "saturation step"
             _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                                     tags, ind_order, tr, R, 0, :POT)
+                                     tags, ind_order, tr, timer, 0, :POT)
             arit_ops += new_arit_ops
             @info "------------------------------------------"
-            @info "$(arit_ops) total submul's"
 
             # remask with 50 perc. probability
             if remask_cnt > 0
@@ -214,6 +217,8 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
                 end
             end
         end
+        @info "$(arit_ops) total submul's"
+        @info timer
 
         # output
         R = parent(first(sys))
@@ -268,7 +273,7 @@ function siggb!(basis::Basis{N},
                 tags::Tags,
                 ind_order::IndOrder,
                 tr::Tracer,
-                R::MPolyRing,
+                timer::Timings,
                 degbound::Int=0,
                 mod_ord::Symbol=:DPOT) where {N, Char, Shift}
 
@@ -286,23 +291,27 @@ function siggb!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        _, compat_ind, sigind = select_normal!(pairset, basis, matrix,
-                                               basis_ht, symbol_ht,
-                                               ind_order, tags,
-                                               mod_ord)
-        symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
-                     ind_order, tags, sigind, compat_ind,
-                     mod_ord)
+        tim = @elapsed _, compat_ind, sigind = select_normal!(pairset, basis, matrix,
+                                                                basis_ht, symbol_ht,
+                                                                ind_order, tags,
+                                                                mod_ord)
+        timer.select_time += tim
+        tim = @elapsed symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+                                    ind_order, tags, sigind, compat_ind,
+                                    mod_ord)
+        timer.sym_pp_time += tim
         finalize_matrix!(matrix, symbol_ht, ind_order)
 
         if !iszero(matrix.nrows)
-            arit_ops_new = echelonize!(matrix, tags, ind_order, char,
-                                       shift, tr)
+            tim = @elapsed arit_ops_new = echelonize!(matrix, tags, ind_order, char,
+                                                      shift, tr)
             arit_ops += arit_ops_new
+            timer.lin_alg_time += tim
 
-            added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
-                                       basis_ht, ind_order, tags,
-                                       tr, char, syz_queue, mod_ord)
+            tim = @elapsed added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
+                                                      basis_ht, ind_order, tags,
+                                                      tr, char, syz_queue, mod_ord)
+            timer.update_time += tim
             if added_unit
                 return true, arit_ops
             end

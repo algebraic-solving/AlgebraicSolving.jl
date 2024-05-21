@@ -34,6 +34,7 @@ end
     s_ind = index(sig)
 
     @inbounds for i in basis.basis_offset:basis.basis_load
+        basis.is_red[i] && continue
         b_ind = index(basis.sigs[i])
         if (ind_order.ord[b_ind] < ind_order.ord[s_ind]
             && !are_incompat(b_ind, s_ind, ind_order))
