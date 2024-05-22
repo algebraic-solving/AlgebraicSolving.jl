@@ -193,40 +193,13 @@ const SyzInfo = Tuple{SigIndex, Dict{SigIndex, Bool}}
 const IndConn = Dict{SigIndex, Vector{SigIndex}}
 
 # For output of decomp algorithms
-abstract type AffineCell end
-
-mutable struct LocClosedSet{T<:MPolyRingElem} <: AffineCell
-    seq::Vector{T}
-    ineqns::Vector{Vector{T}}
-    gbs::Vector{Vector{T}}
-
-    function LocClosedSet{T}(seq::Vector{T}) where {T<:MPolyRingElem}
-        @assert !isempty(seq) "cannot construct affine cell from no equations."
-        R = parent(first(seq))
-        gb = saturate(seq, last(gens(R)))
-        return new(seq, [[last(gens(R))]], [gb])
-    end
-end
-
-mutable struct WLocClosedSet{T<:MPolyRingElem} <: AffineCell
+mutable struct LocClosedSet{T<:MPolyRingElem}
     seq::Vector{T}
     tags::Vector{Symbol}
     hull_eqns::Vector{T}
-    hypplanes::Vector{T}
     codim_upper_bound::Int
     ineqns::Vector{T}
     gbs::Vector{Vector{T}}
-
-    function WLocClosedSet{T}(seq::Vector{T}) where {T<:MPolyRingElem}
-        @assert !isempty(seq) "cannot construct affine cell from no equations."
-        R = parent(first(seq))
-        codim_upper_bound = min(length(seq), ngens(R) - 1)
-        hypplanes = [random_lin_comb(gens(R)) for _ in 1:(ngens(R) - codim_upper_bound)]
-        gb = saturate(vcat(seq, hypplanes), last(gens(R)))
-        return new(seq, [:seq for _ in 1:length(seq)],
-                   T[], hypplanes, codim_upper_bound,
-                   [last(gens(R))], [gb])
-    end
 end
 
 # for benchmarking
