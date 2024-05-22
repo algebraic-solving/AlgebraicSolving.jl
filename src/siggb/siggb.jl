@@ -242,10 +242,11 @@ function sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem
     sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
     
     # fill basis, pairset, tags
-    basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs,
-                                                        basis_ht, def_tg=:split)
-
     sysl = length(sys)
+    basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs,
+                                                        basis_ht, def_tg=:split,
+                                                        trace=Val(true))
+
     # compute divmasks
     fill_divmask!(basis_ht)
     @inbounds for i in 1:sysl
@@ -362,6 +363,7 @@ function sig_decomp!(basis::Basis{N},
             @info "------------------------------------------"
             continue
         elseif add_to_output!(result, lc_set)
+            @info "done"
             @info "------------------------------------------"
             continue
         end
@@ -409,7 +411,7 @@ function siggb_for_split!(basis::Basis{N},
     filter!(ind -> gettag(tags, ind) == :split, splitting_inds)
     sort!(splitting_inds, by = ind -> ind_order.ord[ind])
 
-    sort_pairset!(pairset, 1, pairset.load-1, ind_order)
+    sort_pairset!(pairset, 1, pairset.load-1, :DPOT, ind_order)
 
     lt_squeue = (syz1, syz2) -> begin
         idx1 = index(syz1)
@@ -431,8 +433,8 @@ function siggb_for_split!(basis::Basis{N},
 	matrix = initialize_matrix(Val(N))
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
-        tim = @elapsed deg, _ = select_normal!(pairset, basis, matrix,
-                                               basis_ht, symbol_ht, ind_order, tags)
+        tim = @elapsed deg, _, _ = select_normal!(pairset, basis, matrix,
+                                                  basis_ht, symbol_ht, ind_order, tags)
         timer.select_time += tim
         tim = @elapsed symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
                                     ind_order, tags)
@@ -440,7 +442,7 @@ function siggb_for_split!(basis::Basis{N},
 
         finalize_matrix!(matrix, symbol_ht, ind_order)
         iszero(matrix.nrows) && continue
-        tim = @elapsed echelonize!(matrix, tags, ind_order, char, shift)
+        tim = @elapsed echelonize!(matrix, tags, ind_order, char, shift, tr)
         timer.lin_alg_time += tim
 
         time = @elapsed update_siggb!(basis, matrix, pairset,
@@ -450,7 +452,8 @@ function siggb_for_split!(basis::Basis{N},
         timer.update_time += tim
 
         # find minimum syzygy index
-        sort!(syz_queue, by = sz -> (basis.syz_sigs[sz[1]].deg, ind_order.ord[index(basis.syz_masks[sz[1]])]))
+        sort!(syz_queue, by = sz -> (basis.syz_sigs[sz[1]].deg,
+                                     ind_order.ord[index(basis.syz_masks[sz[1]])]))
         if !isempty(syz_queue)
             min_syz_idx = minimum(sz -> ind_order.ord[index(basis.syz_masks[sz[1]])], syz_queue)
         else
@@ -476,7 +479,7 @@ function siggb_for_split!(basis::Basis{N},
             end
         end
 
-        sort_pairset!(pairset, 1, pairset.load-1, ind_order)
+        sort_pairset!(pairset, 1, pairset.load-1, :DPOT, ind_order)
     end
     if !isempty(syz_queue)
         sort!(syz_queue, by = sz -> basis.syz_sigs[sz[1]].deg)
@@ -524,7 +527,8 @@ function split!(basis::Basis{N},
         sys2_mons = copy(basis.monomials[sorted_inds])
         sys2_coeffs = copy(basis.coefficients[sorted_inds])
         basis2, ps2, tags2, ind_ord2, tr2 = fill_structs!(sys2_mons, sys2_coeffs,
-                                                          basis_ht, def_tg=:split)
+                                                          basis_ht, def_tg=:split,
+                                                          trace=Val(true))
 
         ind_ord2 = new_ind_order(basis2)
         
@@ -550,7 +554,6 @@ function split!(basis::Basis{N},
         push!(lc_set_hull.tags, :hull)
         push!(lc_set_hull.hull_eqns, h)
 
-        # TODO: do we need to delete from hull eqns?
         deleteat!(lc_set_nz.seq, to_del)
         deleteat!(lc_set_nz.tags, to_del)
         new_codim_ub = min(codim_upper_bound(lc_set), num_eqns(lc_set) - 1)

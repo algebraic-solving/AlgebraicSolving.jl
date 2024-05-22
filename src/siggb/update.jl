@@ -32,7 +32,7 @@ function update_siggb!(basis::Basis,
         if isempty(row)
             new_syz_c += 1
             process_syzygy!(basis, new_sig, new_sig_mask, pairset, tr, mod_ord)
-            push!(syz_queue, (basis.syz_load+1, Dict{SigIndex, Bool}()))
+            push!(syz_queue, (basis.syz_load, Dict{SigIndex, Bool}()))
 
             # for cofactor insertion in ndeg computation
             if gettag(tags, index(new_sig)) in [:ndeg, :sat]
