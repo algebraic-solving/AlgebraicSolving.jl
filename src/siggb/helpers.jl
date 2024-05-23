@@ -125,18 +125,23 @@ function garbage_collect!(basis::Basis{N},
             continue
         end
         shc = compute_shift(pti, del_indices)
-        @assert shc != -1
+        if shc == -1
+            push!(to_del_ps, i)
+            continue
+        end
         p.top_index = pti - shc
         if !iszero(pbi)
             shc = compute_shift(pbi, del_indices)
-            @assert shc != -1
+            if shc == -1
+                push!(to_del_ps, i)
+                continue
+            end
             p.bot_index = pbi - shc
         end
     end
     deleteat!(pairset.elems, to_del_ps)
     pairset.load -= length(to_del_ps)
-
-    s1 = [basis.sigs[i] for i in basis.basis_offset:basis.basis_load if !basis.is_red[i]]
+    
     j = 1
     @inbounds for i in basis.basis_offset:basis.basis_load
         if j <= length(del_indices) && i == del_indices[j]
@@ -155,21 +160,24 @@ function garbage_collect!(basis::Basis{N},
         basis.mod_reps[i-shift] = basis.mod_reps[i]
 
         # adjust tracer
-        if typeof(Tracer) == SigTracer
-            tracer.basis_ind_to_mat[i-shift] = tracer.basis_ind_to_mat[i]
+        if typeof(tr) == SigTracer
+            tr.basis_ind_to_mat[i-shift] = tr.basis_ind_to_mat[i]
         end
     end
+    
     basis.basis_load -= length(del_indices)
-    s2 = basis.sigs[basis.basis_offset:basis.basis_load]
-    @assert s1 == s2
-
-    @inbounds if typeof(Tracer) == SigTracer
+    
+    @inbounds if typeof(tr) == SigTracer
         for mat in tr.mats
             for sig in keys(mat.rows)
                 row_ind, rewr_ind = mat.rows[sig]
                 shc = compute_shift(rewr_ind, del_indices)
-                @assert shc != -1
-                mat.rows[sig] = (row_ind, rewr_ind-shift)
+                mat.rows[sig] = (row_ind, shc != -1 ? rewr_ind-shc : 0)
+            end
+            for r_ind in keys(mat.is_basis_row)
+                b_ind = mat.is_basis_row[r_ind]
+                shc = compute_shift(b_ind, del_indices)
+                mat.is_basis_row[r_ind] = shc != -1 ? b_ind-shc : 0
             end
         end
     end
