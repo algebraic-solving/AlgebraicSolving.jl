@@ -363,6 +363,8 @@ function update_pairset!(pairset::Pairset{N},
 end
 
 function minimize!(basis::Basis{N},
+                   pairset::Pairset{N},
+                   tr::Tracer,
                    basis_ht::MonomialHashtable{N},
                    idx_bound::SigIndex,
                    ind_order::IndOrder,
@@ -399,6 +401,7 @@ function minimize!(basis::Basis{N},
           by = x -> x[1],
           lt = (m1, m2) -> m1.deg <= m2.deg) 
 
+    to_del = Int[]
     @inbounds for i in 1:l 
         lm, lm_msk, bind = min_data[i]
         basis.is_red[bind] && continue
@@ -408,8 +411,12 @@ function minimize!(basis::Basis{N},
             if divch(lm, lm2, lm_msk, lm_msk2)
                 el_killed += 1
                 basis.is_red[bind2] = true
+                push!(to_del, bind2)
             end
         end
     end
+
+    sort!(to_del)
     @info "$(el_killed) elements killed"
+    # garbage_collect!(basis, pairset,  tr, to_del)
 end

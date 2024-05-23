@@ -87,9 +87,9 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
     with_logger(logger) do
         timer = new_timer()
-        _, arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                             tags, ind_order, tr, timer, degbound,
-                             mod_ord)
+        _, arit_ops, _ = siggb!(basis, pairset, basis_ht, char, shift,
+                                tags, ind_order, tr, timer, degbound,
+                                mod_ord)
         @info "$(arit_ops) total submul's"
         @info timer
     end
@@ -157,54 +157,24 @@ function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingEl
             end
 
             # run sig gb computation with newly added element
-            _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                                     tags, ind_order, tr, timer, 0, :POT)
+            _, new_arit_ops, nz_conds = siggb!(basis, pairset, basis_ht, char, shift,
+                                               tags, ind_order, tr, timer, 0, :POT)
             arit_ops += new_arit_ops
 
             # extract suitable random linear combinations of inserted elements for cleaning
-            sig_inds = (SigIndex).(collect(eachindex(ind_order.ord)))
-            for idx in sig_inds
-                gettag(tags, idx) != :fndegins && continue
-                # check if element was inserted in previous round
-                gr_inds = filter(idx2 -> gettag(tags, idx2) == :ndeg && !cmp_ind(idx2, idx, ind_order),
-                                 sig_inds)
-                f_ord_ind = ind_order.ord[i]
-                min_gr_ord_ind, _ = findmin(idx2 -> ind_order.ord[idx2], gr_inds)
-                f_ord_ind != min_gr_ord_ind && continue
-
-                # construct nonzero condition to append
-                nz_cfs, nz_mons = Coeff[], MonIdx[]
-                for (j, syz_msk) in enumerate(basis.syz_masks[1:basis.syz_load])
-                    if index(syz_msk) == idx
-                        tim = @elapsed to_add_cfs, to_add_mns = construct_module((idx, basis.syz_sigs[j]),
-                                                                                 basis,
-                                                                                 basis_ht,
-                                                                                 tr.syz_ind_to_mat[j],
-                                                                                 tr,
-                                                                                 char,
-                                                                                 ind_order, idx)
-                        timer.module_time += tim
-                        mul_by_coeff!(to_add_cfs, rand(one(Coeff):Coeff(r_char-1)),
-                                      char)
-                        nz_cfs, nz_mons = add_pols(nz_cfs, nz_mons,
-                                                   to_add_cfs, to_add_mns, char)
-                    end
-                end
-                is_one((nz_cfs, nz_mons), basis_ht) && continue
-                sort_poly!((nz_cfs, nz_mons), by = midx -> basis_ht.exponents[midx],
-                           lt = lt_drl, rev = true)
-                normalize_cfs!(nz_cfs, char)
+            for (nz_cfs, nz_mons) in nz_conds
                 add_new_sequence_element!(basis, basis_ht, tr, nz_cfs, nz_mons,
                                           ind_order, ind_order.max_ind+one(SigIndex),
                                           pairset, tags,
                                           new_tg = :sat)
-                make_sat_incompat!(tags, ind_order)
             end
+            make_sat_incompat!(tags, ind_order)
 
             @info "------------------------------------------"
             @info "saturation step"
-            _, new_arit_ops = siggb!(basis, pairset, basis_ht, char, shift,
-                                     tags, ind_order, tr, timer, 0, :POT)
+            _, new_arit_ops, nz_cn = siggb!(basis, pairset, basis_ht, char, shift,
+                                            tags, ind_order, tr, timer, 0, :POT)
+            @assert isempty(nz_cn)
             arit_ops += new_arit_ops
             @info "------------------------------------------"
 
@@ -282,6 +252,8 @@ function siggb!(basis::Basis{N},
     syz_queue = SyzInfo[]
     arit_ops = 0
 
+    nz_conds = Polynomial[]
+
     sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
 
     while !iszero(pairset.load)
@@ -314,21 +286,45 @@ function siggb!(basis::Basis{N},
                                                       tr, char, syz_queue, mod_ord)
             timer.update_time += tim
             if added_unit
-                return true, arit_ops
+                return true, arit_ops, nz_conds
             end
             sort_pairset!(pairset, 1, pairset.load-1, mod_ord, ind_order)
         end
 
-        if !iszero(pairset.load)
-            p_idx = index(first(pairset.elems).top_sig)
-            if mod_ord == :POT && cmp_ind_str(curr_ind, p_idx, ind_order)
-                minimize!(basis, basis_ht, curr_ind, ind_order, tags)
+        p_idx = iszero(pairset.load) ? zero(SigIndex) : index(first(pairset.elems).top_sig)
+        if mod_ord == :POT && (iszero(p_idx) || cmp_ind_str(curr_ind, p_idx, ind_order))
+
+            # possible nonzero condition to append in nondeg computation
+            if gettag(tags, curr_ind) == :fndegins
+                nz_cfs, nz_mons = Coeff[], MonIdx[]
+                for (j, syz_msk) in enumerate(basis.syz_masks[1:basis.syz_load])
+                    if index(syz_msk) == curr_ind
+                        to_add_cfs, to_add_mns = construct_module((curr_ind, basis.syz_sigs[j]),
+                                                                  basis,
+                                                                  basis_ht,
+                                                                  tr.syz_ind_to_mat[j],
+                                                                  tr,
+                                                                  char,
+                                                                  ind_order, curr_ind)
+                        mul_by_coeff!(to_add_cfs, rand(one(Coeff):Coeff(Char-1)),
+                                      char)
+                        nz_cfs, nz_mons = add_pols(nz_cfs, nz_mons,
+                                                   to_add_cfs, to_add_mns, char)
+                    end
+                end
+                is_one((nz_cfs, nz_mons), basis_ht) && continue
+                sort_poly!((nz_cfs, nz_mons), by = midx -> basis_ht.exponents[midx],
+                           lt = lt_drl, rev = true)
+                normalize_cfs!(nz_cfs, char)
+                push!(nz_conds, (nz_cfs, nz_mons))
             end
+
+            # minimize à la F5c
+            min_idx = iszero(p_idx) ? zero(SigIndex) : curr_ind
+            minimize!(basis, pairset, tr, basis_ht, min_idx, ind_order, tags)
         end
     end
-
-    mod_ord == :POT && minimize!(basis, basis_ht, zero(SigIndex), ind_order, tags)
-    return false, arit_ops
+    return false, arit_ops, nz_conds
 end
 
 #---------------- functions for splitting --------------------#

@@ -67,7 +67,6 @@ function store_basis_elem!(tr::SigTracer,
     @inbounds row_ind, _ = tr_mat.rows[new_sig]
     @inbounds tr_mat.is_basis_row[row_ind] = bas_ind
     @inbounds tr.basis_ind_to_mat[bas_ind] = length(tr.mats)
-    tr.load += 1
 end
 
 function store_syz!(tr::SigTracer)

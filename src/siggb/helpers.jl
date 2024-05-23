@@ -101,14 +101,13 @@ end
     idx = findlast(j -> j <= i, to_del)
     if isnothing(idx)
         return 0
-    elseif del_indices[idx] == i
+    elseif to_del[idx] == i
         return -1
     else
         return idx
     end
 end
 
-# TODO: figure out how to maintain the rewrite tree
 function garbage_collect!(basis::Basis{N},
                           pairset::Pairset{N},
                           tr::Tracer,
@@ -119,6 +118,7 @@ function garbage_collect!(basis::Basis{N},
     @inbounds for (k, i) in enumerate(del_indices)
         shift = k
         upb = k < length(del_indices) ? del_indices[k+1]-1 : basis.basis_load
+        upb = min(upb, basis.basis_load-shift)
         for j in i+1:upb
             basis.sigs[j] = basis.sigs[j+shift]
             basis.sigmasks[j] = basis.sigmasks[j+shift]
@@ -139,9 +139,17 @@ function garbage_collect!(basis::Basis{N},
             end
         end
     end
+    basis.basis_load -= length(del_indices)
 
+    to_del_ps = Int[]
     @inbounds for i in 1:pairset.load
         p = pairset.elems[i]
+        pti = p.top_index
+        pbi = p.bot_index
+        if basis.is_red[pti] || basis.is_red[pbi]
+            push!(to_del_ps, i)
+            continue
+        end
         shc = compute_shift(p.top_index, del_indices)
         @assert shc != -1
         p.top_index = i - shc
@@ -149,6 +157,16 @@ function garbage_collect!(basis::Basis{N},
         @assert shc != -1
         p.bot_index = i - shc
     end
+
+    # @inbounds for (k, i) in enumerate(to_del_ps)
+    #     shift = k
+    #     upb = k < length(to_del_ps) ? to_del_ps[k+1]-1 : pairset.load
+    #     for j in i+1:upb
+    #         pairset.elems[j] = pairset.elems[j+shift]
+    #     end
+    # end
+    deleteat!(pairset.elems, to_del_ps)
+    pairset.load -= length(to_del_ps)
 end
 
 function resize_basis!(basis::Basis)
