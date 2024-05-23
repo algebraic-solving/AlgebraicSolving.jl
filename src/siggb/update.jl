@@ -418,5 +418,5 @@ function minimize!(basis::Basis{N},
 
     sort!(to_del)
     @info "$(el_killed) elements killed"
-    # garbage_collect!(basis, pairset,  tr, to_del)
+    garbage_collect!(basis, pairset,  tr, to_del)
 end

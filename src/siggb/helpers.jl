@@ -115,58 +115,64 @@ function garbage_collect!(basis::Basis{N},
 
     isempty(del_indices) && return
 
-    @inbounds for (k, i) in enumerate(del_indices)
-        shift = k
-        upb = k < length(del_indices) ? del_indices[k+1]-1 : basis.basis_load
-        upb = min(upb, basis.basis_load-shift)
-        for j in i+1:upb
-            basis.sigs[j] = basis.sigs[j+shift]
-            basis.sigmasks[j] = basis.sigmasks[j+shift]
-            basis.sigratios[j] = basis.sigratios[j+shift]
-            basis.lm_masks[j] = basis.lm_masks[j+shift]
-            basis.monomials[j] = basis.monomials[j+shift]
-            basis.coefficients[j] = basis.coefficients[j+shift]
-            basis.is_red[j] = basis.is_red[j+shift]
-            basis.mod_rep_known[j] = basis.mod_rep_known[j+shift]
-            basis.mod_reps[j] = basis.mod_reps[j+shift]
-
-            # adjust rewrite tree, THIS BREAKS IT
-            basis.rewrite_nodes[j+1] = basis.rewrite_nodes[j+shift+1]
-
-            # adjust tracer
-            if typeof(Tracer) == SigTracer
-                tracer.basis_ind_to_mat[j] = tracer.basis_ind_to_mat[j+shift]
-            end
-        end
-    end
-    basis.basis_load -= length(del_indices)
-
     to_del_ps = Int[]
     @inbounds for i in 1:pairset.load
         p = pairset.elems[i]
         pti = p.top_index
         pbi = p.bot_index
-        if basis.is_red[pti] || basis.is_red[pbi]
+        if basis.is_red[pti] || (!iszero(pbi) && basis.is_red[pbi])
             push!(to_del_ps, i)
             continue
         end
-        shc = compute_shift(p.top_index, del_indices)
+        shc = compute_shift(pti, del_indices)
         @assert shc != -1
-        p.top_index = i - shc
-        shc = compute_shift(p.bot_index, del_indices)
-        @assert shc != -1
-        p.bot_index = i - shc
+        p.top_index = pti - shc
+        if !iszero(pbi)
+            shc = compute_shift(pbi, del_indices)
+            @assert shc != -1
+            p.bot_index = pbi - shc
+        end
     end
-
-    # @inbounds for (k, i) in enumerate(to_del_ps)
-    #     shift = k
-    #     upb = k < length(to_del_ps) ? to_del_ps[k+1]-1 : pairset.load
-    #     for j in i+1:upb
-    #         pairset.elems[j] = pairset.elems[j+shift]
-    #     end
-    # end
     deleteat!(pairset.elems, to_del_ps)
     pairset.load -= length(to_del_ps)
+
+    s1 = [basis.sigs[i] for i in basis.basis_offset:basis.basis_load if !basis.is_red[i]]
+    j = 1
+    @inbounds for i in basis.basis_offset:basis.basis_load
+        if j <= length(del_indices) && i == del_indices[j]
+            j += 1
+            continue
+        end
+        shift = j-1
+        basis.sigs[i-shift] = basis.sigs[i]
+        basis.sigmasks[i-shift] = basis.sigmasks[i]
+        basis.sigratios[i-shift] = basis.sigratios[i]
+        basis.lm_masks[i-shift] = basis.lm_masks[i]
+        basis.monomials[i-shift] = basis.monomials[i]
+        basis.coefficients[i-shift] = basis.coefficients[i]
+        basis.is_red[i-shift] = basis.is_red[i]
+        basis.mod_rep_known[i-shift] = basis.mod_rep_known[i]
+        basis.mod_reps[i-shift] = basis.mod_reps[i]
+
+        # adjust tracer
+        if typeof(Tracer) == SigTracer
+            tracer.basis_ind_to_mat[i-shift] = tracer.basis_ind_to_mat[i]
+        end
+    end
+    basis.basis_load -= length(del_indices)
+    s2 = basis.sigs[basis.basis_offset:basis.basis_load]
+    @assert s1 == s2
+
+    @inbounds if typeof(Tracer) == SigTracer
+        for mat in tr.mats
+            for sig in keys(mat.rows)
+                row_ind, rewr_ind = mat.rows[sig]
+                shc = compute_shift(rewr_ind, del_indices)
+                @assert shc != -1
+                mat.rows[sig] = (row_ind, rewr_ind-shift)
+            end
+        end
+    end
 end
 
 function resize_basis!(basis::Basis)
