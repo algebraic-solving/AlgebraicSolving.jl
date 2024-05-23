@@ -323,11 +323,11 @@ function siggb!(basis::Basis{N},
             # minimize à la F5c
             min_idx = iszero(p_idx) ? zero(SigIndex) : curr_ind
             minimize!(basis, basis_ht, min_idx, ind_order, tags)
-            superflous = findall(basis.is_red[basis.basis_offset:basis.basis_load]) .+ (basis.basis_offset-1)
-            if length(superflous) >= gc_threshold
-                @info "garbage collect"
-                garbage_collect!(basis, pairset, tr, superflous)
-            end
+            # superflous = findall(basis.is_red[basis.basis_offset:basis.basis_load]) .+ (basis.basis_offset-1)
+            # if length(superflous) >= gc_threshold
+            #     @info "garbage collect"
+            #     garbage_collect!(basis, pairset, tr, superflous)
+            # end
         end
     end
     return false, arit_ops, nz_conds
