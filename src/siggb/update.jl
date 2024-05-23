@@ -119,9 +119,9 @@ function add_basis_elem!(basis::Basis{N},
     tree_data[1] += 1
 
     # if an existing sig further reduced we dont need the old element
-    if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
-        basis.is_red[parent_ind] = true
-    end 
+    # if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
+    #     basis.is_red[parent_ind] = true
+    # end 
 
     basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
     basis.basis_load = l
@@ -363,8 +363,6 @@ function update_pairset!(pairset::Pairset{N},
 end
 
 function minimize!(basis::Basis{N},
-                   pairset::Pairset{N},
-                   tr::Tracer,
                    basis_ht::MonomialHashtable{N},
                    idx_bound::SigIndex,
                    ind_order::IndOrder,
@@ -418,5 +416,4 @@ function minimize!(basis::Basis{N},
 
     sort!(to_del)
     @info "$(el_killed) elements killed"
-    garbage_collect!(basis, pairset,  tr, to_del)
 end

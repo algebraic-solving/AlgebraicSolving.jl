@@ -3,6 +3,7 @@ const init_ht_size = 2^17
 const init_basis_size = 10000
 const init_syz_size = 1000
 const init_pair_size = 10000
+const gc_threshold = 300
 # default sorting alg
 const def_sort_alg = Base.Sort.DEFAULT_UNSTABLE
 include("typedefs.jl")
@@ -321,7 +322,12 @@ function siggb!(basis::Basis{N},
 
             # minimize à la F5c
             min_idx = iszero(p_idx) ? zero(SigIndex) : curr_ind
-            minimize!(basis, pairset, tr, basis_ht, min_idx, ind_order, tags)
+            minimize!(basis, basis_ht, min_idx, ind_order, tags)
+            superflous = findall(basis.is_red[basis.basis_offset:basis.basis_load]) .+ (basis.basis_offset-1)
+            if length(superflous) >= gc_threshold
+                @info "garbage collect"
+                garbage_collect!(basis, pairset, tr, superflous)
+            end
         end
     end
     return false, arit_ops, nz_conds
