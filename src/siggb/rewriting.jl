@@ -53,20 +53,33 @@ end
                                    sig::Sig,
                                    sigmask::DivMask,
                                    tags::Tags,
-                                   check::Bool)
+                                   check::Bool,
+                                   mod_ord::Symbol)
 
     if !check
         return false
     end
     ind = index(sig)
 
-    k = find_canonical_rewriter(basis, sig, sigmask)
+    k = find_canonical_rewriter(basis, sig, sigmask, mod_ord)
     return k != idx
 end
 
 function find_canonical_rewriter(basis::Basis,
                                  sig::Sig,
-                                 sigmask::DivMask)
+                                 sigmask::DivMask,
+                                 mod_ord::Symbol)
+
+    if mod_ord == :DPOT
+        return find_canonical_rewriter_tree(basis, sig, sigmask)
+    else
+        return find_canonical_rewriter_rat(basis, sig, sigmask)
+    end
+end
+
+function find_canonical_rewriter_tree(basis::Basis,
+                                      sig::Sig,
+                                      sigmask::DivMask)
 
     node_ind = 1
     while true
@@ -116,12 +129,13 @@ function rewriteable(basis::Basis,
                      sigmask::DivMask,
                      ind_order::IndOrder,
                      tags::Tags,
-                     check::Bool)
+                     check::Bool,
+                     mod_ord::Symbol)
 
     s_ind = index(sig)
 
     rewriteable_syz(basis, sig, sigmask, tags, check) && return true
-    rewriteable_basis(basis, idx, sig, sigmask, tags, check) && return true
+    rewriteable_basis(basis, idx, sig, sigmask, tags, check, mod_ord) && return true
     rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags, check) && return true
     return false
 end

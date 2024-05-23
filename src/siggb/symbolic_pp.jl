@@ -58,7 +58,8 @@ function select_normal!(pairset::Pairset{N},
         curr_top_sig = pair.top_sig
 
         rewr_ind = find_canonical_rewriter(basis, curr_top_sig,
-                                           pair.top_sig_mask)
+                                           pair.top_sig_mask,
+                                           mod_ord)
 
         pair_with_rewr_ind = 0
         for j in i:npairs
@@ -116,7 +117,7 @@ function select_normal!(pairset::Pairset{N},
                             rewriteable_basis(basis, pair2.bot_index, pair2.bot_sig,
                                               pair2.bot_sig_mask, tags,
                                               mod_ord == :DPOT || cmp_ind(sigind, index(pair2.bot_sig),
-                                                                          ind_order)) && continue
+                                                                          ind_order), mod_ord) && continue
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
                                           monomial(basis.sigs[ind]))
@@ -291,7 +292,8 @@ function symbolic_pp!(basis::Basis{N},
             # check if reducer is rewriteable
             if rewriteable(basis, ht, j, mul_cand_sig,
                            cand_sig_mask,
-                           ind_order, tags, true)
+                           ind_order, tags, true,
+                           mod_ord)
                 j += 1
                 @goto target
             end
