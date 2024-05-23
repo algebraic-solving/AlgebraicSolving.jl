@@ -139,7 +139,16 @@ function garbage_collect!(basis::Basis{N},
             p.bot_index = pbi - shc
         end
     end
-    deleteat!(pairset.elems, to_del_ps)
+    
+    j = 1
+    @inbounds for i in 1:pairset.load
+        if j <= length(to_del_ps) && i == to_del_ps[j]
+            j += 1
+            continue
+        end
+        shift = j-1
+        pairset.elems[i-shift] = pairset.elems[i]
+    end
     pairset.load -= length(to_del_ps)
     
     j = 1
