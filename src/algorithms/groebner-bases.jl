@@ -147,7 +147,8 @@ function _core_groebner_basis(
         error("At the moment we only supports finite fields.")
     end
 
-    lens, cfs, exps = _convert_to_msolve(F)
+    # nr_gens might change if F contains zero polynomials
+    lens, cfs, exps, nr_gens = _convert_to_msolve(F)
 
     gb_ld  = Ref(Cint(0))
     gb_len = Ref(Ptr{Cint}(0))
