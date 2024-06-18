@@ -22,7 +22,7 @@ field of characteristic $0$ or $p$ where $p$ is a prime number $<2^{31}$.
 
 ## Polynomial Rings
 
-We use [Nemo](https://www.nemocas.org/index.html)'s multivariate polynomial 
+We use [Nemo](https://www.nemocas.org/)'s multivariate polynomial 
 ring structures:
 
 ```@repl
