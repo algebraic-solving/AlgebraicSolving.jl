@@ -15,6 +15,8 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input generators.
+- `eliminate::Int=0`: size of first block of variables to be eliminated.
+- `intersect::Bool=true`: compute the `eliminate`-th elimination ideal.
 - `initial_hts::Int=17`: initial hash table size `log_2`.
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
@@ -40,6 +42,7 @@ julia> eliminate(I, 2)
 function eliminate(
         I::Ideal{T} where T <: MPolyRingElem,
         eliminate::Int;
+        intersect::Bool=true,
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,
@@ -50,9 +53,9 @@ function eliminate(
     if eliminate <= 0
         error("Number of variables to be eliminated is <= 0.")
     else
-        return groebner_basis(I, initial_hts=initial_hts, nr_thrds=nr_thrds,
+        return groebner_basis(I, initial_hts=initial_hts,nr_thrds=nr_thrds,
                               max_nr_pairs=max_nr_pairs, la_option=la_option,
-                              eliminate=eliminate,
+                              eliminate=eliminate, intersect=intersect,
                               complete_reduction=complete_reduction,
                               info_level=info_level)
     end
@@ -73,6 +76,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
 - `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
 - `eliminate::Int=0`: size of first block of variables to be eliminated.
+- `intersect::Bool=true`: compute the `eliminate`-th elimination ideal.
 - `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 
@@ -105,6 +109,7 @@ function groebner_basis(
         max_nr_pairs::Int=0,
         la_option::Int=2,
         eliminate::Int=0,
+        intersect::Bool=true,
         complete_reduction::Bool=true,
         info_level::Int=0
         )
@@ -112,7 +117,7 @@ function groebner_basis(
     return get!(I.gb, eliminate) do
         _core_groebner_basis(I, initial_hts = initial_hts, nr_thrds = nr_thrds, 
                              max_nr_pairs = max_nr_pairs, la_option = la_option,
-                             eliminate = eliminate,
+                             eliminate = eliminate, intersect = intersect,
                              complete_reduction = complete_reduction,
                              info_level = info_level)
     end
@@ -125,6 +130,7 @@ function _core_groebner_basis(
         max_nr_pairs::Int=0,
         la_option::Int=2,
         eliminate::Int=0,
+        intersect::Bool=true,
         complete_reduction::Bool=true,
         info_level::Int=0
         )
@@ -170,9 +176,13 @@ function _core_groebner_basis(
     ptr     = reinterpret(Ptr{Int32}, gb_cf[])
     jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
 
-    basis = _convert_finite_field_array_to_abstract_algebra(
-                jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
-
+    if intersect == true
+        basis = _convert_finite_field_array_to_abstract_algebra(
+            jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
+    else
+        basis = _convert_finite_field_array_to_abstract_algebra(
+            jl_ld, jl_len, jl_cf, jl_exp, R, 0)
+    end
 
     ccall((:free_f4_julia_result_data, libneogb), Nothing ,
           (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
