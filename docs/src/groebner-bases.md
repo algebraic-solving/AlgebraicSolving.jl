@@ -5,7 +5,7 @@ DocTestSetup = quote
 end
 ```
 
-```@setup
+```@setup algebraicsolving
 using AlgebraicSolving
 ```
 
