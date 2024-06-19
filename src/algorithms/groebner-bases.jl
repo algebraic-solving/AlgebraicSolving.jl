@@ -176,12 +176,10 @@ function _core_groebner_basis(
     ptr     = reinterpret(Ptr{Int32}, gb_cf[])
     jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
 
-    println(intersect)
     if intersect == true
         basis = _convert_finite_field_array_to_abstract_algebra(
             jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
     else
-        println("Hi")
         basis = _convert_finite_field_array_to_abstract_algebra(
             jl_ld, jl_len, jl_cf, jl_exp, R, 0)
     end
