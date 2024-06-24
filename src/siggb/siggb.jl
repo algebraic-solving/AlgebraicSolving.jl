@@ -266,9 +266,9 @@ function siggb!(basis::Basis{N},
         symbol_ht = initialize_secondary_hash_table(basis_ht)
 
         tim = @elapsed _, compat_ind, sigind = select_normal!(pairset, basis, matrix,
-                                                                basis_ht, symbol_ht,
-                                                                ind_order, tags,
-                                                                mod_ord)
+                                                              basis_ht, symbol_ht,
+                                                              ind_order, tags,
+                                                              mod_ord)
         timer.select_time += tim
         tim = @elapsed symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
                                     ind_order, tags, sigind, compat_ind,
