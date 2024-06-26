@@ -229,7 +229,7 @@ end
 function _homogenize(F::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
     S, vars = polynomial_ring(base_ring(R), ["x$i" for i in 1:nvars(R)+1],
-                             internal_ordering = :degrevlex)
+                              ordering = :degrevlex)
     res = typeof(first(F))[]
     for f in F
         ctx = MPolyBuildCtx(S)
