@@ -117,7 +117,7 @@ end
     
     @inbounds buffer[bufind] = zero(Cbuf)
     l = length(pivmons)
-    @turbo warn_check_args=false for k in 2:l
+    for k in 2:l
         c = pivcoeffs[k]
         m_idx = pivmons[k]
         colidx = hash2col[m_idx]
