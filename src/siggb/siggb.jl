@@ -51,11 +51,11 @@ julia> sig_groebner_basis(Fhom)
 7-element Vector{Tuple{Tuple{Int64, FqMPolyRingElem}, FqMPolyRingElem}}:
  ((1, 1), x1 + x2 + x3 + x4)
  ((2, 1), x2^2 + 2*x2*x4 + x4^2)
- ((3, 1), x2*x3^2 + 16*x2*x4^2 + x3^2*x4 + 16*x4^3)
- ((4, 1), x2*x3*x4^2 + 16*x2*x4^3 + x3^2*x4^2 + x3*x4^3 + 16*x4^4 + 16*x5^4)
+ ((3, 1), x2*x3^2 + x3^2*x4 + 16*x2*x4^2 + 16*x4^3)
+ ((4, 1), x2*x3*x4^2 + x3^2*x4^2 + 16*x2*x4^3 + x3*x4^3 + 16*x4^4 + 16*x5^4)
  ((4, x3), x3^3*x4^2 + x3^2*x4^3 + 16*x3*x5^4 + 16*x4*x5^4)
- ((4, x2), x2*x4^4 + 16*x2*x5^4 + x4^5 + 16*x4*x5^4)
- ((4, x2*x3), x2*x3*x5^4 + 16*x2*x4*x5^4 + x3^2*x4^4 + x3*x4*x5^4 + 15*x4^2*x5^4)
+ ((4, x2), x2*x4^4 + x4^5 + 16*x2*x5^4 + 16*x4*x5^4)
+ ((4, x2*x3), x3^2*x4^4 + x2*x3*x5^4 + 16*x2*x4*x5^4 + x3*x4*x5^4 + 15*x4^2*x5^4)
 ```
 """
 function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) where {T <: MPolyRingElem}
@@ -228,7 +228,8 @@ end
 # homogenize w.r.t. the last variable
 function _homogenize(F::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
-    S, vars = polynomial_ring(base_ring(R), ["x$i" for i in 1:nvars(R)+1])
+    S, vars = polynomial_ring(base_ring(R), ["x$i" for i in 1:nvars(R)+1],
+                              internal_ordering = :degrevlex)
     res = typeof(first(F))[]
     for f in F
         ctx = MPolyBuildCtx(S)
