@@ -61,6 +61,10 @@
     @test_throws ErrorException real_solutions(I, interval=true)
 	@test_throws ErrorException rational_solutions(I)
 
+    # issue 54
+    I = ideal([R(0)])
+	@test_throws ErrorException real_solutions(I)
+
     # check variable permutation
     R, (x, y) = polynomial_ring(QQ,["x","y"])
     I = Ideal([x^2-1, y])
