@@ -65,6 +65,9 @@ function _core_msolve(
         )
 
     F = I.gens
+    if (is_zero(F))
+        error("Dimension of ideal is greater than zero, no solutions provided.")
+    end
     R = first(F).parent
     nr_vars     = nvars(R)
     nr_gens     = length(F)
