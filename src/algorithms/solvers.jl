@@ -214,7 +214,7 @@ Given an ideal `I` with a finite solution set over the complex numbers, return
 the rational parametrization of the ideal with a given precision (default 32 bits).
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
-is greater then zero an empty array is returned.
+is greater than zero an ErrorException is thrown.
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input generators.
@@ -364,7 +364,7 @@ Given an ideal `I` with a finite solution set over the complex numbers, return
 the real roots of the ideal with a given precision (default 32 bits).
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
-is greater than zero an empty array is returned.
+is greater than zero an ErrorException is thrown.
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input generators.
