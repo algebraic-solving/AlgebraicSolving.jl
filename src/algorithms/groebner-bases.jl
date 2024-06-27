@@ -150,7 +150,7 @@ function _core_groebner_basis(
 
     # convert ideal to flattened arrays of ints
     if !(is_probable_prime(field_char))
-        error("At the moment we only supports finite fields.")
+        error("At the moment we only support finite fields.")
     end
 
     # nr_gens might change if F contains zero polynomials
