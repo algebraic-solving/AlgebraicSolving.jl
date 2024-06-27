@@ -65,6 +65,9 @@ function _core_msolve(
         )
 
     F = I.gens
+    if (is_zero(F))
+        error("Dimension of ideal is greater than zero, no solutions provided.")
+    end
     R = first(F).parent
     nr_vars     = nvars(R)
     nr_gens     = length(F)
@@ -86,7 +89,7 @@ function _core_msolve(
         error("At the moment we only support the rationals as ground field.")
     end
     # convert Singular ideal to flattened arrays of ints
-    lens, cfs, exps = _convert_to_msolve(F)
+    lens, cfs, exps, nr_gens = _convert_to_msolve(F)
 
     res_ld      = Ref(Cint(0))
     res_nr_vars = Ref(Cint(0))
@@ -214,7 +217,7 @@ Given an ideal `I` with a finite solution set over the complex numbers, return
 the rational parametrization of the ideal with a given precision (default 32 bits).
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
-is greater then zero an empty array is returned.
+is greater than zero an ErrorException is thrown.
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input generators.
@@ -364,7 +367,7 @@ Given an ideal `I` with a finite solution set over the complex numbers, return
 the real roots of the ideal with a given precision (default 32 bits).
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
-is greater than zero an empty array is returned.
+is greater than zero an ErrorException is thrown.
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input generators.
