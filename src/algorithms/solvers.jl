@@ -86,7 +86,7 @@ function _core_msolve(
         error("At the moment we only support the rationals as ground field.")
     end
     # convert Singular ideal to flattened arrays of ints
-    lens, cfs, exps = _convert_to_msolve(F)
+    lens, cfs, exps, nr_gens = _convert_to_msolve(F)
 
     res_ld      = Ref(Cint(0))
     res_nr_vars = Ref(Cint(0))
