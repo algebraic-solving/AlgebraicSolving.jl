@@ -32,6 +32,7 @@ import Nemo:
     is_probable_prime,
     is_square,
     is_unit,
+    is_zero,
     isqrtrem,
     jacobi_symbol,
     leading_coefficient,
