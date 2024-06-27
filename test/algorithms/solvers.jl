@@ -64,6 +64,8 @@
     # issue 54
     I = Ideal([R(0)])
 	@test_throws ErrorException real_solutions(I)
+    I = Ideal([x1-1,x2+2,R(0)])
+    @test sort(real_solutions(I)) == sort(Vector{QQFieldElem}[[1, -2]])
 
     # check variable permutation
     R, (x, y) = polynomial_ring(QQ,["x","y"])
