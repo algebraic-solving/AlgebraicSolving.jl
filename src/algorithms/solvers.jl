@@ -37,7 +37,7 @@ function _get_rational_parametrization(
         p[k]  = C([unsafe_load(cfs, j+ctr) for j in 1:lens[i]-1])
         # multiply parametrization polynomial directly with
         # corresponding coefficients
-        p[k]  *=   (-1) * ZZRingElem(unsafe_load(cfs, lens[i]+ctr))
+        p[k]  *=   (-1) // ZZRingElem(unsafe_load(cfs, lens[i]+ctr))
         ctr   +=  lens[i]
         k     +=  1
     end
