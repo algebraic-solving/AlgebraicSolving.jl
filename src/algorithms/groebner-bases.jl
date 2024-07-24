@@ -61,6 +61,7 @@ function eliminate(
                               max_nr_pairs=max_nr_pairs, la_option=la_option,
                               eliminate=eliminate, intersect=intersect,
                               complete_reduction=complete_reduction,
+                              normalize = normalize,
                               info_level=info_level)
     end
 end
@@ -125,6 +126,7 @@ function groebner_basis(
                              max_nr_pairs = max_nr_pairs, la_option = la_option,
                              eliminate = eliminate, intersect = intersect,
                              complete_reduction = complete_reduction,
+                             normalize = normalize,
                              info_level = info_level)
     end
 end
@@ -215,7 +217,7 @@ rr  = Libdl.dlsym(msv, :export_groebner_qq)
     #  convert to basis
     if field_char == 0
         basis = _convert_rational_array_to_abstract_algebra(
-            jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
+            jl_ld, jl_len, jl_cf, jl_exp, R, normalize, eliminate)
     else
         basis = _convert_finite_field_array_to_abstract_algebra(
             jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
