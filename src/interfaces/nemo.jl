@@ -124,3 +124,64 @@ function _convert_finite_field_array_to_abstract_algebra(
 
     return basis
 end
+
+function _convert_rational_array_to_abstract_algebra(
+        bld::Int32,
+        blen::Vector{Int32},
+        bcf::Vector{QQFieldElem},
+        bexp::Vector{Int32},
+        R::MPolyRing,
+        eliminate::Int=0,
+        normalize::Bool=false
+        )
+
+    if characteristic(R) != 0
+        error("We assume QQ as base field here.")
+    end
+
+    nr_gens = bld
+    nr_vars = nvars(R)
+    CR      = coefficient_ring(R)
+
+    basis = (typeof(R(0)))[]
+    #= basis = Vector{MPolyRingElem}(undef, bld) =#
+
+    len   = 0
+
+    if eliminate > 0
+        z = zeros(Int, eliminate)
+    end
+    for i in 1:nr_gens
+                println("i ", i)
+        #= check if element is part of the eliminated basis =#
+        if eliminate > 0
+            cmp = convert(Vector{Int}, bexp[(len)*nr_vars+1:(len+1)*nr_vars])
+            if cmp[1:eliminate] > z
+                continue
+            end
+        end
+        if bcf[len+1] == 0
+            push!(basis, R(0))
+        else
+            g  = MPolyBuildCtx(R)
+            lc = bcf[len+1]
+            if normalize && lc == 1
+            for j in 1:blen[i]
+                println("j ", j)
+                push_term!(g, bcf[len+j],
+                           convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+            end
+            else
+            for j in 1:blen[i]
+                println("j ", j)
+                push_term!(g, bcf[len+j]/lc,
+                           convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+            end
+            end
+            push!(basis, finish(g))
+        end
+        len +=  blen[i]
+    end
+
+    return basis
+end

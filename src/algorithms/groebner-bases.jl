@@ -2,6 +2,8 @@ import msolve_jll: libneogb
 
 export groebner_basis, eliminate
 
+using Libdl
+
 @doc Markdown.doc"""
     eliminate(I::Ideal{T} where T <: MPolyRingElem, eliminate::Int,  <keyword arguments>)
 
@@ -11,7 +13,7 @@ the first `eliminate` variables.
 
 At the moment the underlying algorithm is based on variants of Faugère's F4 Algorithm.
 
-**Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` are supported.
+**Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` and the rationals are supported.
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input generators.
@@ -21,7 +23,8 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 - `nr_thrds::Int=1`: number of threads for parallel linear algebra.
 - `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
 - `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
-- `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`
+- `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`.
+- `normalize::Bool=false`: normalize generators of Gröbner basis for `I`, only applicable when working over the rationals.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 
 # Examples
@@ -48,6 +51,7 @@ function eliminate(
         max_nr_pairs::Int=0,
         la_option::Int=2,
         complete_reduction::Bool=true,
+        normalize::Bool=false,
         info_level::Int=0
         )
     if eliminate <= 0
@@ -67,7 +71,7 @@ end
 Compute a Groebner basis of the ideal `I` w.r.t. to the degree reverse lexicographical monomial ordering using Faugère's F4 algorithm.
 At the moment the underlying algorithm is based on variants of Faugère's F4 Algorithm.
 
-**Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` are supported.
+**Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` and the rationals are supported.
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input generators.
@@ -77,7 +81,8 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 - `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
 - `eliminate::Int=0`: size of first block of variables to be eliminated.
 - `intersect::Bool=true`: compute the `eliminate`-th elimination ideal.
-- `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`
+- `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`.
+- `normalize::Bool=false`: normalize generators of Gröbner basis for `I`, only applicable when working over the rationals.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 
 # Examples
@@ -111,6 +116,7 @@ function groebner_basis(
         eliminate::Int=0,
         intersect::Bool=true,
         complete_reduction::Bool=true,
+        normalize::Bool=false,
         info_level::Int=0
         )
 
@@ -132,6 +138,7 @@ function _core_groebner_basis(
         eliminate::Int=0,
         intersect::Bool=true,
         complete_reduction::Bool=true,
+        normalize::Bool=false,
         info_level::Int=0
         )
 
@@ -149,8 +156,11 @@ function _core_groebner_basis(
     reduce_gb       = Int(complete_reduction)
 
     # convert ideal to flattened arrays of ints
-    if !(is_probable_prime(field_char))
-        error("At the moment we only support finite fields.")
+
+    if !(field_char == 0)
+        if !(is_probable_prime(field_char))
+            error("At the moment we only support finite fields or the rationals.")
+        end
     end
 
     # nr_gens might change if F contains zero polynomials
@@ -160,30 +170,56 @@ function _core_groebner_basis(
     gb_len = Ref(Ptr{Cint}(0))
     gb_exp = Ref(Ptr{Cint}(0))
     gb_cf  = Ref(Ptr{Cvoid}(0))
+    ngb = Libdl.dlopen("/Users/ederc/repos/master-msolve/src/neogb/.libs/libneogb")
 
-    nr_terms  = ccall((:export_f4, libneogb), Int,
-        (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
-        Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
-        Cint, Cint, Cint, Cint, Cint, Cint, Cint),
-        cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
-        field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
-        nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, info_level)
+msv = Libdl.dlopen("/Users/ederc/repos/master-msolve/src/msolve/.libs/libmsolve")
+rr  = Libdl.dlsym(msv, :export_groebner_qq)
+    if field_char == 0
+        nr_terms  = ccall(rr, Int,
+            (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
+            Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
+            Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+            cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
+            field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
+            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, 0, info_level)
+
+    else
+        nr_terms  = ccall((:export_f4, libneogb), Int,
+            (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
+            Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
+            Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+            cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
+            field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
+            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, info_level)
+    end
 
     # convert to julia array, also give memory management to julia
     jl_ld   = gb_ld[]
     jl_len  = Base.unsafe_wrap(Array, gb_len[], jl_ld)
     jl_exp  = Base.unsafe_wrap(Array, gb_exp[], nr_terms*nr_vars)
-    ptr     = reinterpret(Ptr{Int32}, gb_cf[])
-    jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
 
-    if intersect == true
-        basis = _convert_finite_field_array_to_abstract_algebra(
+    #  coefficient handling depending on field characteristic
+    if field_char == 0
+        ptr     = reinterpret(Ptr{BigInt}, gb_cf[])
+        jl_cf   = [QQFieldElem(unsafe_load(ptr, i)) for i in 1:nr_terms]
+    else
+        ptr     = reinterpret(Ptr{Int32}, gb_cf[])
+        jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
+    end
+
+    #  shall eliminated variables be removed?
+    if !intersect
+        eliminate = 0
+    end
+
+    #  convert to basis
+    if field_char == 0
+        basis = _convert_rational_array_to_abstract_algebra(
             jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
     else
         basis = _convert_finite_field_array_to_abstract_algebra(
-            jl_ld, jl_len, jl_cf, jl_exp, R, 0)
+            jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
     end
-
     ccall((:free_f4_julia_result_data, libneogb), Nothing ,
           (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
            Ptr{Ptr{Cvoid}}, Int, Int),
