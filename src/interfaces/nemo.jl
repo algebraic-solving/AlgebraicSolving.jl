@@ -131,8 +131,8 @@ function _convert_rational_array_to_abstract_algebra(
         bcf::Vector{QQFieldElem},
         bexp::Vector{Int32},
         R::MPolyRing,
-        eliminate::Int=0,
-        normalize::Bool=false
+        normalize::Bool=false,
+        eliminate::Int=0
         )
 
     if characteristic(R) != 0
@@ -152,7 +152,6 @@ function _convert_rational_array_to_abstract_algebra(
         z = zeros(Int, eliminate)
     end
     for i in 1:nr_gens
-                println("i ", i)
         #= check if element is part of the eliminated basis =#
         if eliminate > 0
             cmp = convert(Vector{Int}, bexp[(len)*nr_vars+1:(len+1)*nr_vars])
@@ -165,18 +164,17 @@ function _convert_rational_array_to_abstract_algebra(
         else
             g  = MPolyBuildCtx(R)
             lc = bcf[len+1]
-            if normalize && lc == 1
-            for j in 1:blen[i]
-                println("j ", j)
-                push_term!(g, bcf[len+j],
-                           convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
-            end
+
+            if normalize && lc != 1
+                for j in 1:blen[i]
+                    push_term!(g, bcf[len+j]/lc,
+                               convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+                end
             else
-            for j in 1:blen[i]
-                println("j ", j)
-                push_term!(g, bcf[len+j]/lc,
-                           convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
-            end
+                for j in 1:blen[i]
+                    push_term!(g, bcf[len+j],
+                               convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+                end
             end
             push!(basis, finish(g))
         end
