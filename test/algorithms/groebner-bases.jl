@@ -1,8 +1,4 @@
 @testset "Algorithms -> Gröbner bases" begin
-    R, (x,y,z) = polynomial_ring(QQ,["x","y","z"], internal_ordering=:degrevlex)
-    F = [x^2+1-3, x*y-z, x*z^2-3*y^2]
-    #= not a finite field =#
-    @test_throws ErrorException groebner_basis(Ideal(F))
     R, (x,y,z) = polynomial_ring(GF(101),["x","y","z"], internal_ordering=:degrevlex)
     I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
     G = groebner_basis(I)
@@ -38,6 +34,22 @@
     I = Ideal([R(0)])
     G = groebner_basis(I)
     @test G == [R(0)]
+
+    R, (x1, x2) = polynomial_ring(QQ, ["x1", "x2"])
+    I = Ideal([3*x1^2 + ZZRingElem(2)^100, 2*x1*x2 + 5*x1 + ZZRingElem(2)^100])
+    G = groebner_basis(I)
+    H = MPolyRingElem[
+        3*x1 - 2*x2 - 5
+        4*x2^2 + 20*x2 + 3802951800684688204490109616153
+        ]
+    @test G == H
+    J = Ideal([3*x1^2 + ZZRingElem(2)^100, 2*x1*x2 + 5*x1 + ZZRingElem(2)^100])
+    G = groebner_basis(J, normalize=true)
+    H = MPolyRingElem[
+        x1 - 2//3*x2 - 5//3
+        x2^2 + 5*x2 + 3802951800684688204490109616153//4
+        ]
+    @test G == H
 end
 
 @testset "Algorithms -> Sig Gröbner bases" begin
