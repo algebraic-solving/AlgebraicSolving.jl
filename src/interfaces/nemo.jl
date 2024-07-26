@@ -135,6 +135,9 @@ function _convert_rational_array_to_abstract_algebra(
         eliminate::Int=0
         )
 
+    #  Note: Over QQ msolve already returns the eliminated basis
+    #  only in order to save memory due to possible huge
+    #  coefficient sizes.
     if characteristic(R) != 0
         error("We assume QQ as base field here.")
     end
@@ -144,21 +147,10 @@ function _convert_rational_array_to_abstract_algebra(
     CR      = coefficient_ring(R)
 
     basis = (typeof(R(0)))[]
-    #= basis = Vector{MPolyRingElem}(undef, bld) =#
 
     len   = 0
 
-    if eliminate > 0
-        z = zeros(Int, eliminate)
-    end
     for i in 1:nr_gens
-        #= check if element is part of the eliminated basis =#
-        if eliminate > 0
-            cmp = convert(Vector{Int}, bexp[(len)*nr_vars+1:(len+1)*nr_vars])
-            if cmp[1:eliminate] > z
-                continue
-            end
-        end
         if bcf[len+1] == 0
             push!(basis, R(0))
         else
