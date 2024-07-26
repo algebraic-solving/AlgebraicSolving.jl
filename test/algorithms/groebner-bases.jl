@@ -50,6 +50,13 @@
         x2^2 + 5*x2 + 3802951800684688204490109616153//4
         ]
     @test G == H
+    R, (x,y,z) = polynomial_ring(QQ,["x","y","z"], internal_ordering=:degrevlex)
+    I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
+    G = eliminate(I, 2)
+    H = MPolyRingElem[
+        84*z^4 - 40*z^3 + z^2 + z
+    ]
+    @test G == H
 end
 
 @testset "Algorithms -> Sig Gröbner bases" begin
