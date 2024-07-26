@@ -1,4 +1,4 @@
-import msolve_jll: libneogb
+import msolve_jll: libneogb, libmsolve
 
 export groebner_basis, eliminate
 
@@ -25,6 +25,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 - `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
 - `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`.
 - `normalize::Bool=false`: normalize generators of Gröbner basis for `I`, only applicable when working over the rationals.
+- `truncate_lifting::Int=0`: truncates the lifting process to given number of elements, only applicable when working over the rationals.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 
 # Examples
@@ -52,6 +53,7 @@ function eliminate(
         la_option::Int=2,
         complete_reduction::Bool=true,
         normalize::Bool=false,
+        truncate_lifting::Int=0,
         info_level::Int=0
         )
     if eliminate <= 0
@@ -62,6 +64,7 @@ function eliminate(
                               eliminate=eliminate, intersect=intersect,
                               complete_reduction=complete_reduction,
                               normalize = normalize,
+                              truncate_lifting = truncate_lifting,
                               info_level=info_level)
     end
 end
@@ -84,6 +87,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 - `intersect::Bool=true`: compute the `eliminate`-th elimination ideal.
 - `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`.
 - `normalize::Bool=false`: normalize generators of Gröbner basis for `I`, only applicable when working over the rationals.
+- `truncate_lifting::Int=0`: truncates the lifting process to given number of elements, only applicable when working over the rationals.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 
 # Examples
@@ -118,6 +122,7 @@ function groebner_basis(
         intersect::Bool=true,
         complete_reduction::Bool=true,
         normalize::Bool=false,
+        truncate_lifting::Int=0,
         info_level::Int=0
         )
 
@@ -127,6 +132,7 @@ function groebner_basis(
                              eliminate = eliminate, intersect = intersect,
                              complete_reduction = complete_reduction,
                              normalize = normalize,
+                             truncate_lifting = truncate_lifting,
                              info_level = info_level)
     end
 end
@@ -141,6 +147,7 @@ function _core_groebner_basis(
         intersect::Bool=true,
         complete_reduction::Bool=true,
         normalize::Bool=false,
+        truncate_lifting::Int=0,
         info_level::Int=0
         )
 
@@ -155,6 +162,9 @@ function _core_groebner_basis(
 
     mon_order       = 0
     elim_block_size = eliminate
+    if elim_block_size >= nr_vars
+        error("Number of variables to be eliminated is bigger than number of variables in ring.")
+    end
     reduce_gb       = Int(complete_reduction)
 
     # convert ideal to flattened arrays of ints
@@ -183,7 +193,7 @@ rr  = Libdl.dlsym(msv, :export_groebner_qq)
             Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint),
             cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
             field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
-            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, 0, info_level)
+            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, truncate_lifting, info_level)
 
     else
         nr_terms  = ccall((:export_f4, libneogb), Int,
