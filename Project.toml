@@ -1,10 +1,9 @@
 name = "AlgebraicSolving"
 uuid = "66b61cbe-0446-4d5d-9090-1ff510639f9d"
 authors = ["ederc <ederc@mathematik.uni-kl.de>", "Mohab Safey El Din <Mohab.Safey@lip6.fr", "Rafael Mohr <rafael.mohr@lip6.fr>"]
-version = "0.5.1"
+version = "0.6.0"
 
 [deps]
-Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
@@ -16,7 +15,6 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 msolve_jll = "6d01cc9a-e8f6-580e-8c54-544227e08205"
 
 [compat]
-Libdl = "1.10"
 LinearAlgebra = "1.6"
 Logging = "1.6"
 Markdown = "1.6"
@@ -26,4 +24,4 @@ Random = "1.6"
 StaticArrays = "1"
 Test = "1.6"
 julia = "1.6"
-msolve_jll = "0.600.600"
+msolve_jll = "0.700.000"
