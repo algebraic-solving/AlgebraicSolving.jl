@@ -2,8 +2,6 @@ import msolve_jll: libneogb, libmsolve
 
 export groebner_basis, eliminate
 
-using Libdl
-
 @doc Markdown.doc"""
     eliminate(I::Ideal{T} where T <: MPolyRingElem, eliminate::Int,  <keyword arguments>)
 
@@ -182,12 +180,9 @@ function _core_groebner_basis(
     gb_len = Ref(Ptr{Cint}(0))
     gb_exp = Ref(Ptr{Cint}(0))
     gb_cf  = Ref(Ptr{Cvoid}(0))
-    ngb = Libdl.dlopen("/Users/ederc/repos/master-msolve/src/neogb/.libs/libneogb")
 
-msv = Libdl.dlopen("/Users/ederc/repos/master-msolve/src/msolve/.libs/libmsolve")
-rr  = Libdl.dlsym(msv, :export_groebner_qq)
     if field_char == 0
-        nr_terms  = ccall(rr, Int,
+        nr_terms  = ccall((:export_groebner_qq, libmsolve), Int,
             (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
             Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
             Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint),
