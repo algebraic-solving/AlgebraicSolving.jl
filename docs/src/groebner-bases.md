@@ -17,9 +17,9 @@ Pages = ["groebner-bases.md"]
 
 ## Introduction
 
-AlgebraicSolving allows to compute Gröbner bases for input generators over finite
-fields of characteristic smaller $2^{31}$ w.r.t. the degree reverse
-lexicographical monomial order.
+AlgebraicSolving allows to compute Gröbner bases for input generators over prime
+fields of characteristic smaller $2^{31}$ or over the rationals w.r.t. the degree
+reverse lexicographical monomial order.
 
 At the moment different variants of Faugère's F4 Algorithm are implemented as
 well as a signature based algorithm to compute Gröbner bases.
