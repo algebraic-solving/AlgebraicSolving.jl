@@ -151,7 +151,9 @@ function _core_groebner_basis(
 
     F = I.gens
     R = first(F).parent
-    if F == [R(0)]
+
+    if F == repeat([R(0)], length(F))
+        I.gb[eliminate] = F
         return F
     end
     nr_vars     = nvars(R)
