@@ -320,6 +320,7 @@ function rational_solutions(
                  max_nr_pairs = max_nr_pairs,
                  la_option = la_option,
                  info_level = info_level,
+                 get_param = 2, # only rational parametrization, no solutions are computed
                  precision = precision)
     param_t = I.rat_param
 
