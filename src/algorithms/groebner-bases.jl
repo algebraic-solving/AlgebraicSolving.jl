@@ -151,7 +151,9 @@ function _core_groebner_basis(
 
     F = I.gens
     R = first(F).parent
-    if F == [R(0)]
+
+    if F == repeat([R(0)], length(F))
+        I.gb[eliminate] = F
         return F
     end
     nr_vars     = nvars(R)
@@ -164,7 +166,6 @@ function _core_groebner_basis(
         error("Number of variables to be eliminated is bigger than number of variables in ring.")
     end
     reduce_gb       = Int(complete_reduction)
-
     # convert ideal to flattened arrays of ints
 
     if !(field_char == 0)
@@ -176,6 +177,11 @@ function _core_groebner_basis(
     # nr_gens might change if F contains zero polynomials
     lens, cfs, exps, nr_gens = _convert_to_msolve(F)
 
+    #  recheck if all input data is invalid
+    if nr_gens == 0
+        I.gb[eliminate] = F
+        return I.gb[eliminate]
+    end
     gb_ld  = Ref(Cint(0))
     gb_len = Ref(Ptr{Cint}(0))
     gb_exp = Ref(Ptr{Cint}(0))
