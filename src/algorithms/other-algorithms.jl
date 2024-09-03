@@ -1,3 +1,22 @@
+@doc Markdown.doc"""
+    dimension(I::Ideal{T}) where T <: MPolyRingElem
+
+Compute the Krull dimension of a given polynomial ideal `I`.
+
+**Note**: This requires a Gröbner basis of `I`. 
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
+
+julia> I = Ideal([x*y,x*z,y*z]);
+
+julia> dimension(I)
+1
+```
+"""
 function dimension(I::Ideal{T}) where T <: MPolyRingElem
     
     gb = isempty(values(I.gb)) ? groebner_basis(I) : first(values(I.gb))
