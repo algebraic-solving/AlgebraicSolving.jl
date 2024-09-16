@@ -152,7 +152,7 @@ function _core_groebner_basis(
     F = I.gens
 
     if iszero(F)
-        I.gb[eliminate] = QQMPolyRingElem[]
+        I.gb[eliminate] = length(F)==0 ? F : F[1:1]
         return I.gb[eliminate]
     end
 
@@ -205,6 +205,11 @@ function _core_groebner_basis(
             cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
             field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
             nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, info_level)
+    end
+
+    if nr_terms == 0
+        I.gb[eliminate] = [R(0)]
+        return I.gb[eliminate]
     end
 
     # convert to julia array, also give memory management to julia
