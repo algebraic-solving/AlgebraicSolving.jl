@@ -157,21 +157,22 @@ function _convert_rational_array_to_abstract_algebra(
         if bcf[len+1] == 0
             push!(basis, R(0))
         else
-            g  = MPolyBuildCtx(R)
+            g  = zero(R)
             lc = bcf[len+1]
 
             if normalize && lc != 1
                 for j in 1:blen[i]
-                    push_term!(g, bcf[len+j]/lc,
-                               convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+                    Nemo.setcoeff!(g, j, bcf[len+j]/lc)
                 end
             else
                 for j in 1:blen[i]
-                    push_term!(g, bcf[len+j],
-                               convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+                    Nemo.setcoeff!(g, j, bcf[len+j])
                 end
             end
-            push!(basis, finish(g))
+            for j in 1:blen[i]
+                Nemo.set_exponent_vector!(g, j, convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+            end
+            push!(basis, g)
         end
         len +=  blen[i]
     end
