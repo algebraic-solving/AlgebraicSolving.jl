@@ -112,12 +112,15 @@ function _convert_finite_field_array_to_abstract_algebra(
         if bcf[len+1] == 0
             push!(basis, R(0))
         else
-            g  = MPolyBuildCtx(R)
+            g = zero(R)
+            ccall((:fq_nmod_mpoly_resize, Nemo.libflint), Cvoid, (Ref{FqMPolyRingElem}, Int, Ref{FqMPolyRing}), g, blen[i], parent(g))
             for j in 1:blen[i]
-                push_term!(g, CR(bcf[len+j]),
-                           convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+                Nemo.setcoeff!(g, j, CR(bcf[len+j]))
             end
-            push!(basis, finish(g))
+            for j in 1:blen[i]
+                Nemo.set_exponent_vector!(g, j, convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+            end
+            push!(basis, g)
         end
         len +=  blen[i]
     end
