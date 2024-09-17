@@ -150,12 +150,13 @@ function _core_groebner_basis(
         )
 
     F = I.gens
-    R = first(F).parent
 
-    if F == repeat([R(0)], length(F))
-        I.gb[eliminate] = F
-        return F
+    if iszero(F)
+        I.gb[eliminate] = length(F)==0 ? F : F[1:1]
+        return I.gb[eliminate]
     end
+
+    R = first(F).parent
     nr_vars     = nvars(R)
     nr_gens     = length(F)
     field_char  = Int(characteristic(R))
@@ -206,6 +207,11 @@ function _core_groebner_basis(
             nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, info_level)
     end
 
+    if nr_terms == 0
+        I.gb[eliminate] = [R(0)]
+        return I.gb[eliminate]
+    end
+
     # convert to julia array, also give memory management to julia
     jl_ld   = gb_ld[]
     jl_len  = Base.unsafe_wrap(Array, gb_len[], jl_ld)
@@ -214,7 +220,7 @@ function _core_groebner_basis(
     #  coefficient handling depending on field characteristic
     if field_char == 0
         ptr     = reinterpret(Ptr{BigInt}, gb_cf[])
-        jl_cf   = [QQFieldElem(unsafe_load(ptr, i)) for i in 1:nr_terms]
+        jl_cf   = QQFieldElem[QQFieldElem(unsafe_load(ptr, i)) for i in 1:nr_terms]
     else
         ptr     = reinterpret(Ptr{Int32}, gb_cf[])
         jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
