@@ -111,9 +111,9 @@ function _convert_finite_field_array_to_abstract_algebra(
     nr_vars = nvars(R)
     CR      = coefficient_ring(R)
 
-    len   = 0
+    len = 0
+    ctr = 0
 
-    @show eliminate
     if eliminate > 0
         z = zeros(Int, eliminate)
     end
@@ -122,10 +122,6 @@ function _convert_finite_field_array_to_abstract_algebra(
         #= check if element is part of the eliminated basis =#
         if eliminate > 0
             cmp = convert(Vector{Int}, bexp[(len)*nr_vars+1:(len+1)*nr_vars])
-            @show i
-            @show cmp[1:eliminate]
-            @show z
-            @show cmp[1:eliminate] > z
             if cmp[1:eliminate] > z
                 continue
             end
@@ -141,11 +137,12 @@ function _convert_finite_field_array_to_abstract_algebra(
                 Nemo.set_exponent_vector!(g[i], j, convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
             end
         end
+        ctr += 1
         len +=  blen[i]
     end
-
-    sort_terms!.(g)
-    return g
+    basis = g[1:ctr]
+    sort_terms!.(basis)
+    return basis
 end
 
 function _convert_rational_array_to_abstract_algebra(
