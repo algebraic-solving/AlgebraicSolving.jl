@@ -1,3 +1,21 @@
+function _resize_ff!(a::FqMPolyRingElem, n::Int)
+    if a.data isa Generic.MPoly
+        fit!(a, n)
+    elseif a.data isa fqPolyRepMPolyRingElem
+        ccall((:fq_nmod_mpoly_resize, Nemo.libflint), Nothing,
+            (Ref{fqPolyRepMPolyRingElem}, Int, Ref{fqPolyRepMPolyRing}), a.data,
+            n, a.parent.data)
+    else
+        @assert a.data isa Nemo.fpMPolyRingElem
+        ccall((:nmod_mpoly_resize, Nemo.libflint), Nothing,
+            (Ref{fpMPolyRingElem}, Int, Ref{fpMPolyRing}), a.data, n,
+            a.parent.data)
+     end
+end
+
+function _resize_qq!(a::QQMPolyRingElem, n::Int)
+    ccall((:fmpq_mpoly_resize, Nemo.libflint), Cvoid, (Ref{QQMPolyRingElem}, Int, Ref{QQMPolyRing}), a, n, parent(a))
+end
 
 @doc Markdown.doc"""
     _convert_to_msolve(
@@ -93,14 +111,13 @@ function _convert_finite_field_array_to_abstract_algebra(
     nr_vars = nvars(R)
     CR      = coefficient_ring(R)
 
-    basis = (typeof(R(0)))[]
-    #= basis = Vector{MPolyRingElem}(undef, bld) =#
-
-    len   = 0
+    len = 0
+    ctr = 0
 
     if eliminate > 0
         z = zeros(Int, eliminate)
     end
+    g = [zero(R) for j in 1:nr_gens]
     for i in 1:nr_gens
         #= check if element is part of the eliminated basis =#
         if eliminate > 0
@@ -110,18 +127,21 @@ function _convert_finite_field_array_to_abstract_algebra(
             end
         end
         if bcf[len+1] == 0
-            push!(basis, R(0))
+            g[i] = R(0)
         else
-            g  = MPolyBuildCtx(R)
+            _resize_ff!(g[i], Int(blen[i]))
             for j in 1:blen[i]
-                push_term!(g, CR(bcf[len+j]),
-                           convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+                Nemo.setcoeff!(g[i], j, CR(bcf[len+j]))
             end
-            push!(basis, finish(g))
+            for j in 1:blen[i]
+                Nemo.set_exponent_vector!(g[i], j, convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+            end
         end
+        ctr += 1
         len +=  blen[i]
     end
-
+    basis = g[1:ctr]
+    sort_terms!.(basis)
     return basis
 end
 
@@ -146,32 +166,32 @@ function _convert_rational_array_to_abstract_algebra(
     nr_vars = nvars(R)
     CR      = coefficient_ring(R)
 
-    basis = (typeof(R(0)))[]
-
     len   = 0
 
+    g = [zero(R) for j in 1:nr_gens]
     for i in 1:nr_gens
         if bcf[len+1] == 0
-            push!(basis, R(0))
+            g[i] = R(0)
         else
-            g  = MPolyBuildCtx(R)
+            _resize_qq!(g[i], Int(blen[i]))
             lc = bcf[len+1]
 
             if normalize && lc != 1
                 for j in 1:blen[i]
-                    push_term!(g, bcf[len+j]/lc,
-                               convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+                    Nemo.setcoeff!(g[i], j, bcf[len+j]/lc)
                 end
             else
                 for j in 1:blen[i]
-                    push_term!(g, bcf[len+j],
-                               convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+                    Nemo.setcoeff!(g[i], j, bcf[len+j])
                 end
             end
-            push!(basis, finish(g))
+            for j in 1:blen[i]
+                Nemo.set_exponent_vector!(g[i], j, convert(Vector{Int}, bexp[(len+j-1)*nr_vars+1:(len+j)*nr_vars]))
+            end
         end
         len +=  blen[i]
     end
 
-    return basis
+    sort_terms!.(g)
+    return g
 end
