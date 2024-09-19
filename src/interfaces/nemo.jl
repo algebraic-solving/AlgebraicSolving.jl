@@ -13,6 +13,10 @@ function _resize_ff!(a::FqMPolyRingElem, n::Int)
      end
 end
 
+function _resize_ff!(a::fpMPolyRingElem, n::Int)
+    ccall((:nmod_mpoly_resize, Nemo.libflint), Cvoid, (Ref{fpMPolyRingElem}, Int, Ref{fpMPolyRing}), a, n, parent(a))
+end
+
 function _resize_qq!(a::QQMPolyRingElem, n::Int)
     ccall((:fmpq_mpoly_resize, Nemo.libflint), Cvoid, (Ref{QQMPolyRingElem}, Int, Ref{QQMPolyRing}), a, n, parent(a))
 end
