@@ -1,7 +1,7 @@
 name = "AlgebraicSolving"
 uuid = "66b61cbe-0446-4d5d-9090-1ff510639f9d"
 authors = ["ederc <ederc@mathematik.uni-kl.de>", "Mohab Safey El Din <Mohab.Safey@lip6.fr", "Rafael Mohr <rafael.mohr@lip6.fr>"]
-version = "0.6.1"
+version = "0.7.0"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
