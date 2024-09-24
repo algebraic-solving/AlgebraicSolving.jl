@@ -12,7 +12,7 @@ include("interfaces/nemo.jl")
 include("algorithms/groebner-bases.jl")
 include("algorithms/normal-forms.jl")
 include("algorithms/solvers.jl")
-include("algorithms/other-algorithms.jl")
+include("algorithms/dimension.jl")
 #= siggb =#
 include("siggb/siggb.jl")
 #= examples =#
