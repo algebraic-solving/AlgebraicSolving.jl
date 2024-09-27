@@ -3,7 +3,7 @@
 
 Compute the Krull dimension of a given polynomial ideal `I`.
 
-**Note**: This requires a Gröbner basis of `I`. 
+**Note**: This requires a Gröbner basis of `I`, which is computed internally if not alraedy known.
 
 # Examples
 ```jldoctest
