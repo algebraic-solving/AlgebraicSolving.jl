@@ -312,7 +312,7 @@ function sig_decomp!(basis::Basis{N},
         bs, ps, tgs, ind_ord, lc_set, syz_queue, tr = popfirst!(queue)
         neqns = num_eqns(lc_set)
         filter!(gb -> !(one(R) in gb), lc_set.gbs)
-        @info "starting component, $(length(queue)) remaining, $(neqns) equations"
+        @info "starting component, $(length(queue)) remaining, $(neqns) equations, upper bound $(lc_set.codim_upper_bound)"
         if any(isone, lc_set.hull_eqns)
             @info "is empty set"
             @info "------------------------------------------"
@@ -343,7 +343,7 @@ function sig_decomp!(basis::Basis{N},
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set_nz, SyzInfo[], tr2))
         else
             @info "finished component"
-            @assert all(gb -> num_eqns(X) == codim(gb), X.gbs)
+            @assert all(gb -> num_eqns(lc_set) == codim(gb), lc_set.gbs)
             push!(result, lc_set)
         end
         @info "------------------------------------------"
