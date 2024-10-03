@@ -152,6 +152,7 @@ function equidimensional_decomposition(I::Ideal{T};
 
     F = I.gens
     Fhom = homogenize(F)
+    sort!(Fhom, by = p -> total_degree(p))
     cells = _sig_decomp(Fhom, info_level = info_level)
     res = typeof(I)[]
     R = parent(I)
