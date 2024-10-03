@@ -119,7 +119,6 @@ function my_normal_form(F::Vector{T},
     end
 
     R = first(F).parent
-    @assert Nemo.ordering(R) == :degrevlex
     nr_vars     = nvars(R)
     field_char  = Int(characteristic(R))
 

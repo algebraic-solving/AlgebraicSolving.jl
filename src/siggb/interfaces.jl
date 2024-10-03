@@ -1,5 +1,9 @@
 function input_setup(sys::Vector{<:MPolyRingElem}, mod_ord::Symbol=:DPOT)
 
+    if !(mod_ord in [:POT, :DPOT])
+        error("Invalid module order.")
+    end
+
     if isempty(sys)
         error("Input system is empty.")
     end

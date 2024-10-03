@@ -389,7 +389,7 @@ end
 # homogenize w.r.t. the last variable
 function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
-    S, vars = polynomial_ring(base_ring(R), ["x$i" for i in 1:nvars(R)+1], ordering=:degrevlex)
+    S, vars = polynomial_ring(base_ring(R), ["x$i" for i in 1:nvars(R)+1], internal_ordering=:degrevlex)
     res = typeof(first(F))[]
     for f in F
         ctx = MPolyBuildCtx(S)
@@ -397,6 +397,20 @@ function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
         for (e, c) in zip(exponent_vectors(f), coefficients(f))
             enew = push!(e, d - sum(e))
             push_term!(ctx, c, e)
+        end
+        push!(res, finish(ctx))
+    end
+    return res
+end
+
+# dehomogenize w.r.t. the last generator of the underlying ring of F into R
+function _dehomogenize(F::Vector{P}, R::MPolyRing) where {P <: MPolyRingElem}
+    res = typeof(first(F))[]
+    for f in F
+        ctx = MPolyBuildCtx(R)
+        for (e, c) in zip(exponent_vectors(f), coefficients(f))
+            enew = e[1:end-1]
+            push_term!(ctx, c, enew)
         end
         push!(res, finish(ctx))
     end

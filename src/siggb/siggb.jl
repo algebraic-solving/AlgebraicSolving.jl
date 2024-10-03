@@ -49,10 +49,10 @@ julia> using AlgebraicSolving
 julia> R, vars = polynomial_ring(GF(17), ["x$i" for i in 1:4])
 (Multivariate polynomial ring in 4 variables over GF(17), FqMPolyRingElem[x1, x2, x3, x4])
 
-julia> F = AlgebraicSolving.cyclic(R)
+julia> F = cyclic(R)
 FqMPolyRingElem[x1 + x2 + x3 + x4, x1*x2 + x1*x4 + x2*x3 + x3*x4, x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4, x1*x2*x3*x4 + 16]
 
-julia> Fhom = AlgebraicSolving._homogenize(F.gens)
+julia> Fhom = homogenize(F.gens)
 4-element Vector{FqMPolyRingElem}:
  x1 + x2 + x3 + x4
  x1*x2 + x2*x3 + x1*x4 + x3*x4
@@ -70,7 +70,8 @@ julia> sig_groebner_basis(Fhom)
  ((4, x2*x3), x3^2*x4^4 + x2*x3*x5^4 + 16*x2*x4*x5^4 + x3*x4*x5^4 + 15*x4^2*x5^4)
 ```
 """
-function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, mod_ord::Symbol=:DPOT) where {T <: MPolyRingElem}
+function sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
+                            degbound::Int=0, mod_ord::Symbol=:DPOT) where {T <: MPolyRingElem}
 
     # data structure setup/conversion
     sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys, mod_ord)
@@ -79,102 +80,6 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
     basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht)
 
     sysl = length(sys)
-<<<<<<< HEAD
-    degs = Vector{Exp}(undef, sysl)
-    @inbounds for (i, f) in enumerate(sys)
-        deg = total_degree(f)
-        if deg > typemax(Exp)
-            error("input degrees too large.")
-        end
-        degs[i] = Exp(deg)
-        for m in exponent_vectors(f)
-            if sum(m) != deg
-                error("input system must be homogeneous.")
-            end
-        end
-    end
-
-    # constants for fast arithmetic
-    char = Val(Coeff(Rchar.d))
-    shift = Val(maxshift(char))
-
-    # convert to and initialize our data structures
-    nv = nvars(R)
-    basis_ht = initialize_basis_hash_table(Val(nv))
-
-    # initialize basis
-    sigs = Vector{Sig{nv}}(undef, init_basis_size)
-    sigmasks = Vector{MaskSig}(undef, init_basis_size)
-    sigratios = Vector{Monomial{nv}}(undef, init_basis_size)
-    rewrite_nodes = Vector{Vector{Int}}(undef, init_basis_size+1)
-    lm_masks = Vector{DivMask}(undef, init_basis_size)
-    monomials = Vector{Vector{MonIdx}}(undef, init_basis_size)
-    coeffs = Vector{Vector{Coeff}}(undef, init_basis_size)
-    is_red = Vector{Bool}(undef, init_basis_size)
-    syz_sigs = Vector{Monomial{nv}}(undef, init_syz_size)
-    syz_masks = Vector{MaskSig}(undef, init_syz_size)
-    basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
-                  lm_masks, monomials, coeffs, is_red,
-                  syz_sigs, syz_masks, degs, sysl,
-                  init_basis_size, sysl + 1, 0, init_syz_size)
-
-    # root node
-    basis.rewrite_nodes[1] = vcat([length(sys)-1, -1],
-                                  collect(2:length(sys)+1))
-
-    # initialize pairset
-    pairset = Pairset{nv}(Vector{SPair{nv}}(undef, init_pair_size),
-                          sysl,
-                          init_pair_size)
-
-    one_mon = monomial(SVector{nv}(zeros(Exp, nv)))
-    zero_sig = (zero(SigIndex), one_mon)
-    # store initial pols in basis and pairset
-    @inbounds for i in 1:sysl
-        f = sys[i]
-        lf = length(f)
-
-        # gather up monomials and coeffs
-        exps = collect(exponent_vectors(f))
-        cfs = collect(coefficients(f))
-        mons = Vector{MonIdx}(undef, lf)
-        coeffs = Vector{Coeff}(undef, lf)
-        inver = one(Coeff)
-        @inbounds for j in 1:lf
-            m = monomial(SVector{nv}((Exp).(exps[j])))
-            eidx = insert_in_hash_table!(basis_ht, m)
-            if isone(j)
-                inver = inv(Coeff(lift(ZZ, cfs[1])), char)
-            end
-            cf = isone(j) ? one(Coeff) : mul(inver, Coeff(lift(ZZ, cfs[j])), char)
-            mons[j] = eidx
-            coeffs[j] = cf
-        end
-        s = sortperm(mons, by = eidx -> basis_ht.exponents[eidx],
-                     lt = lt_drl, rev = true)
-        @inbounds mons = mons[s]
-        @inbounds coeffs = coeffs[s]
-
-        # signatures
-        sig = (SigIndex(i), one_mon)
-        lm_exps = SVector{nv}((Exp).(exps[1]))
-        sigr = monomial(lm_exps)
-
-        # store stuff in basis
-        basis.sigs[i] = sig
-        basis.sigratios[i] = sigr
-        basis.rewrite_nodes[i+1] = [-1, 1]
-        basis.monomials[i] = mons
-        basis.coefficients[i] = coeffs
-        basis.is_red[i] = false
-
-        # add unitvector as pair
-        pairset.elems[i] = SPair{nv}(sig, zero_sig, zero(DivMask),
-                                     zero(DivMask), i, 0, degs[i])
-    end
-
-=======
->>>>>>> alg-combination
     # compute divmasks
     fill_divmask!(basis_ht)
     @inbounds for i in 1:sysl
@@ -211,124 +116,20 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, 
     return outp
 end
 
-function nondeg_locus(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
+function equidimensional_decomposition(I::Ideal{T};
+                                       info_level::Int=0) where {T <: MPolyRingElem}
 
-    # data structure setup/conversion
-    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup([sys[1]], :POT)
-
-    # fill basis, pairset, tags
-    sysl = length(sys)
-    basis, _, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs,
-                                                  basis_ht,
-                                                  sysl=sysl,
-                                                  def_tg=:ndeg, trace=Val(true))
-    R = parent(first(sys))
-    nvrs = ngens(R)
-    r_char = characteristic(R)
-    pairset = init_pairset(Val(nvrs))
-
-    # compute divmasks
-    remask!(basis_ht, basis, pairset)
-    remask_cnt = 2
-
-    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
-    timer = new_timer()
-    with_logger(logger) do
-        arit_ops = 0
-        for i in 1:sysl
-            @info "sequence index $(i)"
-
-            # add sequence element to data structures
-            if i > 1
-                cfs, mns = convert_to_ht(sys[i], basis_ht, char,
-                                         by = eidx -> basis_ht.exponents[eidx],
-                                         lt = lt_drl, rev = true)
-                idl_inds = filter(idx -> gettag(tags, idx) != :sat,
-                                  1:length(ind_order.ord))
-                ord_ind = maximum(idx -> ind_order.ord[idx], idl_inds) + one(SigIndex)
-                add_new_sequence_element!(basis, basis_ht, tr, cfs, mns,
-                                          ind_order, ord_ind, pairset, tags,
-                                          new_tg = :ndeg)
-            else
-                add_unit_pair!(basis, pairset, i, basis.degs[i])
-            end
-
-            # run sig gb computation with newly added element
-            _, new_arit_ops, nz_conds = siggb!(basis, pairset, basis_ht, char, shift,
-                                               tags, ind_order, tr, timer, 0, :POT)
-            arit_ops += new_arit_ops
-
-            # extract suitable random linear combinations of inserted elements for cleaning
-            for (nz_cfs, nz_mons) in nz_conds
-                add_new_sequence_element!(basis, basis_ht, tr, nz_cfs, nz_mons,
-                                          ind_order, ind_order.max_ind+one(SigIndex),
-                                          pairset, tags,
-                                          new_tg = :sat)
-            end
-            make_sat_incompat!(tags, ind_order)
-
-            @info "------------------------------------------"
-            @info "saturation step"
-            _, new_arit_ops, nz_cn = siggb!(basis, pairset, basis_ht, char, shift,
-                                            tags, ind_order, tr, timer, 0, :POT)
-            @assert isempty(nz_cn)
-            arit_ops += new_arit_ops
-            @info "------------------------------------------"
-
-            # remask with 50 perc. probability
-            if remask_cnt > 0
-                if isone(rand([0,1]))
-                    @info "recomputing divmasks"
-                    remask_cnt -= 1
-                    remask!(basis_ht, basis, pairset)
-                end
-            end
+    F = I.gens
+    Fhom = homogenize(F)
+    cells = _sig_decomp(Fhom, info_level = info_level)
+    res = typeof(I)[]
+    R = parent(I)
+    for cell in cells
+        for gb in cell.gbs
+            push!(res, Ideal(_dehomogenize(gb, R)))
         end
-        @info "$(arit_ops) total submul's"
-        @info timer
-
-        # output
-        R = parent(first(sys))
-        eltp = typeof(first(sys))
-        outp = eltp[]
-        @inbounds for i in basis.basis_offset:basis.basis_load
-            basis.is_red[i] && continue
-            gettag(tags, index(basis.sigs[i])) == :sat && continue
-            pol = convert_to_pol(R,
-                                 [basis_ht.exponents[m] for m in basis.monomials[i]],
-                                 basis.coefficients[i])
-            push!(outp, pol)
-        end
-        return outp
     end
-end
-
-function sig_decomp(sys::Vector{T}; info_level::Int=0, rep=:full) where {T <: MPolyRingElem}
-
-    # data structure setup/conversion
-    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
-    
-    # fill basis, pairset, tags
-    sysl = length(sys)
-    basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs,
-                                                        basis_ht, def_tg=:split,
-                                                        trace=Val(true))
-
-    # compute divmasks
-    fill_divmask!(basis_ht)
-    @inbounds for i in 1:sysl
-        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
-    end
-
-    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
-    result = with_logger(logger) do
-        R = parent(first(sys))
-        timer = new_timer()
-        lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift,
-                              tags, ind_order, tr, R, timer, rep)
-        @info timer
-        return lc_sets
-    end
+    return res
 end
 
 #---------------- function for sig_groebner_basis --------------------#
@@ -419,17 +220,41 @@ function siggb!(basis::Basis{N},
             # minimize à la F5c
             min_idx = iszero(p_idx) ? zero(SigIndex) : curr_ind
             minimize!(basis, basis_ht, min_idx, ind_order, tags)
-            # superflous = findall(basis.is_red[basis.basis_offset:basis.basis_load]) .+ (basis.basis_offset-1)
-            # if length(superflous) >= gc_threshold
-            #     @info "garbage collect"
-            #     garbage_collect!(basis, pairset, tr, superflous)
-            # end
         end
     end
     return false, arit_ops, nz_conds
 end
 
 #---------------- functions for splitting --------------------#
+
+function _sig_decomp(sys::Vector{T}; info_level::Int=0, rep=:full) where {T <: MPolyRingElem}
+
+    # data structure setup/conversion
+    sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
+    
+    # fill basis, pairset, tags
+    sysl = length(sys)
+    basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs,
+                                                        basis_ht, def_tg=:split,
+                                                        trace=Val(true))
+
+    # compute divmasks
+    fill_divmask!(basis_ht)
+    @inbounds for i in 1:sysl
+        basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
+    end
+
+    logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
+    result = with_logger(logger) do
+        R = parent(first(sys))
+        timer = new_timer()
+        lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift,
+                              tags, ind_order, tr, R, timer, rep)
+        @info timer
+        return lc_sets
+    end
+end
+
 
 function sig_decomp!(basis::Basis{N},
                      pairset::Pairset,

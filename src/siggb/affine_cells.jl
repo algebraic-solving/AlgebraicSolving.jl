@@ -171,7 +171,7 @@ end
 function saturate(F::Vector{P}, nzs::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
     S, vars = polynomial_ring(base_ring(R), vcat(["t$i" for i in 1:length(nzs)], ["x$i" for i in 1:nvars(R)]),
-                              ordering = :degrevlex)
+                              internal_ordering = :degrevlex)
     Fconv = [convert_poly_to_t_ring(f, S) for f in F]
 
     for (i, h) in enumerate(nzs)
@@ -198,7 +198,7 @@ end
 function quotient(F::Vector{P}, nzs::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
     S, vars = polynomial_ring(base_ring(R), vcat(["t$i" for i in 1:length(nzs)], ["x$i" for i in 1:nvars(R)]),
-                              ordering = :degrevlex)
+                              internal_ordering = :degrevlex)
     Fconv = [convert_poly_to_t_ring(f, S) for f in F]
 
     for (i, h) in enumerate(nzs)
