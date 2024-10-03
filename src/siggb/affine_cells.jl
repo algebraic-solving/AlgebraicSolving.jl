@@ -119,7 +119,7 @@ function split(X::LocClosedSet, g::MPolyRingElem)
             continue
         end
         sort(col_gb, by = p -> total_degree(p))
-        H_rand = filter(!iszero, my_normal_form(random_lin_combs(col_gb), X_gb))
+        H_rand = filter(!iszero, normal_form(random_lin_combs(col_gb), X_gb))
         gbs = remove(X_gb, H_rand, known_eqns = [g])
         for gb in gbs
             push!(hull_gbs, gb)
@@ -140,7 +140,7 @@ function remove(gb::Vector{P},
     res = Vector{P}[]
     isempty(H) && return res
 
-    R = base_ring(first(gb))
+    R = parent(first(gb))
     h = first(H)
     tim = @elapsed gb1 = saturate(vcat(gb, known_eqns), h)
     @info "remove time $(tim) for degree $(total_degree(h))"
@@ -149,14 +149,20 @@ function remove(gb::Vector{P},
         return remove(gb, H[2:end], known_eqns=known_eqns)
     end
     push!(res, gb1)
-    tim = @elapsed G = filter(!iszero, my_normal_form(random_lin_combs(gb1), gb))
-    @info "normal form time $(tim)"
-    for htil in H[2:end]
-        tim = @elapsed Grem = filter(!iszero, my_normal_form(G .* htil, gb))
-        @info "constructing new equations time $(tim)"
-        new_gbs = remove(gb, Grem, known_eqns=known_eqns)
-        append!(res, new_gbs)
+    tim = @elapsed G = filter(!iszero,
+                              normal_form(random_lin_combs(gb1), gb))
+    gbs2 = remove(gb, H[2:end])
+    for gb2 in gbs2
+        gbs3 = remove(gb2, G)
+        append!(res, gbs3)
     end
+    # @info "normal form time $(tim)"
+    # for (i, htil) in enumerate(H[2:end])
+    #     tim = @elapsed Grem = filter(!iszero, normal_form(G .* htil, gb))
+    #     @info "constructing new equations time $(tim)"
+    #     new_gbs = remove(gb, Grem, known_eqns=known_eqns)
+    #     append!(res, new_gbs)
+    # end
     return res
 end
 

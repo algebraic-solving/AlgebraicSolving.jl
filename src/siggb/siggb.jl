@@ -557,7 +557,7 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
             if isempty(cofac_coeffs)
                 continue
             end
-            if any(gb -> !iszero(my_normal_form(cofac_mons_hsh, cofac_coeffs, basis_ht, gb)), lc_set.gbs)
+            if any(gb -> !iszero(normal_form(cofac_mons_hsh, cofac_coeffs, basis_ht, gb)), lc_set.gbs)
                 found_zd = true
                 zd_coeffs, zd_mons_hsh = cofac_coeffs, cofac_mons_hsh
                 zd_ind = cofac_ind
