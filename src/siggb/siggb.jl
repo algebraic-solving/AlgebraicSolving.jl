@@ -24,23 +24,23 @@ include("helpers.jl")
 #---------------- user functions --------------------#
 
 @doc Markdown.doc"""
-function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, mod_ord::Symbol=:DPOT) where {T <: MPolyRingElem}
+function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, mod_ord::Symbol=:POT) where {T <: MPolyRingElem}
 
 Compute a Signature Gröbner basis of the sequence `sys` w.r.t. to the
-degree reverse lexicographical monomial ordering and the degree
-position-over-term ordering induced by `sys`. The output is a vector
-of `Tuple{Tuple{Int64, T}, T}` where the first element indicates the
+degree reverse lexicographical monomial ordering and the module order
+`mod_ord` underlying the computation. The output is a vector of
+`Tuple{Tuple{Int64, T}, T}` where the first element indicates the
 signature and the second the underlying polynomial.
 
 **Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` are supported.
-**Note**: The input generators must be homogeneous.
+**Note**: If `mod_ord == :DPOT` then the input generators must be homogeneous.
 **Note**: The algorithms behaviour may depend heavily on how the elements in `sys` are sorted.
 
 # Arguments
 - `sys::Vector{T} where T <: MpolyElem`: input generators.
 - `info_level::Int=0`: info level printout: off (`0`, default), computational details (`1`)
 - `degbound::Int=0`: Compute a full Gröbner basis if `0` otherwise only up to degree `degbound`.
-- `mod_ord::Symbol=:DPOT`: The module monomial order underlying the computation, either `:DPOT` (default) or `:POT`.
+- `mod_ord::Symbol=:DPOT`: The module monomial order underlying the computation, either `:POT` (position-over-term, default) or `:DPOT` (degree-position-over-term) .
 
 # Example
 ```jldoctest
@@ -59,7 +59,7 @@ julia> Fhom = homogenize(F.gens)
  x1*x2*x3 + x1*x2*x4 + x1*x3*x4 + x2*x3*x4
  x1*x2*x3*x4 + 16*x5^4
 
-julia> sig_groebner_basis(Fhom)
+julia> sig_groebner_basis(Fhom, mod_ord = :DPOT)
 7-element Vector{Tuple{Tuple{Int64, FqMPolyRingElem}, FqMPolyRingElem}}:
  ((1, 1), x1 + x2 + x3 + x4)
  ((2, 1), x2^2 + 2*x2*x4 + x4^2)
@@ -71,7 +71,7 @@ julia> sig_groebner_basis(Fhom)
 ```
 """
 function sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
-                            degbound::Int=0, mod_ord::Symbol=:DPOT) where {T <: MPolyRingElem}
+                            degbound::Int=0, mod_ord::Symbol=:POT) where {T <: MPolyRingElem}
 
     # data structure setup/conversion
     sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys, mod_ord)
@@ -116,6 +116,37 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
     return outp
 end
 
+@doc Markdown.doc"""
+function equidimensional_decomposition(I::Ideal{T}, info_level::Int=0) where {T <: MPolyRingElem}
+
+Given a polynomial ideal `I`, return a list of ideals `dec` s.t.
+each ideal in `dec` is equidimensional (i.e. has minimal primes
+only of one fixed dimension) and s.t. the radical of `I` equals
+the intersection of the radicals of the ideals in `dec`.
+
+**Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` are supported.
+
+# Arguments
+- `I::Ideal{T} where T <: MpolyElem`: input ideal.
+- `info_level::Int=0`: info level printout: off (`0`, default), computational details (`1`)
+
+# Example
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x, y, z) = polynomial_ring(GF(65521), ["x", "y", "z"])
+(Multivariate polynomial ring in 3 variables over GF(65521), Nemo.FqMPolyRingElem[x, y, z])
+
+julia> I = Ideal([x*y - x*z, x*z^2 - x*z, x^2*z - x*z])
+Nemo.FqMPolyRingElem[x*y + 65520*x*z, x*z^2 + 65520*x*z, x^2*z + 65520*x*z]
+
+julia> equidimensional_decomposition(I)
+3-element Vector{Ideal{Nemo.FqMPolyRingElem}}:
+ Nemo.FqMPolyRingElem[x]
+ Nemo.FqMPolyRingElem[z, y]
+ Nemo.FqMPolyRingElem[z + 65520, y + 65520, x + 65520]
+```
+"""
 function equidimensional_decomposition(I::Ideal{T};
                                        info_level::Int=0) where {T <: MPolyRingElem}
 
