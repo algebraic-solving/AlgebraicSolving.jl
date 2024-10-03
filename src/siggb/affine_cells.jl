@@ -1,29 +1,9 @@
-function loc_closed_set(seq::Vector{T}, rep::Symbol) where {T<:MPolyRingElem}
+function loc_closed_set(seq::Vector{T}) where {T<:MPolyRingElem}
     @assert !isempty(seq) "cannot construct affine cell from no equations."
     R = parent(first(seq))
     codim_upper_bound = min(length(seq), ngens(R) - 1)
-    if rep == :full
-        hypplanes = empty(seq)
-    else
-        hypplanes = [random_lin_comb(gens(R)) for _ in 1:(ngens(R) - codim_upper_bound - 1)]
-    end
-    gb = saturate(vcat(seq, hypplanes), last(gens(R)))
-    return LocClosedSet(seq, [:seq for _ in 1:length(seq)],
-                        T[], codim_upper_bound,
-                        [last(gens(R))], [gb])
-end
-
-# for displaying
-function Base.show(io::IO, lc::LocClosedSet)
-    string_rep_seq = variety_string_rep(lc.seq[findall(tg -> tg == :seq, lc.tags)])
-    string_rep_ineqn = variety_string_rep(lc.ineqns,
-                                          sep = "*", lpar = "(", rpar = ")")
-    if !isempty(lc.hull_eqns)
-        string_rep_hull = variety_string_rep(lc.hull_eqns)
-        print(io, "hull(" * string_rep_seq * "\\" * string_rep_ineqn * ", " * string_rep_hull * ")")
-    else
-        print(io, string_rep_seq * "\\" * string_rep_ineqn)
-    end
+    gb = saturate(seq, last(gens(R)))
+    return LocClosedSet(seq, codim_upper_bound, [gb])
 end
 
 # basic data
@@ -48,23 +28,18 @@ function is_empty_set(X::LocClosedSet)
     return false
 end
 
-function is_equidimensional(X::LocClosedSet, rep::Symbol)
-    if rep == :full
-        return all(gb -> codim(gb) == X.codim_upper_bound, X.gbs)
-    else
-        R = ring(X)
-        return all(gb -> codim(gb) == ngens(R) - 1, X.gbs)
-    end
+function is_equidimensional(X::LocClosedSet)
+    return all(gb -> codim(gb) == X.codim_upper_bound, X.gbs)
 end
 
 # core functions
 function add_to_output!(res::Vector{C},
-                        X::C, rep::Symbol) where C<:LocClosedSet
+                        X::C) where C<:LocClosedSet
 
     if is_empty_set(X)
         @info "empty component"
         return true
-    elseif is_equidimensional(X, rep)
+    elseif is_equidimensional(X)
         @info "component with $(num_eqns(X)) eqns done"
         push!(res, X)
         return true
@@ -72,20 +47,9 @@ function add_to_output!(res::Vector{C},
     return false
 end
 
-function add_hyperplanes!(X::LocClosedSet, new_codim_ub::Int)
-    R = ring(X)
-    n_new_hypplanes = X.codim_upper_bound - new_codim_ub
-    iszero(n_new_hypplanes) && return
-    new_hypplanes = [random_lin_comb(gens(R)) for _ in 1:n_new_hypplanes]
-    X.gbs = [saturate(vcat(gb, new_hypplanes), last(gens(R)))
-             for gb in X.gbs]
-    return
-end
-
 function add_inequation!(X::LocClosedSet, h::P;
                          known_zds=P[]::Vector{P}) where P
     R = ring(X)
-    push!(X.ineqns, h)
     for (i, gb) in enumerate(X.gbs)
         X.gbs[i] = saturate(vcat(gb, known_zds), h)
     end
@@ -110,7 +74,7 @@ function split(X::LocClosedSet, g::MPolyRingElem)
     col_gbs = X_min_g.gbs
     hull_gbs = Vector{typeof(g)}[]
     R = ring(X)
-    for (i, (X_gb, col_gb)) in enumerate(zip(X.gbs, col_gbs))
+    for (X_gb, col_gb) in zip(X.gbs, col_gbs)
         if one(R) in col_gb
             @info "equation vanishes on one GB"
             tim = @elapsed new_gb = saturate(vcat(X_gb, [g]), last(gens(R)))
@@ -120,6 +84,7 @@ function split(X::LocClosedSet, g::MPolyRingElem)
         end
         sort(col_gb, by = p -> total_degree(p))
         H_rand = filter(!iszero, normal_form(random_lin_combs(col_gb), X_gb))
+        isempty(H_rand) && continue
         gbs = remove(X_gb, H_rand, known_eqns = [g])
         for gb in gbs
             push!(hull_gbs, gb)
@@ -151,18 +116,11 @@ function remove(gb::Vector{P},
     push!(res, gb1)
     tim = @elapsed G = filter(!iszero,
                               normal_form(random_lin_combs(gb1), gb))
-    gbs2 = remove(gb, H[2:end])
+    gbs2 = remove(gb, H[2:end], known_eqns = known_eqns)
     for gb2 in gbs2
-        gbs3 = remove(gb2, G)
+        gbs3 = remove(gb2, G, known_eqns = vcat(known_eqns, [h]))
         append!(res, gbs3)
     end
-    # @info "normal form time $(tim)"
-    # for (i, htil) in enumerate(H[2:end])
-    #     tim = @elapsed Grem = filter(!iszero, normal_form(G .* htil, gb))
-    #     @info "constructing new equations time $(tim)"
-    #     new_gbs = remove(gb, Grem, known_eqns=known_eqns)
-    #     append!(res, new_gbs)
-    # end
     return res
 end
 

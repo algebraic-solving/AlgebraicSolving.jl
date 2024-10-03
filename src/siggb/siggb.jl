@@ -258,7 +258,7 @@ end
 
 #---------------- functions for splitting --------------------#
 
-function _sig_decomp(sys::Vector{T}; info_level::Int=0, rep=:full) where {T <: MPolyRingElem}
+function _sig_decomp(sys::Vector{T}; info_level::Int=0) where {T <: MPolyRingElem}
 
     # data structure setup/conversion
     sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys)
@@ -280,7 +280,7 @@ function _sig_decomp(sys::Vector{T}; info_level::Int=0, rep=:full) where {T <: M
         R = parent(first(sys))
         timer = new_timer()
         lc_sets = sig_decomp!(basis, pairset, basis_ht, char, shift,
-                              tags, ind_order, tr, R, timer, rep)
+                              tags, ind_order, tr, R, timer)
         @info timer
         return lc_sets
     end
@@ -296,14 +296,13 @@ function sig_decomp!(basis::Basis{N},
                      ind_order::IndOrder,
                      tr::SigTracer,
                      R::MPolyRing,
-                     timer::Timings,
-                     rep::Symbol) where {N, Char, Shift}
+                     timer::Timings) where {N, Char, Shift}
 
     # compute ideal
     eqns = [convert_to_pol(R, [basis_ht.exponents[mdx] for mdx in basis.monomials[i]],
                            basis.coefficients[i])
             for i in 1:basis.input_load]
-    X = loc_closed_set(eqns, rep)
+    X = loc_closed_set(eqns)
     
     queue = [(basis, pairset, tags, ind_order, X, SyzInfo[], tr)]
     result = LocClosedSet[]
@@ -312,12 +311,8 @@ function sig_decomp!(basis::Basis{N},
         bs, ps, tgs, ind_ord, lc_set, syz_queue, tr = popfirst!(queue)
         neqns = num_eqns(lc_set)
         filter!(gb -> !(one(R) in gb), lc_set.gbs)
-        @info "starting component, $(length(queue)) remaining, $(neqns) equations, upper bound $(lc_set.codim_upper_bound)"
-        if any(isone, lc_set.hull_eqns)
-            @info "is empty set"
-            @info "------------------------------------------"
-            continue
-        elseif add_to_output!(result, lc_set, rep)
+        @info "starting component, $(length(queue)) remaining, $(neqns) equations"
+        if add_to_output!(result, lc_set)
             @info "done"
             @info "------------------------------------------"
             continue
@@ -337,13 +332,12 @@ function sig_decomp!(basis::Basis{N},
                                                              tr, ps,
                                                              zd_ind, tgs,
                                                              ind_ord,
-                                                             lc_set, rep)
+                                                             lc_set)
             timer.comp_lc_time += tim
             pushfirst!(queue, (bs, ps, tgs, ind_ord, lc_set_hull, syz_queue, tr))
             pushfirst!(queue, (bs2, ps2, tgs2, ind_ord2, lc_set_nz, SyzInfo[], tr2))
         else
             @info "finished component"
-            @assert all(gb -> num_eqns(lc_set) == codim(gb), lc_set.gbs)
             push!(result, lc_set)
         end
         @info "------------------------------------------"
@@ -456,8 +450,7 @@ function split!(basis::Basis{N},
                 zd_ind::SigIndex,
                 tags::Tags,
                 ind_order::IndOrder,
-                lc_set::LocClosedSet,
-                rep::Symbol) where N
+                lc_set::LocClosedSet) where N
 
 
     @inbounds begin
@@ -468,10 +461,7 @@ function split!(basis::Basis{N},
 
         # component with nonzero condition
         sorted_inds = collect(1:basis.input_load)
-        to_del = findall(idx -> basis.is_red[idx] || gettag(tags, idx) == :hull, sorted_inds)
-        push!(to_del, zd_ind)
-        unique!(sort!(to_del))
-        deleteat!(sorted_inds, to_del)
+        deleteat!(sorted_inds, zd_ind)
         sort!(sorted_inds, by = ind -> ind_order.ord[ind])
 
         sys2_mons = copy(basis.monomials[sorted_inds])
@@ -480,8 +470,6 @@ function split!(basis::Basis{N},
                                                           basis_ht, def_tg=:split,
                                                           trace=Val(true))
 
-        ind_ord2 = new_ind_order(basis2)
-        
         # hull component
         zd_deg = basis_ht.exponents[first(cofac_mons_hsh)].deg
 
@@ -500,16 +488,10 @@ function split!(basis::Basis{N},
 
         # new components
         lc_set_hull, lc_set_nz = split(lc_set, h)
+        lc_set_nz.seq = lc_set.seq[sorted_inds]
         push!(lc_set_hull.seq, h)
-        push!(lc_set_hull.tags, :hull)
-        push!(lc_set_hull.hull_eqns, h)
 
-        deleteat!(lc_set_nz.seq, to_del)
-        deleteat!(lc_set_nz.tags, to_del)
         new_codim_ub = min(lc_set.codim_upper_bound, num_eqns(lc_set) - 1)
-        if rep != :full
-            add_hyperplanes!(lc_set_nz, new_codim_ub)
-        end
         lc_set_nz.codim_upper_bound = new_codim_ub
     end
 

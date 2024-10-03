@@ -195,10 +195,7 @@ const IndConn = Dict{SigIndex, Vector{SigIndex}}
 # For output of decomp algorithms
 mutable struct LocClosedSet{T<:MPolyRingElem}
     seq::Vector{T}
-    tags::Vector{Symbol}
-    hull_eqns::Vector{T}
     codim_upper_bound::Int
-    ineqns::Vector{T}
     gbs::Vector{Vector{T}}
 end
 

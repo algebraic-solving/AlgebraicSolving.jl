@@ -135,7 +135,7 @@ function construct_module_core(sig::Sig{N},
     @inbounds row_ops = tr_mat.col_inds_and_coeffs[row_ind]
     @inbounds for (j, coeff)  in row_ops
         j_sig = tr_mat.row_ind_to_sig[j]
-        index(j_sig) != idx && continue
+        cmp_ind_str(index(j_sig), idx, ind_ord) && continue
         j_sig_mod = construct_module(j_sig, basis, basis_ht,
                                      mat_index,
                                      tr, vchar,
