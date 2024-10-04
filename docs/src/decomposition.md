@@ -29,6 +29,6 @@ The implemented algorithm is the one given in [this paper](https://arxiv.org/abs
 ```@docs
     equidimensional_decomposition(
 	    I::Ideal{T}, 
-		info_level::Int=0
-		) where {T <: MPolyRingElem}
+	    info_level::Int=0
+	    ) where {T <: MPolyRingElem}
 ```
