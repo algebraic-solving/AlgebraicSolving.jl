@@ -40,7 +40,10 @@ function equidimensional_decomposition(I::Ideal{T};
     R = parent(I)
     for cell in cells
         for gb in cell.gbs
-            push!(res, Ideal(_dehomogenize(gb, R)))
+            gb_dehom = _dehomogenize(gb, R)
+            idl = Ideal(gb_dehom)
+            idl.gb[0] = gb_dehom
+            push!(res, idl)
         end
     end
     return res

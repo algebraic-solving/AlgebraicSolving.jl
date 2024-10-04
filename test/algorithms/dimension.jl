@@ -1,4 +1,4 @@
-@testset "dimension" begin
+@testset "Algorithms -> Dimension" begin
     R, (x,y) = polynomial_ring(QQ,["x","y"])
     I =  Ideal([x^2,x*y])
     @test isone(dimension(I))

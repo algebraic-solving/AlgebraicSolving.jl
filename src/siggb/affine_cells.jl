@@ -40,7 +40,7 @@ function add_to_output!(res::Vector{C},
         @info "empty component"
         return true
     elseif is_equidimensional(X)
-        @info "component with $(num_eqns(X)) eqns done"
+        @info "component with $(num_eqns(X)) eqns done, codimension $(X.codim_upper_bound)"
         push!(res, X)
         return true
     end
