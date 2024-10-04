@@ -114,9 +114,13 @@ function remove(gb::Vector{P},
         return remove(gb, H[2:end], known_eqns=known_eqns)
     end
     push!(res, gb1)
-    tim = @elapsed G = filter(!iszero,
-                              normal_form(random_lin_combs(gb1), gb))
-    gbs2 = remove(gb, H[2:end], known_eqns = known_eqns)
+    tim1 = @elapsed G = filter(!iszero,
+                               normal_form(random_lin_combs(gb1), gb))
+    g_rand = random_lin_comb(G)
+    rem_rest = H[2:end]
+    tim2 = @elapsed filter!(h -> !iszero(normal_form(h*g_rand, gb)), rem_rest)
+    @info "normal forms computed in $(tim1 + tim2)"
+    gbs2 = remove(gb, rem_rest, known_eqns = known_eqns)
     for gb2 in gbs2
         gbs3 = remove(gb2, G, known_eqns = vcat(known_eqns, [h]))
         append!(res, gbs3)

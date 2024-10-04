@@ -6,6 +6,14 @@ function normal_form(F::Vector{T}, gb::Vector{T}) where {T <: MPolyRingElem}
     return normal_form(F, I)
 end
 
+function normal_form(f::T, gb::Vector{T}) where {T <: MPolyRingElem}
+    I = Ideal(gb)
+    I.gb[0] = gb
+    F = [f]
+    nf = normal_form(F, I)
+    return first(nf)
+end
+
 function normal_form(mons::Vector{MonIdx},
                         coeffs::Vector{Coeff},
                         ht::MonomialHashtable{N},
