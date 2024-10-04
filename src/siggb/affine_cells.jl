@@ -288,17 +288,13 @@ function variety_string_rep(F::Vector{<:MPolyRingElem};
     return string_rep
 end
 
-# for debugging
-function check_decomp(F::Vector{P}, Xs::Vector{<:LocClosedSet}) where {P <: MPolyRingElem}
-    println("checking decomp")
-    gb_ch = F
-    for X in Xs
-        for gb in X.gbs
-            g = random_lin_comb(gb)
-            gb_ch = saturate(gb_ch, g)
-        end
+# check if idls provides ideal-theoretic decomposition of radical of I
+function _check_decomp(I::IDL, idls::Vector{IDL}) where {IDL <: Ideal}
+    gb_ch = I.gens
+    for idl in idls
+        g = random_lin_comb(idl.gens)
+        gb_ch = saturate(gb_ch, g)
     end
-    R = parent(first(F))
-    gb_ch = saturate(gb_ch, last(gens(R)))
-    return one(parent(first(F))) in gb_ch
+    R = parent(I)
+    return one(R) in gb_ch
 end
