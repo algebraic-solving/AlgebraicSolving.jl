@@ -67,24 +67,30 @@ end
     R, (x,y,z) = polynomial_ring(GF(17),["x","y","z"], internal_ordering=:degrevlex)
     F = [x^2+1-3, x*y-z, x*z^2-3*y^2]
     #= not homogeneous =#
-    @test_throws ErrorException sig_groebner_basis(F)
+    @test_throws ErrorException sig_groebner_basis(F, mod_ord = :DPOT)
 
     #= GB test 1 =#
-    Fhom = AlgebraicSolving._homogenize(F)
-    sgb = sig_groebner_basis(Fhom)
+    sgb = sig_groebner_basis(F)
+    @test AlgebraicSolving._is_gb(sgb)
+    Fhom = homogenize(F)
+    sgb = sig_groebner_basis(Fhom, mod_ord = :DPOT)
     @test AlgebraicSolving._is_gb(sgb)
 
     #= GB test 2 =#
     R, (x,y,z,w) = polynomial_ring(GF(65521),["x","y","z","w"], internal_ordering=:degrevlex)
     F = cyclic(R).gens
-    Fhom = AlgebraicSolving._homogenize(F)
-    sgb = sig_groebner_basis(Fhom)
+    sgb = sig_groebner_basis(F)
+    @test AlgebraicSolving._is_gb(sgb)
+    Fhom = homogenize(F)
+    sgb = sig_groebner_basis(Fhom, mod_ord = :DPOT)
     @test AlgebraicSolving._is_gb(sgb)
 
     #= GB test 3 =#
     F = katsura(R).gens
-    Fhom = AlgebraicSolving._homogenize(F)
-    sgb = sig_groebner_basis(Fhom)
+    sgb = sig_groebner_basis(F)
+    @test AlgebraicSolving._is_gb(sgb)
+    Fhom = homogenize(F)
+    sgb = sig_groebner_basis(Fhom, mod_ord = :DPOT)
     @test AlgebraicSolving._is_gb(sgb)
 
     #= GB test 4 (pivot setting bug) =#
