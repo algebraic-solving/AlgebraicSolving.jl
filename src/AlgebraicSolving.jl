@@ -13,6 +13,7 @@ include("algorithms/groebner-bases.jl")
 include("algorithms/normal-forms.jl")
 include("algorithms/solvers.jl")
 include("algorithms/dimension.jl")
+include("algorithms/decomposition.jl")
 #= siggb =#
 include("siggb/siggb.jl")
 #= examples =#
