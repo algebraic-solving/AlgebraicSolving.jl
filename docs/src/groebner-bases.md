@@ -65,5 +65,5 @@ for this call:
 To compute signature Gröbner bases use
 
 ```@docs
-    sig_groebner_basis(sys::Vector{T}; info_level::Int = 0, degbound::Int = 0) where {T <: MPolyRingElem}
+    sig_groebner_basis(sys::Vector{T}; info_level::Int = 0, degbound::Int = 0, mod_ord::Symbol=:POT) where {T <: MPolyRingElem}
 ```
