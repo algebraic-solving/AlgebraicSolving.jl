@@ -510,3 +510,15 @@ function process_syz_for_split!(syz_queue::Vector{SyzInfo},
 
     return found_zd, zd_coeffs, zd_mons_hsh, zd_ind
 end
+
+# test against msolve
+function _is_gb(gb::Vector{Tuple{Tuple{Int, P}, P}}) where {P <: MPolyRingElem}
+    gb_pols = [p[2] for p in gb]
+    gb_msolve = groebner_basis(Ideal(gb_pols), complete_reduction = true)
+    
+    lms_gb = (Nemo.leading_monomial).(gb_pols)
+    lms_msolve = (Nemo.leading_monomial).(gb_msolve)
+    res1 = all(u -> any(v -> divides(u, v)[1], lms_gb), lms_msolve)
+    res2 = all(u -> any(v -> divides(u, v)[1], lms_msolve), lms_gb)
+    return res1 && res2
+end
