@@ -116,6 +116,9 @@ function remove(gb::Vector{P},
     push!(res, gb1)
     tim1 = @elapsed G = filter(!iszero,
                                normal_form(random_lin_combs(gb1), gb))
+    if isempty(G)
+        return res
+    end
     g_rand = random_lin_comb(G)
     rem_rest = H[2:end]
     tim2 = @elapsed filter!(h -> !iszero(normal_form(h*g_rand, gb)), rem_rest)
