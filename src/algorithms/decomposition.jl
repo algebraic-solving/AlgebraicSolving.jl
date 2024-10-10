@@ -17,16 +17,16 @@ the intersection of the radicals of the ideals in `dec`.
 julia> using AlgebraicSolving
 
 julia> R, (x, y, z) = polynomial_ring(GF(65521), ["x", "y", "z"])
-(Multivariate polynomial ring in 3 variables over GF(65521), Nemo.FqMPolyRingElem[x, y, z])
+(Multivariate polynomial ring in 3 variables over GF(65521), FqMPolyRingElem[x, y, z])
 
 julia> I = Ideal([x*y - x*z, x*z^2 - x*z, x^2*z - x*z])
-Nemo.FqMPolyRingElem[x*y + 65520*x*z, x*z^2 + 65520*x*z, x^2*z + 65520*x*z]
+FqMPolyRingElem[x*y + 65520*x*z, x*z^2 + 65520*x*z, x^2*z + 65520*x*z]
 
 julia> equidimensional_decomposition(I)
 3-element Vector{Ideal{Nemo.FqMPolyRingElem}}:
- Nemo.FqMPolyRingElem[x]
- Nemo.FqMPolyRingElem[z, y]
- Nemo.FqMPolyRingElem[z + 65520, y + 65520, x + 65520]
+ FqMPolyRingElem[x]
+ FqMPolyRingElem[z, y]
+ FqMPolyRingElem[z + 65520, y + 65520, x + 65520]
 ```
 """
 function equidimensional_decomposition(I::Ideal{T};
