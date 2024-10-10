@@ -23,7 +23,7 @@ julia> I = Ideal([x*y - x*z, x*z^2 - x*z, x^2*z - x*z])
 FqMPolyRingElem[x*y + 65520*x*z, x*z^2 + 65520*x*z, x^2*z + 65520*x*z]
 
 julia> equidimensional_decomposition(I)
-3-element Vector{Ideal{Nemo.FqMPolyRingElem}}:
+3-element Vector{Ideal{FqMPolyRingElem}}:
  FqMPolyRingElem[x]
  FqMPolyRingElem[z, y]
  FqMPolyRingElem[z + 65520, y + 65520, x + 65520]
