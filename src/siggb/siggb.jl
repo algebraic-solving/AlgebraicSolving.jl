@@ -430,7 +430,7 @@ function split!(basis::Basis{N},
         if isempty(ge_deg_inds)
             ord_ind = ind_order.max_ind + one(SigIndex)
         else
-            ord_ind, _ = findmin(i -> ind_order.ord[i], ge_deg_inds)
+            ord_ind, _ = findmin((i -> ind_order.ord[i]).(ge_deg_inds))
         end
 
         # insert zd in system
