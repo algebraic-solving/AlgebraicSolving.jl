@@ -1,19 +1,25 @@
 # updating the pairset and basis
 
 # add new reduced rows to basis/syzygies
-# TODO: make a new symbol ht everytime?
-function update_basis!(basis::Basis,
+function update_siggb!(basis::Basis,
                        matrix::MacaulayMatrix,
                        pairset::Pairset{N},
                        symbol_ht::MonomialHashtable,
-                       basis_ht::MonomialHashtable) where N
+                       basis_ht::MonomialHashtable,
+                       ind_order::IndOrder,
+                       tags::Tags,
+                       tr::Tracer,
+                       vchar::Val{Char},
+                       syz_queue::Vector{SyzInfo},
+                       mod_ord::Symbol=:DPOT) where {N, Char}
 
     new_basis_c = 0
     new_syz_c = 0
 
-    # TODO: this can be done more optimally
     toadd = matrix.toadd[1:matrix.toadd_length]
-    # sort!(toadd, by = i -> matrix.sigs[i], lt = lt_pot)
+    added_unit = false
+
+    cofac_ins_inds = Int[]
 
     @inbounds for i in toadd
         # determine if row is zero
@@ -25,95 +31,221 @@ function update_basis!(basis::Basis,
                                          basis_ht.ndivbits))
         if isempty(row)
             new_syz_c += 1
+            process_syzygy!(basis, new_sig, new_sig_mask, pairset, tr, mod_ord)
+            push!(syz_queue, (basis.syz_load, Dict{SigIndex, Bool}()))
 
-            # make sure we have enough space
-            if basis.syz_load == basis.syz_size
-                basis.syz_size *= 2
-                resize!(basis.syz_sigs, basis.syz_size)
-                resize!(basis.syz_masks, basis.syz_size)
+            # for cofactor insertion in ndeg computation
+            if gettag(tags, index(new_sig)) in [:ndeg, :sat]
+                push!(cofac_ins_inds, i)
             end
-            
-            # add new syz sig
-            l = basis.syz_load + 1
-            basis.syz_sigs[l] = monomial(new_sig)
-            basis.syz_masks[l] = new_sig_mask
-            basis.syz_load += 1
-
-            # kill pairs with known syz signature
-            @inbounds for j in 1:pairset.load
-                p = pairset.elems[j]
-                cond = index(p.top_sig) == new_idx
-                if cond && divch(new_sig_mon, monomial(p.top_sig),
-                                 new_sig_mask[2], p.top_sig_mask)
-                    pairset.elems[j].top_index = 0
-                end
-                cond = index(p.bot_sig) == new_idx
-                if cond && divch(new_sig_mon, monomial(p.bot_sig),
-                                 new_sig_mask[2], p.bot_sig_mask)
-                    pairset.elems[j].top_index = 0
-                end
-            end
-
-            # remove pairs that became rewriteable in previous loop
-            remove_red_pairs!(pairset)
         else
             new_basis_c += 1
-
-            # make sure we have enough space
-            if basis.basis_load == basis.basis_size
-                basis.basis_size *= 2
-                resize!(basis.sigs, basis.basis_size)
-                resize!(basis.sigmasks, basis.basis_size)
-                resize!(basis.sigratios, basis.basis_size)
-                resize!(basis.rewrite_nodes, basis.basis_size)
-                resize!(basis.lm_masks, basis.basis_size)
-                resize!(basis.monomials, basis.basis_size)
-                resize!(basis.coefficients, basis.basis_size)
-                resize!(basis.is_red, basis.basis_size)
-            end
-            
-            # add to basis hashtable
-            insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
-            lm = basis_ht.exponents[first(row)]
-            s = new_sig
-
-            # add everything to basis
-            l = basis.basis_load + 1
-            basis.sigs[l] = new_sig
-            basis.sigmasks[l] = new_sig_mask
-            new_sig_ratio = divide(lm, new_sig_mon)
-            basis.sigratios[l] = new_sig_ratio
-
+            coeffs = matrix.coeffs[i]
             parent_ind = matrix.parent_inds[i]
-            tree_data = basis.rewrite_nodes[parent_ind+1]
-            insind = 3 
-            @inbounds for j in insind:insind+tree_data[1]
-                child_ind = tree_data[j]
-                rat = basis.sigratios[child_ind-1]
-                if lt_drl(new_sig_ratio, rat)
-                    break
-                end
-                insind += 1
-            end
-            insert!(tree_data, insind, l+1)
-            tree_data[1] += 1
-            basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
-            
-            basis.lm_masks[l] = divmask(lm, basis_ht.divmap,
-                                        basis_ht.ndivbits)
-            basis.monomials[l] = row
-            basis.coefficients[l] = matrix.coeffs[i]
-            basis.basis_load = l
-
-            # build new pairs
-            update_pairset!(pairset, basis, basis_ht, l)
+            added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
+                                         row, coeffs,
+                                         new_sig, new_sig_mask, parent_ind,
+                                         tr, ind_order, tags, mod_ord)
         end
     end
+
+    insert_syz_cofacs!(basis, basis_ht, matrix.sigs[cofac_ins_inds],
+                       pairset, vchar, tr, tags, ind_order)
+
     if new_basis_c != 0 || new_syz_c != 0
         @info "$(new_basis_c) new, $(new_syz_c) zero"
     end
+
+    return added_unit
 end
 
+function add_basis_elem!(basis::Basis{N},
+                         pairset::Pairset,
+                         basis_ht::MonomialHashtable,
+                         symbol_ht::MonomialHashtable,
+                         row::Vector{MonIdx},
+                         coeffs::Vector{Coeff},
+                         new_sig::Sig,
+                         new_sig_mask::MaskSig,
+                         parent_ind::Int,
+                         tr::Tracer,
+                         ind_order::IndOrder,
+                         tags::Tags,
+                         mod_ord::Symbol) where N
+
+
+    # make sure we have enough space
+    resize_basis!(basis)
+    
+    # add to basis hashtable
+    insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
+    lm = basis_ht.exponents[first(row)]
+    @debug "new lm $(lm)"
+    lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
+    s = new_sig
+
+    # check if we're adding a unit
+    if length(row) == 1 && all(iszero, lm.exps)
+        return true
+    end
+
+    # add everything to basis
+    l = basis.basis_load + 1
+    basis.sigs[l] = new_sig
+    basis.sigmasks[l] = new_sig_mask
+    new_sig_ratio = divide(lm, monomial(new_sig))
+    basis.sigratios[l] = new_sig_ratio
+
+    basis.lm_masks[l] = lm_mask
+    basis.monomials[l] = row
+    basis.coefficients[l] = coeffs
+
+    basis.mod_rep_known[l] = falses(ind_order.max_ind)
+    basis.mod_reps[l] = Vector{Polynomial}(undef, ind_order.max_ind)
+
+    basis.is_red[l] = false
+
+    tree_data = basis.rewrite_nodes[parent_ind+1]
+    insind = 3 
+    @inbounds for j in insind:insind+tree_data[1]
+        child_ind = tree_data[j]
+        rat = basis.sigratios[child_ind-1]
+        if lt_drl(new_sig_ratio, rat)
+            break
+        end
+        insind += 1
+    end
+    insert!(tree_data, insind, l+1)
+    tree_data[1] += 1
+
+    # if an existing sig further reduced we dont need the old element
+    # if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
+    #     basis.is_red[parent_ind] = true
+    # end 
+
+    basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
+    basis.basis_load = l
+
+    # update tracer info
+    store_basis_elem!(tr, new_sig, l, basis.basis_size)
+    
+    # build new pairs
+    update_pairset!(pairset, basis, basis_ht, l, ind_order, tags, mod_ord)
+
+    return false
+end
+
+function process_syzygy!(basis::Basis,
+                         new_sig::Sig,
+                         new_sig_mask::MaskSig,
+                         pairset::Pairset,
+                         tr::Tracer,
+                         mod_ord::Symbol) 
+
+    new_idx = index(new_sig_mask)
+    
+    new_sig_mon = monomial(new_sig)
+
+    # make sure we have enough space
+    if basis.syz_load == basis.syz_size
+        basis.syz_size *= 2
+        resize!(basis.syz_sigs, basis.syz_size)
+        resize!(basis.syz_masks, basis.syz_size)
+    end
+    
+    # add new syz sig
+    l = basis.syz_load + 1
+    basis.syz_sigs[l] = monomial(new_sig)
+    basis.syz_masks[l] = new_sig_mask
+    basis.syz_load += 1
+
+    # add info to tracer
+    store_syz!(tr)
+
+    # kill pairs with known syz signature
+    @inbounds for j in 1:pairset.load
+        p = pairset.elems[j]
+        cond = index(p.top_sig) == new_idx
+        if cond && divch(new_sig_mon, monomial(p.top_sig),
+                         new_sig_mask[2], p.top_sig_mask)
+            pairset.elems[j].top_index = 0
+        end
+        cond = index(p.bot_sig) == new_idx && (mod_ord == :DPOT || index(p.bot_sig) == index(p.top_sig))
+        if cond && divch(new_sig_mon, monomial(p.bot_sig),
+                         new_sig_mask[2], p.bot_sig_mask)
+            pairset.elems[j].top_index = 0
+        end
+    end
+
+    # remove pairs that became rewriteable in previous loop
+    remove_red_pairs!(pairset)
+end
+
+function insert_syz_cofacs!(basis::Basis{N},
+                            basis_ht::MonomialHashtable{N},
+                            syz_sigs::Vector{Sig{N}},
+                            pairset::Pairset{N},
+                            vchar::Val{Char},
+                            tr::Tracer,
+                            tags::Tags,
+                            ind_order::IndOrder) where {N, Char}
+
+    isempty(syz_sigs) && return
+    cofacs = Polynomial[]
+    mat_ind = length(tr.mats)
+    syz_ind = index(first(syz_sigs))
+
+    # we only use this in nondeg computation
+    @assert length(unique([index(s) for s in syz_sigs])) == 1
+
+    # construct cofactors of zero reduction and ins in hashtable
+    for new_sig in syz_sigs
+        new_idx = index(new_sig)
+        @info "constructing module"
+        cofac = construct_module(new_sig, basis,
+                                 basis_ht,
+                                 mat_ind, tr,
+                                 vchar,
+                                 ind_order,
+                                 new_idx)
+        if isempty(cofacs)
+            push!(cofacs, cofac)
+        else
+            cofacs[1] = add_pols(cofac..., cofacs[1]...,
+                                 vchar, rand(one(Coeff):Coeff(Char)))
+            sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
+                       lt = lt_drl, rev = true)
+            normalize_cfs!(cofac[1], vchar)
+            push!(cofacs, cofac)
+        end
+    end
+
+    # insert cofactors in system
+    tag = gettag(tags, index(first(syz_sigs)))
+    new_f_idx = zero(SigIndex)
+    for (i, cofac) in enumerate(cofacs)
+        ord_ind = if tag == :sat
+            sat_inds = findall(tag -> tag == :sat, tags)
+            findmin(sat_ind -> ind_order.ord[sat_ind], sat_inds)[1]
+        else
+            ind_order.ord[syz_ind]
+        end
+        if isone(i)
+            sort_poly!(cofac, by = midx -> basis_ht.exponents[midx],
+                       lt = lt_drl, rev = true)
+            normalize_cfs!(cofac[1], vchar)
+        end
+        new_tg = if tag == :sat
+            isone(i) ? :fsatins : :satins
+        else
+            isone(i) ? :fndegins : :ndegins
+        end
+        new_ind = add_new_sequence_element!(basis, basis_ht, tr, cofac...,
+                                            ind_order, ord_ind, pairset,
+                                            tags,
+                                            new_tg = new_tg)
+    end
+end
 
 # construct all pairs with basis element at new_basis_idx
 # and perform corresponding rewrite checks
@@ -121,29 +253,35 @@ end
 function update_pairset!(pairset::Pairset{N},
                          basis::Basis,
                          basis_ht::MonomialHashtable,
-                         new_basis_idx::Int) where N
-
+                         new_basis_idx::Int,
+                         ind_order::IndOrder,
+                         tags::Tags,
+                         mod_ord::Symbol=:DPOT) where N
 
     new_sig_mon = monomial(basis.sigs[new_basis_idx])
     new_sig_idx = index(basis.sigs[new_basis_idx])
 
     # check existing pairs for rewriteability against element
-    # at new_basis_idx
+    # at new_basis_idx and for koszul rewriteability
     @inbounds bmask = basis.sigmasks[new_basis_idx]
-    @inbounds parent_ind = basis.rewrite_nodes[new_basis_idx+1][2]
+    @inbounds new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
+    @inbounds new_lm_msk = basis.lm_masks[new_basis_idx]
     @inbounds for i in 1:pairset.load
         p = pairset.elems[i]
-        if p.top_index == parent_ind-1
-            if divch(new_sig_mon, monomial(p.top_sig),
-                     mask(bmask), p.top_sig_mask)
+        if (cmp_ind_str(new_sig_idx, index(p.top_sig), ind_order)
+            && !are_incompat(new_sig_idx, index(p.top_sig), ind_order))
+            if divch(new_lm, monomial(p.top_sig), new_lm_msk, p.top_sig_mask)
                 pairset.elems[i].top_index = 0
                 continue
             end
         end
-        if p.bot_index == parent_ind-1
-            if divch(new_sig_mon, monomial(p.bot_sig),
-                     mask(bmask), p.bot_sig_mask)
-                pairset.elems[i].top_index = 0
+        if !iszero(p.bot_index) && (mod_ord == :DPOT || index(p.bot_sig) != index(p.top_sig))
+            if (cmp_ind_str(new_sig_idx, index(p.bot_sig), ind_order)
+                && !are_incompat(new_sig_idx, index(p.top_sig), ind_order))
+                if divch(new_lm, monomial(p.bot_sig), new_lm_msk, p.bot_sig_mask)
+                    pairset.elems[i].top_index = 0
+                    continue
+                end
             end
         end
     end
@@ -153,19 +291,20 @@ function update_pairset!(pairset::Pairset{N},
 
     # resize pairset if needed
     num_new_pairs = new_basis_idx - 1
-    if pairset.load + num_new_pairs >= pairset.size
-          resize!(pairset.elems, max(2 * pairset.size,
-                                     pairset.load - num_new_pairs))
-          pairset.size *= 2
-    end
+    resize_pairset!(pairset, num_new_pairs)
 
     new_sig_ratio = basis.sigratios[new_basis_idx]
-    new_lm = leading_monomial(basis, basis_ht, new_basis_idx)
     # pair construction loop
     @inbounds for i in basis.basis_offset:(new_basis_idx - 1)
-        basis_lm = leading_monomial(basis, basis_ht, i)
-        basis_sig_idx = index(basis.sigs[i])
 
+        # ignore if redundant
+        basis.is_red[i] && continue
+
+        basis_sig_idx = index(basis.sigs[i])
+        # dont build incompatible pairs 
+        are_incompat(new_sig_idx, basis_sig_idx, ind_order) && continue
+
+        basis_lm = leading_monomial(basis, basis_ht, i)
         mult_new_elem = lcm_div(new_lm, basis_lm)
         new_pair_sig_mon = mul(mult_new_elem, new_sig_mon)
         
@@ -174,6 +313,10 @@ function update_pairset!(pairset::Pairset{N},
 
         new_pair_sig = (new_sig_idx, new_pair_sig_mon)
         basis_pair_sig = (basis_sig_idx, basis_pair_sig_mon)
+
+        new_sig_is_smaller = lt_pot(new_pair_sig, basis_pair_sig, ind_order)
+
+        top_idx = new_sig_is_smaller ? basis_sig_idx : new_sig_idx
         
         # check if S-pair is singular
         new_pair_sig == basis_pair_sig && continue
@@ -185,166 +328,92 @@ function update_pairset!(pairset::Pairset{N},
                                       basis_ht.divmap,
                                       basis_ht.ndivbits)
 
-        # check both pair sigs against non-trivial syzygies
         rewriteable_syz(basis, new_pair_sig,
-                        new_pair_sig_mask) && continue
+                        new_pair_sig_mask, tags,
+                        mod_ord == :DPOT || cmp_ind(basis_sig_idx, new_sig_idx, ind_order)) && continue
         rewriteable_syz(basis, basis_pair_sig,
-                        basis_pair_sig_mask) && continue
-
-        # check both pair signatures against koszul syzygies
+                        basis_pair_sig_mask, tags,
+                        mod_ord == :DPOT || cmp_ind(new_sig_idx, basis_sig_idx, ind_order)) && continue
         rewriteable_koszul(basis, basis_ht, new_pair_sig,
-                           new_pair_sig_mask) && continue
+                           new_pair_sig_mask, ind_order, tags,
+                           mod_ord == :DPOT || cmp_ind(basis_sig_idx, new_sig_idx, ind_order)) && continue
         rewriteable_koszul(basis, basis_ht, basis_pair_sig,
-                           basis_pair_sig_mask) && continue
+                           basis_pair_sig_mask, ind_order, tags,
+                           mod_ord == :DPOT || cmp_ind(new_sig_idx, basis_sig_idx, ind_order)) && continue
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin
-	    if lt_pot(basis_pair_sig, new_pair_sig)
-                new_pair_sig, new_pair_sig_mask, new_basis_idx,
-                basis_pair_sig, basis_pair_sig_mask, i
-            else
+	    if new_sig_is_smaller
                 basis_pair_sig, basis_pair_sig_mask, i,
                 new_pair_sig, new_pair_sig_mask, new_basis_idx
+            else
+                new_pair_sig, new_pair_sig_mask, new_basis_idx,
+                basis_pair_sig, basis_pair_sig_mask, i
             end 
         end
         
         pair_deg = new_pair_sig_mon.deg + basis.degs[new_sig_idx]
-        new_pair =  SPair(top_sig, bot_sig,
-                          top_sig_mask, bot_sig_mask,
-                          top_index, bot_index,
-                          pair_deg)
+        new_pair = SPair(top_sig, bot_sig,
+                         top_sig_mask, bot_sig_mask,
+                         top_index, bot_index,
+                         pair_deg)
         pairset.elems[pairset.load + 1] = new_pair
         pairset.load += 1
     end
 end
 
-@inline function rewriteable_syz(basis::Basis,
-                                 sig::Sig,
-                                 sigmask::DivMask)
+function minimize!(basis::Basis{N},
+                   basis_ht::MonomialHashtable{N},
+                   idx_bound::SigIndex,
+                   ind_order::IndOrder,
+                   tags::Tags) where N
 
-    ind = index(sig)
-
-    @inbounds for i in 1:basis.syz_load
-        if index(basis.syz_masks[i]) == ind
-            is_rewr = divch(basis.syz_sigs[i], monomial(sig),
-                            basis.syz_masks[i][2], sigmask) 
-            is_rewr && return true
-        end
+    if !iszero(idx_bound)
+        @info "minimizing up to $(ind_order.ord[idx_bound])"
+    else
+        @info "minimizing"
     end
-    return false
-end
+    el_killed = 0
 
-@inline function rewriteable_basis(basis::Basis,
-                                   idx::Int,
-                                   sig::Sig,
-                                   sigmask::DivMask)
+    sz = 10000
+    min_data = Vector{Tuple{Monomial{N},
+                            DivMask,
+                            Int}}(undef, sz)
 
-    k = find_canonical_rewriter(basis, sig, sigmask)
-    return k != idx
-end
-
-# @inline function rewriteable_basis(basis::Basis,
-#                                    idx::Int,
-#                                    sig::Sig,
-#                                    sigmask::DivMask)
-
-#     ind = index(sig)
-    
-#     @inbounds for i in basis.basis_load:-1:basis.basis_offset
-#         i == idx && continue
-#         i_sig_idx = index(basis.sigmasks[i])
-#         i_sig_idx != ind && continue
-#         i_sig_mask = mask(basis.sigmasks[i])
-#         if divch(monomial(basis.sigs[i]), monomial(sig),
-#                  i_sig_mask, sigmask)
-#             is_rewr = comp_sigratio(basis, i, idx)
-#             is_rewr && return true
-#         end
-#     end
-#     return false
-# end
-
-function find_canonical_rewriter(basis::Basis,
-                                 sig::Sig,
-                                 sigmask::DivMask)
-
-    node_ind = 1
-    while true
-        @inbounds node = basis.rewrite_nodes[node_ind]
-        @inbounds node[1] == -1 && break
-        found_div = false
-        @inbounds for i in 3:3+node[1]
-            ch = node[i]
-            basis_sig = basis.sigs[ch - 1]
-            basis_sigmask = basis.sigmasks[ch - 1]
-            index(basis_sig) != index(sig) && continue
-            if divch(monomial(basis_sig), monomial(sig),
-                     mask(basis_sigmask), sigmask)
-                node_ind = ch
-                found_div = true
-                break
-            end
-        end
-        !found_div && break
-    end
-    return node_ind - 1
-end
-
-@inline function rewriteable_koszul(basis::Basis,
-                                    basis_ht::MonomialHashtable,
-                                    sig::Sig,
-                                    sigmask::DivMask)
-
+    j = 1
     @inbounds for i in basis.basis_offset:basis.basis_load
-        if index(basis.sigs[i]) < index(sig)
-            if divch(basis.lm_masks[i], sigmask)
-                if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
-                    return true
-                end
+        bsi = index(basis.sigs[i])
+        !iszero(idx_bound) && cmp_ind_str(idx_bound, bsi, ind_order) && continue
+        gettag(tags, bsi) == :sat && continue
+        if j > sz
+            sz *= 2
+            resize!(min_data, sz)
+        end
+        min_data[j] = (leading_monomial(basis, basis_ht, i),
+                       basis.lm_masks[i], i)
+        j += 1
+    end
+
+    l = j-1
+    sort!(view(min_data, 1:l),
+          by = x -> x[1],
+          lt = (m1, m2) -> m1.deg <= m2.deg) 
+
+    to_del = Int[]
+    @inbounds for i in 1:l 
+        lm, lm_msk, bind = min_data[i]
+        basis.is_red[bind] && continue
+        for j in i+1:l
+            lm2, lm_msk2, bind2 = min_data[j]
+            basis.is_red[bind2] && continue
+            if divch(lm, lm2, lm_msk, lm_msk2)
+                el_killed += 1
+                basis.is_red[bind2] = true
+                push!(to_del, bind2)
             end
         end
     end
-    return false
-end
 
-function rewriteable(basis::Basis,
-                     basis_ht::MonomialHashtable,
-                     idx::Int,
-                     sig::Sig,
-                     sigmask::DivMask)
-
-    rewriteable_syz(basis, sig, sigmask) && return true
-    rewriteable_basis(basis, idx, sig, sigmask) && return true
-    rewriteable_koszul(basis, basis_ht, sig, sigmask) && return true
-    return false
-end
-
-# helper functions for readability
-function leading_monomial(basis::Basis,
-                          basis_ht::MonomialHashtable,
-                          i)
-
-    return basis_ht.exponents[first(basis.monomials[i])]
-end
-
-@inline function comp_sigratio(basis::Basis, ind1::Int, ind2::Int)
-
-    rat1 = basis.sigratios[ind1]
-    rat2 = basis.sigratios[ind2]
-    if rat1 == rat2
-        return lt_drl(monomial(basis.sigs[ind1]), monomial(basis.sigs[ind2]))
-    end
-    return lt_drl(rat1, rat2)
-end
-
-# remove pairs that are rewriteable
-function remove_red_pairs!(pairset::Pairset)
-    iszero(pairset.load) && return
-    j = 0 
-    @inbounds for i in 1:pairset.load
-        iszero(pairset.elems[i].top_index) && continue
-        j += 1
-        pairset.elems[j] = pairset.elems[i]
-    end
-    pairset.load = j 
+    sort!(to_del)
+    @info "$(el_killed) elements killed"
 end

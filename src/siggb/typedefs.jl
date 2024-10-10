@@ -12,6 +12,8 @@ const ColIdx = UInt32
 const Coeff = UInt32
 # 64 bit buffer
 const Cbuf = UInt64
+# module order
+const ModOrd = Symbol
 
 struct Monomial{N}
     deg::Exp
@@ -20,8 +22,43 @@ end
 function monomial(exps::SV) where {N, SV <: StaticArray{Tuple{N}}}
     return Monomial{N}(sum(exps), exps)
 end
+
+mutable struct Hashvalue
+    hash::MonHash
+    divmask::DivMask
+end
+
+# Hashtable designed to store monomials
+mutable struct MonomialHashtable{N}
+    exponents::Vector{Monomial{N}}
+
+    # for buffering exponent vectors during certain operations
+    buffer::MVector{N, Exp}
+
+    # maps exponent hash to its position in exponents array
+    hashtable::Vector{MonIdx}
+
+    # stores hashes, division masks,
+    # and other valuable info
+    # for each hashtable enrty
+    hashdata::Vector{Hashvalue}
+
+    #= Monom divisibility =#
+    # divisor map to check divisibility faster
+    divmap::Vector{UInt32}
+    # bits per div variable
+    ndivbits::Int
+
+    size::Int
+    # elements added
+    load::Int
+end
+
 const Sig{N} = Tuple{SigIndex, Monomial{N}}
 const MaskSig = Tuple{SigIndex, DivMask}
+
+const Polynomial = Tuple{Vector{Coeff}, Vector{MonIdx}}
+const ModCache{N} = Dict{Tuple{Sig{N}, SigIndex}, Polynomial}
 
 mutable struct Basis{N}
     sigs::Vector{Sig{N}}
@@ -43,6 +80,9 @@ mutable struct Basis{N}
 
     is_red::Vector{Bool}
 
+    mod_rep_known::Vector{Vector{Bool}}
+    mod_reps::Vector{Vector{Polynomial}}
+
     syz_sigs::Vector{Monomial{N}}
     syz_masks::Vector{MaskSig}
 
@@ -51,13 +91,14 @@ mutable struct Basis{N}
 
     basis_load::Int
     basis_size::Int
-    # for storing the initial polynomials from 1 to offset-1
+    # for storing the initial polynomials
+    input_load::Int
+    input_size::Int
     basis_offset::Int
     syz_load::Int
     syz_size::Int
 end
 
-# TODO: should these be stored in a more vectorized way?
 mutable struct SPair{N}
     top_sig::Sig{N}
     bot_sig::Sig{N}
@@ -106,4 +147,65 @@ mutable struct MacaulayMatrix{N}
     # for each i in toadd rows[i] should be added to basis/syzygies
     toadd::Vector{Int}
     toadd_length::Int
+end
+
+abstract type TracerMatrix end
+
+struct NoTracerMatrix <: TracerMatrix end
+
+# struct to remember the row reductions we did
+mutable struct SigTracerMatrix
+    # first index row index, second one rewr ind
+    rows::Dict{Sig, Tuple{Int, Int}}
+    # if row i has been added to basis
+    is_basis_row::Dict{Int, Int}
+    row_ind_to_sig::Dict{Int, Sig}
+    diagonal::Vector{Coeff}
+    col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
+end
+
+abstract type Tracer end
+
+struct NoTracer <: Tracer end
+
+mutable struct SigTracer <: Tracer
+    mats::Vector{SigTracerMatrix}
+    basis_ind_to_mat::Vector{Int}
+    syz_ind_to_mat::Vector{Int}
+    load::Int
+    size::Int
+end
+
+# For Index ordering
+mutable struct IndOrder
+    ord::Vector{SigIndex}
+    incompat::Dict{Tuple{SigIndex, SigIndex}, Bool}
+    max_ind::SigIndex
+end
+
+# This is to store where certain elements come from
+const Tags = Dict{SigIndex, Symbol}
+
+# For syzygy processing during splitting
+const SyzInfo = Tuple{SigIndex, Dict{SigIndex, Bool}}
+
+# For syzygy processing in nondegenerate locus
+const IndConn = Dict{SigIndex, Vector{SigIndex}}
+
+# For output of decomp algorithms
+mutable struct LocClosedSet{T<:MPolyRingElem}
+    seq::Vector{T}
+    codim_upper_bound::Int
+    gbs::Vector{Vector{T}}
+end
+
+# for benchmarking
+mutable struct Timings
+    sym_pp_time::Float32
+    lin_alg_time::Float32
+    select_time::Float32
+    update_time::Float32
+    arit_ops::Int64
+    module_time::Float32
+    comp_lc_time::Float32
 end

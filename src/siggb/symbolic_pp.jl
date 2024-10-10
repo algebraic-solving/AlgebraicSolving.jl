@@ -2,47 +2,68 @@ function select_normal!(pairset::Pairset{N},
                         basis::Basis{N},
                         matrix::MacaulayMatrix,
                         ht::MonomialHashtable,
-                        symbol_ht::MonomialHashtable) where N
-
-    # sort pairset
-    sort_pairset_by_degree!(pairset, 1, pairset.load-1)
+                        symbol_ht::MonomialHashtable,
+                        ind_order::IndOrder,
+                        tags::Tags,
+                        mod_ord::Symbol=:DPOT) where N
 
     # number of selected pairs
     npairs = 0
-    deg = zero(Exp) 
+    min_pair_ind = 0
+    deg = Exp(-1) 
+    sigind = zero(SigIndex)
+    compat_ind = zero(SigIndex)
+    dont_sel = Int[]
     for i in 1:pairset.load
-        if iszero(deg)
-            deg = pairset.elems[i].deg
+        pe = pairset.elems[i]
+        if deg == -1 && iszero(sigind)
+            deg = mod_ord == :DPOT ? pe.deg : monomial(pe.top_sig).deg
+            sigind = index(pe.top_sig)
             npairs += 1
             continue
         end
-        if pairset.elems[i].deg == deg
+        if should_select(pairset, i, deg, sigind, mod_ord)
             npairs += 1
+            top_s_idx = index(pe.top_sig)
+            if iszero(compat_ind) && gettag(tags, top_s_idx) == :sat
+                compat_ind = top_s_idx
+            elseif are_incompat(top_s_idx, compat_ind, ind_order)
+                push!(dont_sel, i)
+            end
         else
             break
         end
     end
 
-    @info "selected $(npairs) pairs, degree $(deg)"
     added_to_matrix = 0
 
     # allocate matrix
     reinitialize_matrix!(matrix, npairs)
     skip = falses(npairs)
 
+    l = 1
+    dl = length(dont_sel)
     @inbounds for i in 1:npairs
         if skip[i]
+            continue
+        end
+
+        if l <= dl && i == dont_sel[l]
+            l += 1
             continue
         end
 
         pair = pairset.elems[i]
         # for each unique pair signature
         curr_top_sig = pair.top_sig
-        rewr_ind = find_canonical_rewriter(basis, pair.top_sig,
-                                           pair.top_sig_mask)
+
+        rewr_ind = find_canonical_rewriter(basis, curr_top_sig,
+                                           pair.top_sig_mask,
+                                           mod_ord)
 
         pair_with_rewr_ind = 0
         for j in i:npairs
+            skip[j] && continue
             pair2 = pairset.elems[j]
             if pair2.top_sig == curr_top_sig
                 skip[j] = true
@@ -53,7 +74,6 @@ function select_normal!(pairset::Pairset{N},
         end
 
         if !iszero(pair_with_rewr_ind)
-
             # take pair with non-rewr top signature
             pair = pairset.elems[pair_with_rewr_ind]
             
@@ -67,7 +87,7 @@ function select_normal!(pairset::Pairset{N},
                 lm = mul(mult, leading_monomial(basis, ht, rewr_ind))
                 l_idx = find_in_hash_table(symbol_ht, lm)
                 if !iszero(l_idx)
-                    if !iszero(matrix.pivots[l_idx])
+                    if matrix.pivot_size >= l_idx && !iszero(matrix.pivots[l_idx])
                         add_cond = matrix.sigs[matrix.pivots[l_idx]] != curr_top_sig
                     end
                 end
@@ -88,13 +108,16 @@ function select_normal!(pairset::Pairset{N},
                 @inbounds for j in 1:npairs
                     pair2 = pairset.elems[j]
                     pair2.bot_sig == curr_top_sig && continue
-                    if iszero(reducer_ind) || lt_pot(pair2.bot_sig, reducer_sig)
-                        !lt_pot(pair2.bot_sig, curr_top_sig) && continue
+                    iszero(pair2.bot_index) && continue
+                    are_incompat(index(pair2.bot_sig), compat_ind, ind_order) && continue
+                    if iszero(reducer_ind) || lt_pot(pair2.bot_sig, reducer_sig, ind_order)
+                        !lt_pot(pair2.bot_sig, curr_top_sig, ind_order) && continue
                         new_red = false
                         if !iszero(pair2.bot_index)
-                            rewriteable_basis(basis, pair2.bot_index,
-                                              pair2.bot_sig,
-                                              pair2.bot_sig_mask) && continue
+                            rewriteable_basis(basis, pair2.bot_index, pair2.bot_sig,
+                                              pair2.bot_sig_mask, tags,
+                                              mod_ord == :DPOT || cmp_ind(sigind, index(pair2.bot_sig),
+                                                                          ind_order), mod_ord) && continue
                             ind = pair2.bot_index
                             mult = divide(monomial(pair2.bot_sig),
                                           monomial(basis.sigs[ind]))
@@ -104,10 +127,14 @@ function select_normal!(pairset::Pairset{N},
                         if new_red
                             reducer_sig = pair2.bot_sig
                             reducer_ind = pair2.bot_index
+                            if mod_ord == :POT && cmp_ind_str(index(reducer_sig), sigind, ind_order)
+                                @goto lab_add_row
+                            end
                         end
                     end
                 end
 
+                @label lab_add_row
                 add_cond = !iszero(reducer_ind)
                 if add_cond
                     mult = divide(monomial(reducer_sig),
@@ -139,35 +166,49 @@ function select_normal!(pairset::Pairset{N},
     end
                 
     if !iszero(added_to_matrix)
+        @info if mod_ord == :DPOT
+            "selected $(npairs) pairs, degree $(deg)"
+        else
+            "selected $(npairs) pairs, index $(sigind), order index $(ind_order.ord[sigind]), tag $(gettag(tags, sigind)), sig degree $(deg)"
+        end
         @info "$(added_to_matrix) non-rewriteable critical signatures added to matrix"
     end
 
     # remove selected pairs from pairset
-    @inbounds for i in 1:(pairset.load-npairs)
-        pairset.elems[i] = pairset.elems[i+npairs]
+    l = 1
+    @inbounds for i in 1:(pairset.load-npairs+dl)
+        if l <= dl && i == dont_sel[j]
+            l += 1
+            continue
+        end
+        pairset.elems[i] = pairset.elems[i+npairs-l+1]
     end
     pairset.load -= npairs
-    resize_pivots!(matrix, symbol_ht)
+    return deg, compat_ind, sigind
 end
 
 function symbolic_pp!(basis::Basis{N},
                       matrix::MacaulayMatrix,
                       ht::MonomialHashtable,
-                      symbol_ht::MonomialHashtable) where N
+                      symbol_ht::MonomialHashtable,
+                      ind_order::IndOrder,
+                      tags::Tags,
+                      sigind::SigIndex=zero(SigIndex),
+                      compat_ind::SigIndex=zero(SigIndex),
+                      mod_ord::Symbol=:DPOT) where N
 
     i = one(MonIdx)
     mult = similar(ht.buffer)
     mult2 = similar(ht.buffer)
     red_sig_mon = similar(ht.buffer)
 
+    resize_pivots!(matrix, symbol_ht)
+
     # iterate over monomials in symbolic ht
     @inbounds while i <= symbol_ht.load
         found_reducer = false
         # skip if reducer already exists
         if !iszero(matrix.pivots[i])
-            # exp = symbol_ht.exponents[i]
-            # println("mon: $(exp.exps)")
-            # println("reducer exists")
             i += one(MonIdx)
             continue
         end
@@ -195,10 +236,27 @@ function symbolic_pp!(basis::Basis{N},
         @label target
         # find element in basis which divmask divides divmask of monomial
         @inbounds while j <= basis.basis_load && !divch(basis.lm_masks[j], divm)
-            j += 1 
+            j += 1
         end
 
         if j <= basis.basis_load
+            if basis.is_red[j]
+                j += 1
+                @goto target
+            end
+
+            cand_sig = basis.sigs[j]
+            if !iszero(compat_ind) && are_incompat(index(cand_sig),
+                                                   compat_ind, ind_order)
+                j += 1
+                @goto target
+            end
+
+            if mod_ord == :POT && cmp_ind_str(sigind, index(cand_sig), ind_order)
+                j += 1
+                @goto target
+            end
+            
             @inbounds red_exp = leading_monomial(basis, ht, j)
 
             # actual divisibility check
@@ -206,21 +264,36 @@ function symbolic_pp!(basis::Basis{N},
                 j += 1
                 @goto target
             end
-            # found_reducer = true
+
+            mul_cand_sig = (index(cand_sig),
+                            mul(monomial(mult2), monomial(cand_sig)))
+            cand_sig_mask = divmask(monomial(mul_cand_sig),
+                                    ht.divmap,
+                                    ht.ndivbits)
+
+            # during POT computation: take reducer if its index is smaller than sigind
+            if mod_ord == :POT && cmp_ind_str(index(cand_sig), sigind, ind_order)
+                red_ind = j
+                mul_red_sig = mul_cand_sig
+                j = basis.basis_load + 1
+                @inbounds for k in 1:N
+                    mult[k] = mult2[k]
+                end
+                @goto target
+            end
 
             # check if new reducer sig is smaller than possible previous
-            if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig)
+            if !iszero(red_ind) && lt_pot(mul_red_sig, mul_cand_sig,
+                                          ind_order)
                 j += 1
                 @goto target
             end
 
             # check if reducer is rewriteable
-            cand_sig = basis.sigs[j]
-            mul_cand_sig = (index(cand_sig),
-                            mul(monomial(mult2), monomial(cand_sig)))
-            cand_sig_mask = divmask(monomial(mul_cand_sig), ht.divmap,
-                                    ht.ndivbits)
-            if rewriteable(basis, ht, j, mul_cand_sig, cand_sig_mask)
+            if rewriteable(basis, ht, j, mul_cand_sig,
+                           cand_sig_mask,
+                           ind_order, tags, true,
+                           mod_ord)
                 j += 1
                 @goto target
             end
@@ -238,6 +311,9 @@ function symbolic_pp!(basis::Basis{N},
         # write to matrix
         if !iszero(red_ind)
             mm = monomial(SVector(mult))
+            if iszero(compat_ind) && gettag(tags, index(mul_red_sig)) == :sat
+                compat_ind = index(mul_red_sig)
+            end
             @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
                                                       red_ind, symbol_ht,
                                                       ht, mm,
@@ -250,7 +326,10 @@ function symbolic_pp!(basis::Basis{N},
 end
 
 function finalize_matrix!(matrix::MacaulayMatrix,
-                          symbol_ht::MonomialHashtable)
+                          symbol_ht::MonomialHashtable,
+                          ind_order::IndOrder,
+                          sigind::SigIndex=zero(SigIndex),
+                          mod_ord::Symbol=:DPOT)
     
     # store indices into hashtable in a sorted way
     ncols = symbol_ht.load
@@ -276,66 +355,25 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     end
     matrix.sig_order = Vector{Int}(undef, matrix.nrows)
     # sort signatures
-    sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
-              lt = (sig1, sig2) -> lt_pot(sig1, sig2))
-end
 
-# TODO: later to optimize: mem allocations for matrix
-# helper functions
-function initialize_matrix(::Val{N}) where {N}
-    rows = Vector{Vector{MonIdx}}(undef, 0)
-    pivots = Vector{Int}(undef, 0)
-    pivot_size = 0
-    sigs = Vector{Sig{N}}(undef, 0)
-    parent_inds = Vector{Int}(undef, 0)
-    sig_order = Vector{Int}(undef, 0)
-    col2hash = Vector{ColIdx}(undef, 0)
-    coeffs = Vector{Vector{Coeff}}(undef, 0)
-    toadd = Vector{Int}(undef, 0)
-
-    size = 0
-    nrows = 0
-    ncols = 0
-    toadd_length = 0
-
-    return MacaulayMatrix(rows, pivots, pivot_size,
-                          sigs, parent_inds, sig_order,
-                          col2hash, coeffs, size, nrows,
-                          ncols, toadd, toadd_length)
-end
-    
-# Refresh and initialize matrix for `npairs` elements
-function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
-    matrix.size = 2 * npairs
-    matrix.pivot_size = 2 * npairs
-    resize!(matrix.rows, matrix.size)
-    resize!(matrix.pivots, matrix.pivot_size)
-    for i in 1:matrix.pivot_size
-        matrix.pivots[i] = 0
-    end
-    resize!(matrix.sigs, matrix.size)
-    resize!(matrix.parent_inds, matrix.size)
-    resize!(matrix.coeffs, matrix.size)
-    resize!(matrix.toadd, matrix.size)
-    for i in 1:npairs
-        matrix.toadd[i] = 0
-    end
-    return matrix
-end
-
-# resize pivots array if needed
-@inline function resize_pivots!(matrix::MacaulayMatrix,
-                                symbol_ht::MonomialHashtable)
-    if matrix.pivot_size < symbol_ht.load 
-        pv_size = matrix.pivot_size
-        new_pv_size = 2 * (symbol_ht.load)
-        resize!(matrix.pivots, new_pv_size)
-        @inbounds for j in pv_size+1:new_pv_size 
-            matrix.pivots[j] = 0
+    lt_mat = (sig1, sig2) -> begin
+        if mod_ord == :POT
+            i1, i2 = index(sig1), index(sig2)
+            if cmp_ind_str(i1, sigind, ind_order) && cmp_ind_str(i2, sigind, ind_order)
+                true
+            else
+                lt_pot(sig1, sig2, ind_order)
+            end
+        else
+            lt_pot(sig1, sig2, ind_order)
         end
-        matrix.pivot_size = new_pv_size
     end
+    
+    @inbounds sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
+                        lt = lt_mat)
 end
+
+# helper functions
     
 # helper function to write row to matrix
 function write_to_matrix_row!(matrix::MacaulayMatrix,
@@ -365,4 +403,21 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
         matrix.nrows += 1
     end
     return first(matrix.rows[row_ind])
+end
+
+# check if element i from pairset should be selected
+function should_select(pairset::Pairset,
+                       i::Int,
+                       deg::Exp,
+                       idx::SigIndex,
+                       mod_ord::Symbol)
+
+    if mod_ord == :DPOT
+        return pairset.elems[i].deg == deg
+    elseif mod_ord == :POT
+        sig = pairset.elems[i].top_sig
+        return index(sig) == idx && monomial(sig).deg == deg
+    else
+        error("unrecognized module order")
+    end
 end

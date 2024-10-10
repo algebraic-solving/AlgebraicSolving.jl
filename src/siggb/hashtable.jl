@@ -21,42 +21,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-mutable struct Hashvalue
-    hash::MonHash
-    divmask::DivMask
-end
-
 function copy_hashvalue(x::Hashvalue)
     Hashvalue(x.hash, x.divmask)
 end
-
-# Hashtable designed to store monomials
-mutable struct MonomialHashtable{N}
-    exponents::Vector{Monomial{N}}
-
-    # for buffering exponent vectors during certain operations
-    buffer::MVector{N, Exp}
-
-    # maps exponent hash to its position in exponents array
-    hashtable::Vector{MonIdx}
-
-    # stores hashes, division masks,
-    # and other valuable info
-    # for each hashtable enrty
-    hashdata::Vector{Hashvalue}
-
-    #= Monom divisibility =#
-    # divisor map to check divisibility faster
-    divmap::Vector{UInt32}
-    # bits per div variable
-    ndivbits::Int
-
-    size::Int
-    # elements added
-    load::Int
-end
-
-#------------------------------------------------------------------------------
 
 # Returns the next look-up position in the table 
 function nexthashindex(h::MonHash, j::MonHash, mod::MonHash)
@@ -469,4 +436,32 @@ function insert_in_basis_hash_table_pivots!(
     end
 
     nothing
+end
+
+# remask all global data
+function remask!(ht::MonomialHashtable{N},
+                 basis::Basis{N},
+                 pairset::Pairset{N}) where N
+
+    fill_divmask!(ht)
+
+    @inbounds for i in 1:basis.basis_load
+        basis.input_load < i < basis.basis_offset && continue
+        basis.lm_masks[i] = ht.hashdata[basis.monomials[i][1]].divmask
+        bm = basis.sigs[i]
+        basis.sigmasks[i] = (index(bm), divmask(monomial(bm), ht.divmap,
+                                                ht.ndivbits))
+    end
+
+    @inbounds for i in 1:basis.syz_load
+        bs = basis.syz_sigs[i]
+        bsm = basis.syz_masks[i]
+        basis.syz_masks[i] = (index(bsm), divmask(bs, ht.divmap, ht.ndivbits))
+    end
+
+    @inbounds for i in 1:pairset.load
+        p = pairset.elems[i]
+        p.top_sig_mask = divmask(monomial(p.top_sig), ht.divmap, ht.ndivbits)
+        p.bot_sig_mask = divmask(monomial(p.bot_sig), ht.divmap, ht.ndivbits)
+    end
 end

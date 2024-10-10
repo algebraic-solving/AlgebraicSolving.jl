@@ -22,7 +22,8 @@ makedocs(
         "Algorithms" => ["groebner-bases.md",
                          "normal-forms.md",
                          "dimension.md",
-                         "solvers.md"],
+                         "solvers.md",
+                         "decomposition.md"],
         "Examples" => "katsura.md"
         ]
 )
