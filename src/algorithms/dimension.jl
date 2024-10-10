@@ -19,17 +19,16 @@ julia> dimension(I)
 """
 function dimension(I::Ideal{T}) where T <: MPolyRingElem
     
-    gb = isempty(values(I.gb)) ? groebner_basis(I) : first(values(I.gb))
+    gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true))
     R = parent(first(gb))
     res = [trues(ngens(R))]
 
-    lms = (Nemo.leading_monomial).(gb)
-    for lm in lms
+    lead_exps = (_drl_lead_exp).(gb)
+    for lexp in lead_exps 
         to_del = Int[]
         new_miss = BitVector[]
         for (i, mis) in enumerate(res)
-            nz_exps_inds = findall(e -> !iszero(e),
-                                   first(Nemo.exponent_vectors(lm)))
+            nz_exps_inds = findall(e -> !iszero(e), lexp)
             ind_var_inds = findall(mis)
             if issubset(nz_exps_inds, ind_var_inds)
                 for j in nz_exps_inds
@@ -47,4 +46,14 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
 
     max_length = maximum(mis -> length(findall(mis)), res)
     return max_length
+end
+
+function _drl_exp_vector(u::Vector{Int})
+    return [sum(u), -reverse(u)...]
+end
+
+function _drl_lead_exp(p::MPolyRingElem)
+    exps = collect(Nemo.exponent_vectors(p))
+    _, i = findmax((u -> _drl_exp_vector(u)).(exps))
+    return exps[i]
 end
