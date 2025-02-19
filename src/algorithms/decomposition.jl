@@ -1,5 +1,5 @@
 @doc Markdown.doc"""
-function equidimensional_decomposition(I::Ideal{T}, info_level::Int=0) where {T <: MPolyRingElem}
+    equidimensional_decomposition(I::Ideal{T}, info_level::Int=0) where {T <: MPolyRingElem}
 
 Given a polynomial ideal `I`, return a list of ideals `dec` s.t.
 each ideal in `dec` is equidimensional (i.e. has minimal primes
