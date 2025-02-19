@@ -35,9 +35,9 @@ end
 # initialize and set fields for basis hashtable
 function initialize_basis_hash_table(::Val{N}) where N
 
-    # for now at most 32 variables
-    if N > 32
-        error("At most 32 variables currently supported.")
+    # for now at most 64 variables
+    if N > 64
+        error("At most 64 variables currently supported.")
     end
     
     # not necessary to create `initial_size` exponents
@@ -50,8 +50,8 @@ function initialize_basis_hash_table(::Val{N}) where N
     size = init_ht_size
 
     # initialize fast divisibility params
-    int32bits = 32
-    ndivbits = div(int32bits, N)
+    int64bits = 64
+    ndivbits = div(64, N)
     # division mask stores at least 1 bit
     # per each of first ndivvars variables
     ndivbits == 0 && (ndivbits += 1)
@@ -270,16 +270,17 @@ function fill_divmask!(ht::MonomialHashtable{N}) where N
    end
 
     ctr = 1
-    steps = UInt32(0)
+    steps = DivMask(0)
     @inbounds for i in 1:N
-        steps = div(max_exp[i] - min_exp[i], UInt32(ht.ndivbits))
-        (iszero(steps)) && (steps += UInt32(1))
+        steps = div(DivMask(max_exp[i] - min_exp[i]), DivMask(ht.ndivbits))
+        (iszero(steps)) && (steps += DivMask(1))
         for j in 1:ht.ndivbits
             ht.divmap[ctr] = steps
-            steps += UInt32(1)
+            steps += DivMask(1)
             ctr += 1
         end
     end
+    
     @inbounds for vidx in 1:ht.load
         m = ht.exponents[vidx]
         divm = divmask(m, ht.divmap, ht.ndivbits)
