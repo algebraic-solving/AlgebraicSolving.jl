@@ -7,6 +7,7 @@ const Exp = Int16
 const MonIdx = Int32
 const MonHash = UInt32
 const DivMask = UInt64
+const DivMaskSize = 64
 # stuff for matrix
 const ColIdx = UInt32
 const Coeff = UInt32

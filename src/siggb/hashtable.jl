@@ -34,11 +34,6 @@ end
 
 # initialize and set fields for basis hashtable
 function initialize_basis_hash_table(::Val{N}) where N
-
-    # for now at most 64 variables
-    if N > 64
-        error("At most 64 variables currently supported.")
-    end
     
     # not necessary to create `initial_size` exponents
     exponents = Vector{Monomial{N}}(undef, init_ht_size)
@@ -50,8 +45,7 @@ function initialize_basis_hash_table(::Val{N}) where N
     size = init_ht_size
 
     # initialize fast divisibility params
-    int64bits = 64
-    ndivbits = div(64, N)
+    ndivbits = div(DivMaskSize, N)
     # division mask stores at least 1 bit
     # per each of first ndivvars variables
     ndivbits == 0 && (ndivbits += 1)
