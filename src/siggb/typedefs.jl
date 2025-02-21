@@ -6,7 +6,8 @@ const Exp = Int16
 # types for hashvalue, ht index and divisor mask of a monomial
 const MonIdx = Int32
 const MonHash = UInt32
-const DivMask = UInt32
+const DivMask = UInt64
+const DivMaskSize = 64
 # stuff for matrix
 const ColIdx = UInt32
 const Coeff = UInt32
@@ -45,7 +46,7 @@ mutable struct MonomialHashtable{N}
 
     #= Monom divisibility =#
     # divisor map to check divisibility faster
-    divmap::Vector{UInt32}
+    divmap::Vector{DivMask}
     # bits per div variable
     ndivbits::Int
 

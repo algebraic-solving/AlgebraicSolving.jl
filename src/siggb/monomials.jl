@@ -121,6 +121,7 @@ function divmask(e::Monomial{N},
     ctr = one(DivMask)
     res = zero(DivMask)
     o = one(DivMask)
+    lb = N > DivMaskSize ? N - DivMaskSize : 1
     for i in N:-1:1
         for j in 1:ndivbits
             @inbounds if e.exps[i] >= divmap[ctr]
