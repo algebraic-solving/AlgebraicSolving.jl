@@ -4,9 +4,9 @@ export compute_param, param_newvars
 function rem_var(f, i)
     # Remove the occurence of the ith variable
     R = parent(f)
-    A, Avars = polynomial_ring(base_ring(R), rem_ind(R.S, i))
+    A, = polynomial_ring(base_ring(R), [R.S[1:i-1]; R.S[i+1:end]])
     CE = [collect(coefficients(f)), collect(exponent_vectors(f))]
-    CE[2] = [ rem_ind(e, i) for e in CE[2]]
+    CE[2] = [ [e[1:i-1]; e[i+1,end]] for e in CE[2]]
 
     # Reconstruct the polynomial in the ring A
     C = MPolyBuildCtx(A)
@@ -15,27 +15,6 @@ function rem_var(f, i)
         push_term!(C, R(CE[1][i]), CE[2][i]);
     end
     return finish(C)
-end
-
-function rem_var(f, i, S)
-    # Remove the occurence of the ith variable
-    R = parent(f)
-    A, Avars = polynomial_ring(base_ring(R), rem_ind(S, i))
-    CE = [collect(coefficients(f)), collect(exponent_vectors(f))]
-    CE[2] = [ rem_ind(e, i) for e in CE[2]]
-
-    # Reconstruct the polynomial in the ring A
-    C = MPolyBuildCtx(A)
-    R = base_ring(A)
-    for i in eachindex(CE[1])
-        push_term!(C, R(CE[1][i]), CE[2][i]);
-    end
-    return finish(C)
-end
-
-function rem_ind(L,i::Int)
-    # remove element at index i
-    return [ L[1:i-1]; L[i+1:end] ]
 end
 
 function deg_Alg(F, dim)
@@ -50,12 +29,9 @@ function deg_Alg(F, dim)
 end
 
 function compute_param(I::Ideal{P} where P<:MPolyRingElem; use_lfs = false, lfs = [])
-    return compute_param(I.gens, use_lfs = use_lfs, lfs = lfs)
-end
-
-function compute_param(F::Vector{P} where P<:MPolyRingElem; use_lfs = false, lfs = [])
-    R = parent(first(F))
+    R = parent(I)
     varias, N = gens(R), nvars(R)
+    F = I.gens
     DEG = deg_Alg(F,1)
 
     if !use_lfs && length(lfs)==0
@@ -134,16 +110,13 @@ function compute_param(F::Vector{P} where P<:MPolyRingElem; use_lfs = false, lfs
         end
         for j in 1:length(free_ind)
             # For lifting: the same variable must be chosen for the param
-            if  Lr[j].vars == rem_ind(R.S, N-1)
+            if  Lr[j].vars == [R.S[1:N-2]; R.S[N]]
                 lc = leading_coefficient(Lr[j].elim)
-                # TODO: why dividing by lc ? To get a unique representative?
                 rr = [ p/lc for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
                 PARAM[j] = rr
                 _values[j] = QQ(i+j-1)
                 used_ind[j] = true
-                #println("Good specialization: ",i+j-1)
             else
-                #println(r.vars, rem_ind(R.S, N-1))
                 println("bad specialization: ", i+j-1)
             end
         end
@@ -179,34 +152,3 @@ function compute_param(F::Vector{P} where P<:MPolyRingElem; use_lfs = false, lfs
 
     return [R.S, lf_cfs, POLY_PARAM[1], POLY_PARAM[2], POLY_PARAM[3:end]]
 end
-
-function param_newvars(F::Vector{P} where P <: MPolyRingElem, Svars::Vector{Symbol}, cfs_lf::Vector{Vector{I}} where I<:Union{ZZRingElem, QQFieldElem})
-    Svarsbis = vcat(Svars[1:end-2], reverse!(Svars[end-1:end]))
-    eq = change_ringvar(F, Svarsbis)
-	newvarias = gens(parent(first(eq)))
-    newvariasbis = vcat(newvarias[1:end-2], reverse!(newvarias[end-1:end]))
-	neweq = vcat(eq, [ transpose(lf)*newvariasbis for lf in cfs_lf ])
-
-	C = rational_parametrization(Ideal(neweq))
-	return change_ringvar([C.elim, C.elim == -1 ? C.elim : C.param[end], C.denom], [:x,:y])
-end
-
-
-#=
-# Tests
-R, (a,b,c) = polynomial_ring(QQ, [:a,:b,:c])
-F = [-62*a^2-24*a*b+83*a*c-46*b^2-45*b*c+16*c^2+13*a-65*b-84*c-19,
-92*a^2-a*b+39*a*c-16*b^2+61*b*c+78*c^2+17*a+49*b-97*c-56
-]
-
-R, (x1,x2,x3,x4) = polynomial_ring(QQ, ["x1","x2","x3","x4"])
-F = [
-x1^4 - 12*x1^3*x2 - 40*x1^3*x3 + 12*x1^3*x4 + 56*x1^2*x2^2 + 320*x1^2*x2*x3 - 148*x1^2*x2*x4 + 802*x1^2*x3^2 + 56*x1^2*x3*x4 + 288*x1^2*x4^2 - 20*x1^2 - 120*x1*x2^3 - 880*x1*x2^2*x3 + 576*x1*x2^2*x4 - 4012*x1*x2*x3^2 + 224*x1*x2*x3*x4 - 1968*x1*x2*x4^2 + 120*x1*x2 - 8040*x1*x3^3 - 3508*x1*x3^2*x4 - 3264*x1*x3*x4^2 + 400*x1*x3 + 1512*x1*x4^3 - 120*x1*x4 + 100*x2^4 + 800*x2^3*x3 - 760*x2^3*x4 + 5620*x2^2*x3^2 - 80*x2^2*x3*x4 + 3964*x2^2*x4^2 - 200*x2^2 + 16080*x2*x3^3 - 3436*x2*x3^2*x4 - 1168*x2*x3*x4^2 - 800*x2*x3 - 9576*x2*x4^3 + 760*x2*x4 + 40401*x3^4 + 59496*x3^3*x4 + 72556*x3^2*x4^2 - 4020*x3^2 + 37296*x3*x4^3 - 2960*x3*x4 + 15876*x4^4 - 2484*x4^2 + 64,
- -40*x1^3 + 320*x1^2*x2 + 1604*x1^2*x3 + 56*x1^2*x4 - 880*x1*x2^2 - 8024*x1*x2*x3 + 224*x1*x2*x4 - 24120*x1*x3^2 - 7016*x1*x3*x4 - 3264*x1*x4^2 + 400*x1 + 800*x2^3 + 11240*x2^2*x3 - 80*x2^2*x4 + 48240*x2*x3^2 - 6872*x2*x3*x4 - 1168*x2*x4^2 - 800*x2 + 161604*x3^3 + 178488*x3^2*x4 + 145112*x3*x4^2 - 8040*x3 + 37296*x4^3 - 2960*x4,
- 12*x1^3 - 148*x1^2*x2 + 56*x1^2*x3 + 576*x1^2*x4 + 576*x1*x2^2 + 224*x1*x2*x3 - 3936*x1*x2*x4 - 3508*x1*x3^2 - 6528*x1*x3*x4 + 4536*x1*x4^2 - 120*x1 - 760*x2^3 - 80*x2^2*x3 + 7928*x2^2*x4 - 3436*x2*x3^2 - 2336*x2*x3*x4 - 28728*x2*x4^2 + 760*x2 + 59496*x3^3 + 145112*x3^2*x4 + 111888*x3*x4^2 - 2960*x3 + 63504*x4^3 - 4968*x4
- ]
-
- @time begin
- compute_param(F)
- end
-=#
