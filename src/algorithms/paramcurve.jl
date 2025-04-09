@@ -29,7 +29,6 @@ function change_ringvar(F::Vector{P}, newvarias_S::Vector{Symbol}) where {P <: M
     return res
 end
 
-
 function deg_Alg(F, dim)
     if dim <= 0
         r = rational_parametrization(Ideal(F))
@@ -41,64 +40,32 @@ function deg_Alg(F, dim)
     return degree(r.elim)
 end
 
-function compute_param(I::Ideal{P} where P<:MPolyRingElem; use_lfs = false, lfs = [])
+function compute_param(I::Ideal{P} where P<:MPolyRingElem; use_lfs = false, cfs_lfs = [])
     R = parent(I)
     varias, N = gens(R), nvars(R)
     F = I.gens
     DEG = deg_Alg(F,1)
 
-    if !use_lfs && length(lfs)==0
-        # Identification of two generic variables for the parametrization")
-        ivarias_gen = Vector{Int}(undef,0)
-        ind = N
-        while true
-            NEW_DEG = deg_Alg(vcat(F, varias[ind]-rand(-100:100)), 0)
-            if NEW_DEG == DEG
-                push!(ivarias_gen, ind)
-            end
-            (length(ivarias_gen) < 2 && ind > 0) || break
-            ind -= 1
-        end
-        reverse!(ivarias_gen)
-        nb_lf = 2-length(ivarias_gen)
-
-        if ivarias_gen != [N-1,N]
-            # Add new generic variables at the end if necessary
-            newvarias_S = [R.S[i] for i in vcat(setdiff(1:N, ivarias_gen), ivarias_gen)]
-            append!(newvarias_S, [:A,:B][nb_lf:-1:1] )
-
-            # We change the polynomial ring and add linear form(s) if necessary
-            Rold, Nold = R, N
-            R, varias = polynomial_ring(base_ring(Rold), newvarias_S)
-            N = length(varias)
-
-            index_permut = Dict((v, i) for (i, v) in enumerate(newvarias_S))
-            permut_varias = [ index_permut[v] for v in Rold.S ]
-            # TODO: permut exponents and use polynomial constructor
-            F = [ evaluate(f, [ varias[permut_varias[i]] for i in 1:Nold ]) for f in F ]
-
-            if nb_lf > 0
-                lf_cfs = [ rand(ZZ(-100):ZZ(100), N) for _ in 1:nb_lf]
-                append!(F, [ transpose(lf)*varias  for lf in lf_cfs ])
-            else
-                lf_cfs = Vector{Vector{ZZRingElem}}(undef,0)
-            end
-        else
-            lf_cfs = Vector{Vector{ZZRingElem}}(undef,0)
-        end
-    else
+    if use_lfs || length(cfs_lfs)>0
         # Add new generic variables at the end if necessary
-        newvarias_S = vcat(R.S, [:B,:A])
-
+        nb_lfs = length(cfs_lfs)
+        newvarias_S = vcat(R.S[1:end-(2-nb_lfs)], [:A,:B][nb_lfs:-1:1], R.S[end-(1-nb_lfs):end])
+        
         # We change the polynomial ring and add linear form(s) if necessary
-        Rold, Nold = R, N
-        R, varias = polynomial_ring(base_ring(Rold), newvarias_S)
+        R, varias = polynomial_ring(base_ring(R), newvarias_S)
         N = length(varias)
 
         F = change_ringvar(F, newvarias_S)
-        lf_cfs = vcat(lfs, [ rand(ZZ(-100):ZZ(100), N) for _ in 1:2-length(lfs)])
-        append!(F, [ transpose(lf)*varias  for lf in lf_cfs ])
+        cfs_lfs = [ vcat(cfs_lfs[i], [ZZ(i==k) for k in 1:nb_lfs]) for i in 1:nb_lfs ]
+        if use_lfs
+            append!(cfs_lfs, [rand(ZZ(-100):ZZ(100), N) for _ in 1:2-nb_lfs])
+        end
+        append!(F, [ transpose(lf)*varias  for lf in cfs_lfs ])
     end
+
+    @assert(deg_Alg(vcat(F, varias[N-1]-rand(ZZ(-100):ZZ(100))), 0) == DEG,
+         "The curve is not in generic position")
+
     # Compute DEG+1 evaluations of the param (whose deg is bounded by DEG)
     PARAM  = Vector{Vector{AlgebraicSolving.QQPolyRingElem}}(undef,DEG+2)
     _values = Vector{QQFieldElem}(undef,DEG+2)
@@ -153,5 +120,5 @@ function compute_param(I::Ideal{P} where P<:MPolyRingElem; use_lfs = false, lfs 
         POLY_PARAM[count] = POL
     end
 
-    return [R.S, lf_cfs, POLY_PARAM[1], POLY_PARAM[2], POLY_PARAM[3:end]]
+    return [R.S, cfs_lfs, POLY_PARAM[1], POLY_PARAM[2], POLY_PARAM[3:end]]
 end
