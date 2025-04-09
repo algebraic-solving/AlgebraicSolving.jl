@@ -34,33 +34,34 @@ function deg_Alg(F, dim)
         r = rational_parametrization(Ideal(F))
     else
         varias = gens(parent(first(F)))
-        planes = [ sum([ rand(-100:100)*v for v in vcat(varias,1) ])  for _ in 1:dim]
+        planes = [ sum([ rand(ZZ(-100):ZZ(100))*v for v in vcat(varias,1) ])  for _ in 1:dim]
         r = rational_parametrization(Ideal(vcat(F,planes)))
     end
     return degree(r.elim)
 end
 
-function compute_param(I::Ideal{P} where P<:MPolyRingElem; use_lfs = false, cfs_lfs = [])
+function compute_param(I::Ideal{P} where P<:MPolyRingElem; use_lfs = false, 
+    cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{Vector{ZZRingElem}}())
     R = parent(I)
     varias, N = gens(R), nvars(R)
     F = I.gens
     DEG = deg_Alg(F,1)
 
-    if use_lfs || length(cfs_lfs)>0
+    nb_lfs = length(cfs_lfs)
+    @assert(nb_lfs in [0,2], "Provide either none or two linear forms")
+    @assert(all(length(cfs_lf) == N+2 for cfs_lf in cfs_lfs), "Linear form(s) of wrong size")
+    if use_lfs || nb_lfs>0
         # Add new generic variables at the end if necessary
-        nb_lfs = length(cfs_lfs)
-        newvarias_S = vcat(R.S[1:end-(2-nb_lfs)], [:A,:B][nb_lfs:-1:1], R.S[end-(1-nb_lfs):end])
-        
+        newvarias_S = vcat(R.S, [:B,:A])
         # We change the polynomial ring and add linear form(s) if necessary
         R, varias = polynomial_ring(base_ring(R), newvarias_S)
         N = length(varias)
-
+        # Add linear forms to keep dimension
         F = change_ringvar(F, newvarias_S)
-        cfs_lfs = [ vcat(cfs_lfs[i], [ZZ(i==k) for k in 1:nb_lfs]) for i in 1:nb_lfs ]
-        if use_lfs
-            append!(cfs_lfs, [rand(ZZ(-100):ZZ(100), N) for _ in 1:2-nb_lfs])
+        if nb_lfs == 0
+            cfs_lfs = [rand(ZZ.(setdiff(-100:100,0)), N) for _ in 1:2]
         end
-        append!(F, [ transpose(lf)*varias  for lf in cfs_lfs ])
+        append!(F, [ transpose(cfs_lf)*varias  for cfs_lf in cfs_lfs ])
     end
 
     @assert(deg_Alg(vcat(F, varias[N-1]-rand(ZZ(-100):ZZ(100))), 0) == DEG,
@@ -76,10 +77,12 @@ function compute_param(I::Ideal{P} where P<:MPolyRingElem; use_lfs = false, cfs_
         if i > 2*(DEG+2)
             error("Too many bad specializations")
         end
+        # Evaluation of the generators
         LFeval = Vector{AlgebraicSolving.Ideal}(undef, length(free_ind))
         Threads.@threads for j in 1:length(free_ind)
             LFeval[i+j-1] = Ideal(change_ringvar(evaluate.(F, Ref([N-1]), Ref([QQ(i+j-1)])), [R.S[1:N-2]; R.S[N]]))
         end
+        # Compute parametrization of each evaluation
         Lr = Vector{AlgebraicSolving.RationalParametrization}(undef, length(free_ind))
         for j in 1:length(free_ind)
             Lr[i+j-1] = rational_parametrization(LFeval[i+j-1], nr_thrds=Threads.nthreads())
@@ -105,7 +108,7 @@ function compute_param(I::Ideal{P} where P<:MPolyRingElem; use_lfs = false, cfs_
     # Interpolate each coefficient of each poly in the param
     POLY_PARAM = Vector{QQMPolyRingElem}(undef,N)
     T, (x,y) = polynomial_ring(QQ, [:x,:y])
-    A, u = polynomial_ring(QQ, :u)
+    A, = polynomial_ring(QQ, :u)
     Threads.@threads for count in 1:N
         COEFFS = Vector{QQPolyRingElem}(undef, DEG+1)
         Threads.@threads for deg in 0:DEG
