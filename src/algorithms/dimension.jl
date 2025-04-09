@@ -46,6 +46,8 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
 
     length(res) == 0 && return -1
     max_length = maximum(mis -> length(findall(mis)), res)
+
+    I.dim = max_length
     return max_length
 end
 
