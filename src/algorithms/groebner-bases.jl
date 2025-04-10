@@ -245,6 +245,5 @@ function _core_groebner_basis(
           cglobal(:jl_free), gb_len, gb_exp, gb_cf, jl_ld, field_char)
 
     I.gb[eliminate] = basis
-
-    return basis
+    return I.gb[eliminate]
 end
