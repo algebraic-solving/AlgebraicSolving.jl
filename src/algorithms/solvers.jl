@@ -31,7 +31,7 @@ function _get_rational_parametrization(
     ctr +=  lens[2]
 
     size  = nr-2
-    p = Vector{PolyRingElem}(undef, size)
+    p = Vector{QQPolyRingElem}(undef, size)
     k = 1
     for i in 3:nr
         p[k]  = C([unsafe_load(cfs, j+ctr) for j in 1:lens[i]-1])
@@ -151,6 +151,7 @@ function _core_msolve(
 
     rat_param = _get_rational_parametrization(jl_ld, jl_len,
                                               jl_cf, jl_cf_lf, jl_rp_nr_vars)
+
 
     I.rat_param = RationalParametrization(vsymbols, rat_param[1],rat_param[2],
                                           rat_param[3], rat_param[4])

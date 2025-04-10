@@ -79,7 +79,8 @@ function compute_param(
     end
 
     # Output: [vars, linear forms, elim, denom, [nums_param]]
-    return [R.S, cfs_lfs, POLY_PARAM[1], POLY_PARAM[2], POLY_PARAM[3:end]]
+    return RationalCurveParametrization(R.S, cfs_lfs, POLY_PARAM[1],
+                                        POLY_PARAM[2], POLY_PARAM[3:end])
 end
 
 
