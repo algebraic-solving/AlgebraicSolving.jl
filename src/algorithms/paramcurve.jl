@@ -1,79 +1,21 @@
-export compute_param, param_newvars
-
-
-# Return the polynomials in F, but injected in the polynomial ring with newvarias_S as new variables
-function change_ringvar(
-        F::Vector{P} where P <: MPolyRingElem,  # list of polynomials
-        newvarias_S::Vector{Symbol}             # new variable symbols
-        ) 
-    R = parent(first(F))
-    # Locate variables of R in newvarias
-    to_varias = Vector{Int}(undef,0)
-    for v in newvarias_S
-        ind = findfirst(x->x==v, R.S)
-        push!(to_varias, typeof(ind)==Nothing ? length(R.S)+1 : ind)
-    end
-
-    ind_novarias = setdiff(eachindex(R.S), to_varias)
-    newR, = polynomial_ring(base_ring(R), newvarias_S)
-
-    res = typeof(first(F))[]
-    ctx = MPolyBuildCtx(newR)
-
-    for f in F
-        for (e, c) in zip(exponent_vectors(f), coefficients(f))
-            @assert(all([ e[i]==0 for i in ind_novarias ]), "Occurence of old variable.s found!")
-            push!(e, 0)
-            push_term!(ctx, c, [e[i] for i in to_varias ])
-        end
-        push!(res, finish(ctx))
-    end
-
-    return res
-end
-
-function deg_Alg(I)
-    dim = I.dim >= 0 ? I.dim :  dimension(I)
-    if dim == 0
-        r = rational_parametrization(I)
-    else
-        varias = gens(parent(I))
-        planes = [ transpose(ZZ.(rand(-100:100, length(varias)+1)))*vcat(varias,1) for _ in 1:dim]
-        r = rational_parametrization(Ideal(vcat(I.gens, planes)))
-    end
-    return degree(r.elim)
-end
+export compute_param, add_genvars
 
 function compute_param(
-        I::Ideal{P} where P<:MPolyRingElem;                         # input generators
-        use_lfs::Bool = false,                                      # add generic variables
-        cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]  # linear forms for generic vars
-        )
-
+        I::Ideal{P} where P<:MPolyRingElem; # input generators
+        use_lfs::Bool = false,              # add generic variables
+    )
     @assert(I.dim==1 || I.dim<0 && dimension(I)==1, "I must be one-dimensional dimension")
-    R, F = parent(I), I.gens
-    varias, N = gens(R), nvars(R)
     DEG = deg_Alg(I)
-    nb_lfs = length(cfs_lfs)
-    @assert(nb_lfs in [0,2], "Provide either none or two linear forms")
-    @assert(all(length(cfs_lf) == N+2 for cfs_lf in cfs_lfs), "Linear form(s) of wrong size")
 
     # If generic variables must be added
-    if use_lfs || nb_lfs>0
-        # Change the polynomial ring
-        newvarias_S = vcat(R.S, [:B,:A])
-        R, varias = polynomial_ring(base_ring(R), newvarias_S)
-        N = length(varias)
-        # Add linear forms to keep dimension
-        F = change_ringvar(F, newvarias_S)
-        if nb_lfs == 0
-            cfs_lfs = [rand(ZZ.(setdiff(-100:100,0)), N) for _ in 1:2]
-        end
-        append!(F, [ transpose(cfs_lf)*varias  for cfs_lf in cfs_lfs ])
-    end
+    F, cfs_lfs = use_lfs ? add_genvars(I.gens, 2) : (I.gens, Vector{ZZRingElem}[])
+    R = parent(first(F))
+    N = nvars(R)
 
-    @assert(deg_Alg(Ideal(vcat(F, varias[N-1]-rand(ZZ(-100):ZZ(100))))) == DEG,
-         "The curve is not in generic position")
+    let #local code block test
+        local INEW = Ideal(vcat(F, gens(R)[N-1]-rand(ZZ(-100):ZZ(100))))
+        @assert(dimension(INEW)==0 && deg_Alg(INEW) == DEG, "The curve is not in generic position")
+    end
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
     PARAM  = Vector{Vector{AlgebraicSolving.QQPolyRingElem}}(undef,DEG+2)
@@ -137,3 +79,80 @@ function compute_param(
     # Output: [vars, linear forms, elim, denom, [nums_param]]
     return [R.S, cfs_lfs, POLY_PARAM[1], POLY_PARAM[2], POLY_PARAM[3:end]]
 end
+
+
+# Return the polynomials in F, but injected in the polynomial ring with newvarias_S as new variables
+function change_ringvar(
+        F::Vector{P} where P <: MPolyRingElem,  # list of polynomials
+        newvarias_S::Vector{Symbol}             # new variable symbols
+        ) 
+    R = parent(first(F))
+    # Locate variables of R in newvarias
+    to_varias = Vector{Int}(undef,0)
+    for v in newvarias_S
+        ind = findfirst(x->x==v, R.S)
+        push!(to_varias, typeof(ind)==Nothing ? length(R.S)+1 : ind)
+    end
+
+    ind_novarias = setdiff(eachindex(R.S), to_varias)
+    newR, = polynomial_ring(base_ring(R), newvarias_S)
+
+    res = typeof(first(F))[]
+    ctx = MPolyBuildCtx(newR)
+
+    for f in F
+        for (e, c) in zip(exponent_vectors(f), coefficients(f))
+            @assert(all([ e[i]==0 for i in ind_novarias ]), "Occurence of old variable.s found!")
+            push!(e, 0)
+            push_term!(ctx, c, [e[i] for i in to_varias ])
+        end
+        push!(res, finish(ctx))
+    end
+
+    return res
+end
+
+function deg_Alg(I)
+    dim = I.dim >= 0 ? I.dim :  dimension(I)
+    if dim == 0
+        r = rational_parametrization(I)
+    else
+        varias = gens(parent(I))
+        planes = [ transpose(ZZ.(rand(-100:100, length(varias)+1)))*vcat(varias,1) for _ in 1:dim]
+        r = rational_parametrization(Ideal(vcat(I.gens, planes)))
+    end
+    return degree(r.elim)
+end
+
+function add_genvars(
+    F::Vector{P} where P<:MPolyRingElem,
+    ngenvars::Int;
+    cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{Vector{ZZRingElem}}()
+)
+
+if length(cfs_lfs) > ngenvars
+    error("Too many linear forms provided (", length(cfs_lfs), ") for ngenvars = ", ngenvars)
+end
+R = parent(first(F))
+N = nvars(R)
+# Add new variables (reverse alphabetical order)
+newS = vcat(R.S, Symbol.(["_Z$i" for i in ngenvars:-1:1]))
+R_ext, all_vars = polynomial_ring(base_ring(R), newS)
+Fnew = change_ringvar(F, newS)
+
+# Complete possible incomplete provided linear forms
+for i in eachindex(cfs_lfs)
+    if N+ngenvars < length(cfs_lfs[i])
+        error("Too many coefficients provided for the ", i, "th linear form")
+    else
+        append!(cfs_lfs[i], rand(ZZ.(setdiff(-100:100,0)), N+ngenvars - length(cfs_lfs[i])))
+    end
+end
+# Add missing linear forms if needed
+append!(cfs_lfs, [rand(ZZ.(setdiff(-100:100,0)), N+ngenvars) for _ in 1:ngenvars-length(cfs_lfs)])
+# Construct and append linear forms
+append!(Fnew, [transpose(cfs_lf) * all_vars for cfs_lf in cfs_lfs])
+
+return Fnew, cfs_lfs
+end
+
