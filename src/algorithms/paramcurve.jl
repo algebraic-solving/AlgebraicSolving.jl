@@ -1,18 +1,20 @@
 export compute_param, add_genvars
 
 function compute_param(
-        I::Ideal{P} where P<:MPolyRingElem; # input generators
-        use_lfs::Bool = false,              # add generic variables
+        I::Ideal{P} where P<:MPolyRingElem;                         # input generators
+        use_lfs::Bool = false,                                      # add generic variables
+        cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]  # coeffs of linear forms
     )
     @assert(I.dim==1 || I.dim<0 && dimension(I)==1, "I must be one-dimensional dimension")
     DEG = deg_Alg(I)
-
     # If generic variables must be added
-    F, cfs_lfs = use_lfs ? add_genvars(I.gens, 2) : (I.gens, Vector{ZZRingElem}[])
+    F, cfs_lfs = use_lfs ? add_genvars(I.gens, max(2, length(cfs_lfs)), cfs_lfs) :
+             !isempty(cfs_lfs) ? add_genvars(I.gens, length(cfs_lfs), cfs_lfs) :
+             (I.gens, Vector{ZZRingElem}[])
     R = parent(first(F))
     N = nvars(R)
 
-    let #local code block test
+    let # local code block test
         local INEW = Ideal(vcat(F, gens(R)[N-1]-rand(ZZ(-100):ZZ(100))))
         @assert(dimension(INEW)==0 && deg_Alg(INEW) == DEG, "The curve is not in generic position")
     end
@@ -126,12 +128,12 @@ end
 
 function add_genvars(
     F::Vector{P} where P<:MPolyRingElem,
-    ngenvars::Int;
-    cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{Vector{ZZRingElem}}()
+    ngenvars::Int,
+    cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]
 )
 
 if length(cfs_lfs) > ngenvars
-    error("Too many linear forms provided (", length(cfs_lfs), ") for ngenvars = ", ngenvars)
+    error("Too many linear forms provided ($(length(cfs_lfs))>$(ngenvars))")
 end
 R = parent(first(F))
 N = nvars(R)
@@ -143,7 +145,7 @@ Fnew = change_ringvar(F, newS)
 # Complete possible incomplete provided linear forms
 for i in eachindex(cfs_lfs)
     if N+ngenvars < length(cfs_lfs[i])
-        error("Too many coefficients provided for the ", i, "th linear form")
+        error("Too many coeffs ($(length(cfs_lfs[i]))>$(N+ngenvars)) for the $(i)th linear form")
     else
         append!(cfs_lfs[i], rand(ZZ.(setdiff(-100:100,0)), N+ngenvars - length(cfs_lfs[i])))
     end
