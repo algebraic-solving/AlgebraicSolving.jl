@@ -28,7 +28,7 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
         to_del = Int[]
         new_miss = BitVector[]
         for (i, mis) in enumerate(res)
-            nz_exps_inds = findall(e -> !iszero(e), lexp)
+            nz_exps_inds = findall(!iszero, lexp)
             ind_var_inds = findall(mis)
             if issubset(nz_exps_inds, ind_var_inds)
                 for j in nz_exps_inds
