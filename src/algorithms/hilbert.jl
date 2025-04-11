@@ -1,8 +1,14 @@
 include("dimension.jl")
 
-export affine_hilbert_series, hilbert_series, _hilbert_series_mono, _monomial_support_partition
+export affine_hilbert_series, hilbert_series, hilbert_series_mono, hilbert_dimension, hilbert_degree
 
-function _hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
+function hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
+    h = _num_hilbert_series_mono(exps, variant=variant)
+    t = gen(parent(h))
+    return h//(1-t)^length(first(exps))
+end
+
+function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
     r = sort!(exps, by=reverse) |> length
 
     A, t = polynomial_ring(ZZ, 't')
@@ -16,9 +22,11 @@ function _hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
                       !any(all(sat[k] .<= sat[j]) for k in eachindex(sat) if k!=j)]
 
         if variant==0
+            # Trivial partition of monomial supports
             nolin_sat = [u for u in sat if sum(u)>1]
-            hsat = (1-t)^(length(sat)-length(nolin_sat))*_hilbert_series_mono(nolin_sat)
+            hsat = (1-t)^(length(sat)-length(nolin_sat))*_num_hilbert_series_mono(nolin_sat, variant=variant)
         elseif variant==1
+            # Finest partition of monomial supports
             LV, hsat = _monomial_support_partition(sat), one(A)
             rem_mon = collect(1:length(sat))
             for V in LV
@@ -30,28 +38,29 @@ function _hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
                         push!(JV, mono)
                     end
                 end
-                hsat *= _hilbert_series_mono(JV)
+                hsat *= _num_hilbert_series_mono(JV, variant=variant)
                 # Avoid re-check monomials (LV partitions sat)
                 deleteat!(rem_mon, iJV)
             end
         else
-            hsat = _hilbert_series_mono(sat)
+            # No partition of monomial supports
+            hsat = _num_hilbert_series_mono(sat, variant=variant)
         end
         h -= t^(sum(exps[i]))*hsat
     end
     return h
 end
 
-function hilbert_series(I)
+function hilbert_series(I; variant::Int=0)
     gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true))
     lexps = (_drl_lead_exp).(gb)
-    return _hilbert_series_mono(lexps)
+    return hilbert_series_mono(lexps, variant=variant)
 end
 
-function affine_hilbert_series(I)
+function affine_hilbert_series(I; variant::Int=0)
     gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true))
     lexps = (_drl_lead_exp).(homogenize(gb))
-    return _hilbert_series_mono(lexps)
+    return hilbert_series_mono(lexps, variant=variant)
 end
 
 function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
@@ -111,4 +120,12 @@ function _monomial_support_partition(L::Vector{Vector{Int}})
     end
 
     return components
+end
+
+function hilbert_degree(I)
+    return numerator(hilbert_series(I))(1) |> abs
+end
+
+function hilbert_dimension(I)
+    return denominator(hilbert_series(I)) |> degree
 end
