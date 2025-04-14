@@ -1,10 +1,26 @@
-#include("dimension.jl")
+export affine_hilbert_series, hilbert_series, hilbert_dimension, hilbert_degree
 
-global plop = 0
+function hilbert_series(I; variant::Int=0)
+    gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, nr_thrds=Threads.nthreads()))
+    lexps = (_drl_lead_exp).(gb)
+    return _hilbert_series_mono(lexps, variant=variant)
+end
 
-export affine_hilbert_series, hilbert_series, hilbert_series_mono, hilbert_dimension, hilbert_degree
+function affine_hilbert_series(I; variant::Int=0)
+    gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, nr_thrds=Threads.nthreads()))
+    lexps = (_drl_lead_exp).(homogenize(gb))
+    return _hilbert_series_mono(lexps, variant=variant)
+end
 
-function hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
+function hilbert_degree(I)
+    return numerator(hilbert_series(I))(1) |> abs
+end
+
+function hilbert_dimension(I)
+    return denominator(hilbert_series(I)) |> degree
+end
+
+function _hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
     h = _num_hilbert_series_mono(exps, variant=variant)
     t = gen(parent(h))
     return h//(1-t)^length(first(exps))
@@ -13,25 +29,26 @@ end
 function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
     A, t = polynomial_ring(ZZ, 't')
     r = length(exps)
-    global plop
-    plop +=1
-
-    ## Base cases ##
     r == 0 && return one(A)
+    N = length(first(exps))
+    ## Base cases ##
+    r == 1 && return (1-t^sum(first(exps)))
     supp = findall.(Ref(!iszero), exps)
     pow_supp = findall(s->length(s)==1, supp)
     # If exps is a product of simple powers
     if length(pow_supp) == r
+        #println("Simple power")
         return prod(1-t^(exps[i][supp[i][1]]) for i in pow_supp)
     # Only one non-simple power P
     elseif length(pow_supp) == r-1
-        inpow = setdiff(1:r, pow_supp) |> first
+        #println("Mixed pow")
+        inpow = setdiff(eachindex(exps), pow_supp) |> first
         # P has disjoint support with other powers
-        if all(iszero(exps[inpow][ind[1]]) for ind in supp)
+        if all(iszero(exps[inpow][supp[i][1]]) for i in pow_supp)
             return (1-t^sum(exps[inpow]))*prod(1-t^(exps[i][supp[i][1]]) for i in pow_supp)
         else
             return prod(1-t^(exps[i][supp[i][1]]) for i in pow_supp) - t^sum(exps[inpow]) *
-            prod(1-t^(exps[i][supp[i][1]]-exps[inpow][i]) for i in pow_supp)
+            prod(1-t^(exps[i][supp[i][1]]-exps[inpow][supp[i][1]]) for i in pow_supp)
         end
     end
 
@@ -42,9 +59,9 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
     ## Splitting recursive cases ##
     # Monomials have disjoint supports
     if counts[ivarmax] == 1
-        return prod(_num_hilbert_series_mono(mono) for mono in exps)
+        return prod(1-t^sum(mono) for mono in exps)
     # Heuristic where general splitting is useful
-    elseif 8 <= r <= length(first(exps))
+    elseif 8 <= r <= N
         # Finest partition of monomial supports
         LV, h = _monomial_support_partition(exps), one(A)
         rem_mon = collect(1:r)
@@ -57,6 +74,9 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
                     push!(JV, mono)
                 end
             end
+            # Interreduce JV
+            JV = [JV[j] for j in eachindex(JV) if
+                      !any(all(JV[k] .<= JV[j]) for k in eachindex(JV) if k!=j)]
             h *= _num_hilbert_series_mono(JV, variant=variant)
             # Avoid re-check monomials (LV partitions sat)
             deleteat!(rem_mon, iJV)
@@ -64,61 +84,31 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
         return h
     end
 
-    ## Pivot recurive case ##
-    sort!(exps, by=reverse)
-    h = 1-t^(sum(exps[1]))
-    for i in 2:r
-        # Compute generators for (x^a1,...,x^a{i-1}):x^ai
-        sat = [ [ max(a[j]-exps[i][j], 0) for j in eachindex(a)]
-                                                for a in exps[1:i-1] ]
-        # Reduce to minimal generators
-        sat = [sat[j] for j in eachindex(sat) if
-                      !any(all(sat[k] .<= sat[j]) for k in eachindex(sat) if k!=j)]
-
-        if variant==0
-            # Trivial partition of monomial supports
-            nolin_sat = [u for u in sat if sum(u)>1]
-            hsat = (1-t)^(length(sat)-length(nolin_sat))*_num_hilbert_series_mono(nolin_sat, variant=variant)
-        else
-            # No partition of monomial supports
-            hsat = _num_hilbert_series_mono(sat, variant=variant)
+    ## Pivot recursive case ##
+    C = 0
+    while C < r
+        C +=1
+        # Exponent of ivarmax in gcd of two random generators
+        pivexp = max(1, minimum(mon[ivarmax] for mon in rand(exps, 2)))
+        # Compute interreduced generators for (exps):pivot
+        sat = Vector{Vector{Int64}}(undef, r)
+        for j in 1:r
+            sat[j] = [exps[j][1:ivarmax-1]; max(exps[j][ivarmax]-pivexp, 0); exps[j][ivarmax+1:end]]
         end
-        h -= t^(sum(exps[i]))*hsat
+        sat = [sat[j] for j in eachindex(sat) if !iszero(sat[j]) &&
+                         !any(all(sat[k] .<= sat[j]) for k in eachindex(sat) if k!=j)]
+        isempty(sat) && continue # We must split the ideal
+
+        # Interreduce exps + pivot
+        filter!(e->(pivexp > e[ivarmax]), exps)
+        push!(exps,[zeros(Int64,ivarmax-1); pivexp; zeros(Int64,N-ivarmax)])
+
+        a = _num_hilbert_series_mono(exps)
+        b = _num_hilbert_series_mono(sat)
+        return a+b*t^pivexp
     end
-    return h
+    error("Impossible to find a suitable pivot")
 end
-
-function hilbert_series(I; variant::Int=0)
-    global plop = 0
-    gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, info_level=2))
-    lexps = (_drl_lead_exp).(gb)
-    h= hilbert_series_mono(lexps, variant=variant)
-    println(plop)
-    return h
-end
-
-function affine_hilbert_series(I; variant::Int=0)
-    gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true))
-    lexps = (_drl_lead_exp).(homogenize(gb))
-    return hilbert_series_mono(lexps, variant=variant)
-end
-
-#=function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
-    R = parent(first(F))
-    S, vars = polynomial_ring(base_ring(R), ["x$i" for i in 1:nvars(R)+1], internal_ordering=:degrevlex)
-    res = typeof(first(F))[]
-    for f in F
-        ctx = MPolyBuildCtx(S)
-        d = total_degree(f)
-        for (e, c) in zip(exponent_vectors(f), coefficients(f))
-            enew = push!(e, d - sum(e))
-            push_term!(ctx, c, e)
-        end
-        push!(res, finish(ctx))
-    end
-    return res
-end=#
-
 
 function _monomial_support_partition(L::Vector{Vector{Int}})
     # Build adjacency graph: connect variables that appear together in a monomial
@@ -160,12 +150,4 @@ function _monomial_support_partition(L::Vector{Vector{Int}})
     end
 
     return components
-end
-
-function hilbert_degree(I)
-    return numerator(hilbert_series(I))(1) |> abs
-end
-
-function hilbert_dimension(I)
-    return denominator(hilbert_series(I)) |> degree
 end
