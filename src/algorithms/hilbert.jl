@@ -21,19 +21,22 @@ function hilbert_dimension(I)
 end
 
 function hilbert_polynomial(I)
+    A, d = polynomial_ring(QQ, :d)
     H = hilbert_series(I)
-    num, dim = numerator(H), degree(denominator(H))
+    dim = degree(denominator(H))
     num = iseven(dim) ? numerator(H) : -numerator(H)
+    dim==0 && return num(d), 0
+
     t = gen(parent(num))
     La = Vector{ZZPolyRingElem}(undef, dim)
     while dim>0
         num, La[dim] = divrem(num, 1-t)
         dim -= 1
     end
-    println(La, num)
+
     Hpolyfct = d->sum(La[i](0)*binomial(i+d, i) for i in 1:length(La))
+    return Hpolyfct
     dim = degree(denominator(H))
-    A, = polynomial_ring(QQ, :d)
     Hpoly = interpolate(A, QQ.(0:dim+1), [QQ(Hpolyfct(d)) for d in 0:dim+1])
     @assert(degree(Hpoly)==dim, "Degree of poly does not match the dimension")
     # Hilbert poly, index of regularity
