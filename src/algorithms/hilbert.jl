@@ -35,7 +35,36 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
         end
     end
 
-    # Otherwise switch to pivot-case
+    # Variable index occuring the most in exps
+    counts = sum(x -> x .> 0, eachcol(reduce(hcat, exps)))
+    ivarmax = argmax(counts)
+
+    ## Splitting recursive cases ##
+    # Monomials have disjoint supports
+    if counts[ivarmax] == 1
+        return prod(_num_hilbert_series_mono(mono) for mono in exps)
+    # Heuristic where general splitting is useful
+    elseif 8 <= r <= length(first(exps))
+        # Finest partition of monomial supports
+        LV, h = _monomial_support_partition(exps), one(A)
+        rem_mon = collect(1:r)
+        for V in LV
+            JV, iJV = Vector{Vector{Int}}(), Int[]
+            for (k, i) in enumerate(rem_mon)
+                mono = exps[i]
+                if any(mono[j] != 0 for j in V)
+                    push!(iJV, k)
+                    push!(JV, mono)
+                end
+            end
+            h *= _num_hilbert_series_mono(JV, variant=variant)
+            # Avoid re-check monomials (LV partitions sat)
+            deleteat!(rem_mon, iJV)
+        end
+        return h
+    end
+
+    ## Pivot recurive case ##
     sort!(exps, by=reverse)
     h = 1-t^(sum(exps[1]))
     for i in 2:r
@@ -50,23 +79,6 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
             # Trivial partition of monomial supports
             nolin_sat = [u for u in sat if sum(u)>1]
             hsat = (1-t)^(length(sat)-length(nolin_sat))*_num_hilbert_series_mono(nolin_sat, variant=variant)
-        elseif variant==1
-            # Finest partition of monomial supports
-            LV, hsat = _monomial_support_partition(sat), one(A)
-            rem_mon = collect(1:length(sat))
-            for V in LV
-                JV, iJV = Vector{Vector{Int}}(), Int[]
-                for (k, i) in enumerate(rem_mon)
-                    mono = sat[i]
-                    if any(mono[j] != 0 for j in V)
-                        push!(iJV, k)
-                        push!(JV, mono)
-                    end
-                end
-                hsat *= _num_hilbert_series_mono(JV, variant=variant)
-                # Avoid re-check monomials (LV partitions sat)
-                deleteat!(rem_mon, iJV)
-            end
         else
             # No partition of monomial supports
             hsat = _num_hilbert_series_mono(sat, variant=variant)
