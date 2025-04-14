@@ -1,4 +1,6 @@
-include("dimension.jl")
+#include("dimension.jl")
+
+global plop = 0
 
 export affine_hilbert_series, hilbert_series, hilbert_series_mono, hilbert_dimension, hilbert_degree
 
@@ -9,10 +11,33 @@ function hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
 end
 
 function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
-    r = sort!(exps, by=reverse) |> length
-
     A, t = polynomial_ring(ZZ, 't')
-    h = iszero(r) ? one(A) : 1-t^(sum(exps[1]))
+    r = length(exps)
+    global plop
+    plop +=1
+
+    ## Base cases ##
+    r == 0 && return one(A)
+    supp = findall.(Ref(!iszero), exps)
+    pow_supp = findall(s->length(s)==1, supp)
+    # If exps is a product of simple powers
+    if length(pow_supp) == r
+        return prod(1-t^(exps[i][supp[i][1]]) for i in pow_supp)
+    # Only one non-simple power P
+    elseif length(pow_supp) == r-1
+        inpow = setdiff(1:r, pow_supp) |> first
+        # P has disjoint support with other powers
+        if all(iszero(exps[inpow][ind[1]]) for ind in supp)
+            return (1-t^sum(exps[inpow]))*prod(1-t^(exps[i][supp[i][1]]) for i in pow_supp)
+        else
+            return prod(1-t^(exps[i][supp[i][1]]) for i in pow_supp) - t^sum(exps[inpow]) *
+            prod(1-t^(exps[i][supp[i][1]]-exps[inpow][i]) for i in pow_supp)
+        end
+    end
+
+    # Otherwise switch to pivot-case
+    sort!(exps, by=reverse)
+    h = 1-t^(sum(exps[1]))
     for i in 2:r
         # Compute generators for (x^a1,...,x^a{i-1}):x^ai
         sat = [ [ max(a[j]-exps[i][j], 0) for j in eachindex(a)]
@@ -52,9 +77,12 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
 end
 
 function hilbert_series(I; variant::Int=0)
-    gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true))
+    global plop = 0
+    gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, info_level=2))
     lexps = (_drl_lead_exp).(gb)
-    return hilbert_series_mono(lexps, variant=variant)
+    h= hilbert_series_mono(lexps, variant=variant)
+    println(plop)
+    return h
 end
 
 function affine_hilbert_series(I; variant::Int=0)
@@ -63,7 +91,7 @@ function affine_hilbert_series(I; variant::Int=0)
     return hilbert_series_mono(lexps, variant=variant)
 end
 
-function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
+#=function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
     R = parent(first(F))
     S, vars = polynomial_ring(base_ring(R), ["x$i" for i in 1:nvars(R)+1], internal_ordering=:degrevlex)
     res = typeof(first(F))[]
@@ -77,7 +105,7 @@ function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
         push!(res, finish(ctx))
     end
     return res
-end
+end=#
 
 
 function _monomial_support_partition(L::Vector{Vector{Int}})
