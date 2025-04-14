@@ -1,4 +1,4 @@
-export affine_hilbert_series, hilbert_series, hilbert_dimension, hilbert_degree
+export affine_hilbert_series, hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial
 
 function hilbert_series(I; variant::Int=0)
     gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, nr_thrds=Threads.nthreads()))
@@ -19,6 +19,27 @@ end
 function hilbert_dimension(I)
     return denominator(hilbert_series(I)) |> degree
 end
+
+function hilbert_polynomial(I)
+    H = hilbert_series(I)
+    num, dim = numerator(H), degree(denominator(H))
+    num = iseven(dim) ? numerator(H) : -numerator(H)
+    t = gen(parent(num))
+    La = Vector{ZZPolyRingElem}(undef, dim)
+    while dim>0
+        num, La[dim] = divrem(num, 1-t)
+        dim -= 1
+    end
+    println(La, num)
+    Hpolyfct = d->sum(La[i](0)*binomial(i+d, i) for i in 1:length(La))
+    dim = degree(denominator(H))
+    A, = polynomial_ring(QQ, :d)
+    Hpoly = interpolate(A, QQ.(0:dim+1), [QQ(Hpolyfct(d)) for d in 0:dim+1])
+    @assert(degree(Hpoly)==dim, "Degree of poly does not match the dimension")
+    # Hilbert poly, index of regularity
+    return Hpoly, degree(num)+1
+end
+
 
 function _hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
     h = _num_hilbert_series_mono(exps, variant=variant)
@@ -53,7 +74,7 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
     end
 
     # Variable index occuring the most in exps
-    counts = sum(x -> x .> 0, eachcol(reduce(hcat, exps)))
+    counts = sum(x->x .> 0, eachcol(reduce(hcat, exps)))
     ivarmax = argmax(counts)
 
     ## Splitting recursive cases ##
