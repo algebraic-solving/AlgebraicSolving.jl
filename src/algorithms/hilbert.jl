@@ -98,9 +98,6 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
                     push!(JV, mono)
                 end
             end
-            # Interreduce JV
-            JV = [JV[j] for j in eachindex(JV) if
-                      !any(all(JV[k] .<= JV[j]) for k in eachindex(JV) if k!=j)]
             h *= _num_hilbert_series_mono(JV, variant=variant)
             # Avoid re-check monomials (LV partitions sat)
             deleteat!(rem_mon, iJV)
