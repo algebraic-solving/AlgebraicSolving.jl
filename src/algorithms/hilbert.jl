@@ -109,38 +109,46 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
 
     # Exponent of ivarmax in gcd of two random generators
     pivexp = max(1, minimum(mon[ivarmax] for mon in rand(exps, 2)))
-    #Partition and reduce accordingly generators
+    h = zero(A)
+
+    #Compute and partition gens of (exps):pivot
     Lsat = [Vector{Int64}[] for _ in 1:pivexp+2]
+    trivialsat = false
     for mono in exps
         if mono[ivarmax] <= pivexp
-            push!(Lsat[mono[ivarmax]+1],
-                vcat(mono[1:ivarmax-1], 0, mono[ivarmax+1:end]))
+            monosat = vcat(mono[1:ivarmax-1], 0, mono[ivarmax+1:end])
+            if iszero(monosat)
+                trivialsat = true
+                break
+            end
+            push!(Lsat[mono[ivarmax]+1],  monosat)
         else
             push!(Lsat[pivexp+2],
                 vcat(mono[1:ivarmax-1], mono[ivarmax]-pivexp, mono[ivarmax+1:end]))
         end
     end
-    # Interreduce generators based on partition
-    Lsatred = [Vector{Int64}[] for _ in 1:pivexp+1]
-    push!(Lsatred, deepcopy(Lsat[end]))
-    for i in pivexp+1:-1:1
-        for mono in Lsat[i]
-            if !iszero(mono) &&
-               !any(all(mini .<= mono) for j in pivexp+1:-1:i+1 for mini in Lsat[j]) #Lsatred should be enought, but it leads to a wrong output...
-                push!(Lsatred[i], mono)
+    if !trivialsat
+        # Interreduce generators based on partition
+        Lsatred = [Vector{Int64}[] for _ in 1:pivexp+1]
+        push!(Lsatred, deepcopy(Lsat[end]))
+        for i in pivexp+1:-1:1
+            for mono in Lsat[i]
+                if !any(all(mini .<= mono) for j in pivexp+1:-1:i+1 for mini in Lsatred[j])
+                    push!(Lsatred[i], mono)
+                end
             end
         end
+        # Merge all partitions
+        sat = vcat(Lsatred...)
+        h += _num_hilbert_series_mono(sat)*t^pivexp
     end
-    # Merge all partitions
-    sat = vcat(Lsatred...)
 
-    # Interreduce exps + pivot
+    # Interreduce (exps) + pivot
     filter!(e->(pivexp > e[ivarmax]), exps)
     push!(exps,[zeros(Int64,ivarmax-1); pivexp; zeros(Int64,N-ivarmax)])
+    h += _num_hilbert_series_mono(exps)
 
-    a = _num_hilbert_series_mono(exps)
-    b = isempty(sat) ? zero(A) : _num_hilbert_series_mono(sat)*t^pivexp
-    return a+b
+    return h
 end
 
 function _monomial_support_partition(L::Vector{Vector{Int}})
