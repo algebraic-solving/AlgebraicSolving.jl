@@ -1,15 +1,15 @@
 export affine_hilbert_series, hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial
 
-function hilbert_series(I; variant::Int=0)
+function hilbert_series(I)
     gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, nr_thrds=Threads.nthreads()))
     lexps = (_drl_lead_exp).(gb)
-    return _hilbert_series_mono(lexps, variant=variant)
+    return _hilbert_series_mono(lexps)
 end
 
-function affine_hilbert_series(I; variant::Int=0)
+function affine_hilbert_series(I)
     gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, nr_thrds=Threads.nthreads()))
     lexps = (_drl_lead_exp).(homogenize(gb))
-    return _hilbert_series_mono(lexps, variant=variant)
+    return _hilbert_series_mono(lexps)
 end
 
 function hilbert_degree(I)
@@ -44,13 +44,13 @@ function hilbert_polynomial(I)
 end
 
 
-function _hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
-    h = _num_hilbert_series_mono(exps, variant=variant)
+function _hilbert_series_mono(exps::Vector{Vector{Int}})
+    h = _num_hilbert_series_mono(exps)
     t = gen(parent(h))
     return h//(1-t)^length(first(exps))
 end
 
-function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
+function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
     A, t = polynomial_ring(ZZ, 't')
     r = length(exps)
     r == 0 && return one(A)
@@ -98,7 +98,7 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
                     push!(JV, mono)
                 end
             end
-            h *= _num_hilbert_series_mono(JV, variant=variant)
+            h *= _num_hilbert_series_mono(JV)
             # Avoid re-check monomials
             deleteat!(rem_mon, iJV)
         end
