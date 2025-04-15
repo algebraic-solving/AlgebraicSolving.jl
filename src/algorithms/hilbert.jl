@@ -122,6 +122,7 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
     end
     # Interreduce generators based on partition
     Lsatred = [Vector{Int64}[] for _ in 1:pivexp+1]
+    push!(Lsatred, deepcopy(Lsat[end]))
     for i in pivexp+1:-1:1
         for mono in Lsat[i]
             if !iszero(mono) &&
@@ -132,10 +133,6 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
     end
     # Merge all partitions
     sat = vcat(Lsatred...)
-    # Add last generators
-    append!(sat, [mono for mono in Lsat[pivexp+2] if !iszero(mono) &&
-                 !any(all(mini .<= mono) for mini in sat)
-                 ])
 
     # Interreduce exps + pivot
     filter!(e->(pivexp > e[ivarmax]), exps)
