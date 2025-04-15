@@ -99,50 +99,42 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}}; variant::Int=0)
                 end
             end
             h *= _num_hilbert_series_mono(JV, variant=variant)
-            # Avoid re-check monomials (LV partitions sat)
+            # Avoid re-check monomials
             deleteat!(rem_mon, iJV)
         end
         return h
     end
 
     ## Pivot recursive case ##
-
     # Exponent of ivarmax in gcd of two random generators
     pivexp = max(1, minimum(mon[ivarmax] for mon in rand(exps, 2)))
     h = zero(A)
-
     #Compute and partition gens of (exps):pivot
-    Lsat = [Vector{Int64}[] for _ in 1:pivexp+2]
-    trivialsat = false
+    Lquo = [Vector{Int64}[] for _ in 1:pivexp+2]
+    trivialquo = false
     for mono in exps
         if mono[ivarmax] <= pivexp
-            monosat = vcat(mono[1:ivarmax-1], 0, mono[ivarmax+1:end])
-            if iszero(monosat)
-                trivialsat = true
+            monoquo = vcat(mono[1:ivarmax-1], 0, mono[ivarmax+1:end])
+            if iszero(monoquo)
+                trivialquo = true
                 break
             end
-            push!(Lsat[mono[ivarmax]+1],  monosat)
+            push!(Lquo[mono[ivarmax]+1],  monoquo)
         else
-            push!(Lsat[pivexp+2],
+            push!(Lquo[pivexp+2],
                 vcat(mono[1:ivarmax-1], mono[ivarmax]-pivexp, mono[ivarmax+1:end]))
         end
     end
-    if !trivialsat
+    if !trivialquo
         # Interreduce generators based on partition
-        Lsatred = [Vector{Int64}[] for _ in 1:pivexp+1]
-        push!(Lsatred, deepcopy(Lsat[end]))
         for i in pivexp+1:-1:1
-            for mono in Lsat[i]
-                if !any(all(mini .<= mono) for j in pivexp+1:-1:i+1 for mini in Lsatred[j])
-                    push!(Lsatred[i], mono)
-                end
-            end
+            non_min = [ k for (k,mono) in enumerate(Lquo[i]) if
+                    any(all(mini .<= mono) for j in pivexp+1:-1:i+1 for mini in Lquo[j])]
+            deleteat!(Lquo[i], non_min)
         end
         # Merge all partitions
-        sat = vcat(Lsatred...)
-        h += _num_hilbert_series_mono(sat)*t^pivexp
+        h += _num_hilbert_series_mono(vcat(Lquo...))*t^pivexp
     end
-
     # Interreduce (exps) + pivot
     filter!(e->(pivexp > e[ivarmax]), exps)
     push!(exps,[zeros(Int64,ivarmax-1); pivexp; zeros(Int64,N-ivarmax)])
