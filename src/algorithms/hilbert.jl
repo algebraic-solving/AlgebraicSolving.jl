@@ -167,20 +167,23 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
         # Finest partition of monomial supports
         LV, h = _monomial_support_partition(exps), one(A)
         rem_mon = collect(1:r)
-        for V in LV
-            JV, iJV = Vector{Vector{Int}}(), Int[]
-            for (k, i) in enumerate(rem_mon)
-                mono = exps[i]
-                if any(mono[j] != 0 for j in V)
-                    push!(iJV, k)
-                    push!(JV, mono)
+        # If we are indeed splitting
+        if length(LV) > 1
+            for V in LV
+                JV, iJV = Vector{Vector{Int}}(), Int[]
+                for (k, i) in enumerate(rem_mon)
+                    mono = exps[i]
+                    if any(mono[j] != 0 for j in V)
+                        push!(iJV, k)
+                        push!(JV, mono)
+                    end
                 end
+                h *= _num_hilbert_series_mono(JV)
+                # Avoid re-check monomials
+                deleteat!(rem_mon, iJV)
             end
-            h *= _num_hilbert_series_mono(JV)
-            # Avoid re-check monomials
-            deleteat!(rem_mon, iJV)
+            return h
         end
-        return h
     end
 
     ## Pivot recursive case ##
