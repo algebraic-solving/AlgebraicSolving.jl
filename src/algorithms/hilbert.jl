@@ -1,31 +1,109 @@
 export affine_hilbert_series, hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial
 
-function hilbert_series(I)
+@doc Markdown.doc"""
+    hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
+
+Compute the Hilbert series of a given polynomial ideal `I`.
+
+**Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
+
+julia> I = Ideal([x*y,x*z,y*z]);
+
+julia> hilbert_series(I)
+(3*t - 1)//(t - 1)
+```
+"""
+function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
     gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, nr_thrds=Threads.nthreads()))
     lexps = (_drl_lead_exp).(gb)
     return _hilbert_series_mono(lexps)
 end
 
-function affine_hilbert_series(I)
-    gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, nr_thrds=Threads.nthreads()))
-    lexps = (_drl_lead_exp).(homogenize(gb))
-    return _hilbert_series_mono(lexps)
+@doc Markdown.doc"""
+    hilbert_degree(I::Ideal{T}) where T <: MPolyRingElem
+
+Compute the degree of a given polynomial ideal `I` by first computing its Hilbert series.
+
+**Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
+
+julia> I = Ideal([x*y,x*z,y*z]);
+
+julia> hilbert_degree(I)
+3
+```
+"""
+function hilbert_degree(I::Ideal{T}) where T <: MPolyRingElem
+    I.deg = numerator(hilbert_series(I))(1) |> abs
+    return I.deg
 end
 
-function hilbert_degree(I)
-    return numerator(hilbert_series(I))(1) |> abs
+@doc Markdown.doc"""
+    hilbert_dimension(I::Ideal{T}) where T <: MPolyRingElem
+
+Compute the Krull dimension of a given polynomial ideal `I` by first computing its Hilbert series.
+
+**Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
+
+julia> I = Ideal([x*y,x*z,y*z]);
+
+julia> hilbert_dimension(I)
+1
+```
+"""
+function hilbert_dimension(I::Ideal{T}) where T <: MPolyRingElem
+    H = hilbert_series(I)
+    I.dim = iszero(H) ? -1 : degree(denominator(H))
+    return I.dim
 end
 
-function hilbert_dimension(I)
-    return denominator(hilbert_series(I)) |> degree
-end
+@doc Markdown.doc"""
+    hilbert_polynomial(I::Ideal{T}) where T <: MPolyRingElem
 
-function hilbert_polynomial(I)
-    A, d = polynomial_ring(QQ, :d)
+Compute the Hilbert polynomial and the index of regularity of a given polynomial ideal `I`
+by first computing its Hilbert series. The index of regularity is the smallest integer such that
+the Hilbert function and polynomial match.
+
+Note that the Hilbert polynomial of I has leading term (e/d!)*t^d, where e and d are respectively
+the degree and Krull dimension of I.
+
+**Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
+
+julia> I = Ideal([x*y,x*z,y*z]);
+
+julia> hilbert_degree(I)
+(3*s + 3, 1)
+```
+"""
+function hilbert_polynomial(I::Ideal{T}) where T <: MPolyRingElem
+    A, s = polynomial_ring(QQ, :s)
     H = hilbert_series(I)
     dim = degree(denominator(H))
     num = iseven(dim) ? numerator(H) : -numerator(H)
-    dim==0 && return num(d), 0
+    dim==0 && return num(s), 0
 
     t = gen(parent(num))
     La = Vector{ZZPolyRingElem}(undef, dim)
@@ -35,7 +113,6 @@ function hilbert_polynomial(I)
     end
 
     Hpolyfct = d->sum(La[i](0)*binomial(i+d, i) for i in 1:length(La))
-    return Hpolyfct
     dim = degree(denominator(H))
     Hpoly = interpolate(A, QQ.(0:dim+1), [QQ(Hpolyfct(d)) for d in 0:dim+1])
     @assert(degree(Hpoly)==dim, "Degree of poly does not match the dimension")
@@ -43,13 +120,14 @@ function hilbert_polynomial(I)
     return Hpoly, degree(num)+1
 end
 
-
+# Computes hilbert series of a monomial ideal on input list of exponents
 function _hilbert_series_mono(exps::Vector{Vector{Int}})
     h = _num_hilbert_series_mono(exps)
     t = gen(parent(h))
     return h//(1-t)^length(first(exps))
 end
 
+# Computes numerator hilbert series of a monomial ideal on input list of exponents
 function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
     A, t = polynomial_ring(ZZ, 't')
     r = length(exps)
@@ -143,39 +221,31 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
     return h
 end
 
+# Build adjacency graph: connect variables that appear together in a monomial
 function _monomial_support_partition(L::Vector{Vector{Int}})
-    # Build adjacency graph: connect variables that appear together in a monomial
     n = length(first(L))
     adj = [Set{Int}() for _ in 1:n]
-    supp_tot = (!).(trues(n))
+    active = falses(n)
+
     for mono in L
         support = findall(!=(0), mono)
-        for i in support
-            supp_tot[i] = supp_tot[i] || true
-        end
+        foreach(i -> active[i] = true, support)
         for i in support, j in support
-            if i != j
-                push!(adj[i], j)
-            end
+            i != j && push!(adj[i], j)
         end
     end
 
-    # DFS to extract connected components
     visited = falses(n)
     components = Vector{Vector{Int}}()
 
     function dfs(u, comp)
         visited[u] = true
         push!(comp, u)
-        for v in adj[u]
-            if !visited[v]
-                dfs(v, comp)
-            end
-        end
+        foreach(v -> !visited[v] && dfs(v, comp), adj[u])
     end
 
-    for v in [i for i in 1:n if supp_tot[i]]
-        if !visited[v]
+    for v in 1:n
+        if active[v] && !visited[v]
             comp = Int[]
             dfs(v, comp)
             push!(components, comp)

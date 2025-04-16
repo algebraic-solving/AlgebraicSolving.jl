@@ -3,7 +3,7 @@
 
 Compute the Krull dimension of a given polynomial ideal `I`.
 
-**Note**: This requires a Gröbner basis of `I`, which is computed internally if not alraedy known.
+**Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
 
 # Examples
 ```jldoctest
@@ -18,13 +18,13 @@ julia> dimension(I)
 ```
 """
 function dimension(I::Ideal{T}) where T <: MPolyRingElem
-    
+
     gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true))
     R = parent(first(gb))
     res = [trues(ngens(R))]
 
     lead_exps = (_drl_lead_exp).(gb)
-    for lexp in lead_exps 
+    for lexp in lead_exps
         to_del = Int[]
         new_miss = BitVector[]
         for (i, mis) in enumerate(res)
@@ -46,7 +46,7 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
 
     length(res) == 0 && return -1
     max_length = maximum(mis -> length(findall(mis)), res)
-    
+
     I.dim = max_length
     return I.dim
 end
