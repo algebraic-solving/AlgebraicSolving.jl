@@ -20,7 +20,9 @@ julia> hilbert_series(I)
 ```
 """
 function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
-    gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true, nr_thrds=Threads.nthreads()))
+    gb = get!(I.gb, 0) do
+        groebner_basis(I, complete_reduction = true, nr_thrds=Threads.nthreads())
+    end
     lexps = (_drl_lead_exp).(gb)
     return _hilbert_series_mono(lexps)
 end

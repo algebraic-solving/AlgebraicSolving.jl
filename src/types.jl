@@ -60,10 +60,7 @@ mutable struct Ideal{T <: MPolyRingElem}
     rat_sols::Vector{Vector{QQFieldElem}}
     rat_param::RationalParametrization
 
-    function Ideal(
-            F::Vector{T}; 
-            dim::Int = -1
-        ) where {T <: MPolyRingElem}
+    function Ideal(F::Vector{T}) where {T <: MPolyRingElem}
         I = new{T}()
         I.gens = F
         I.dim  = -1

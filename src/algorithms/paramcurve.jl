@@ -5,18 +5,18 @@ function compute_param(
         use_lfs::Bool = false,                                      # add generic variables
         cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]  # coeffs of linear forms
     )
-    @assert(I.dim==1 || I.dim<0 && dimension(I)==1, "I must be one-dimensional dimension")
-    DEG = deg_Alg(I)
+    Itest = Ideal(change_base_ring.(Ref(GF(65521)), I.gens))
+    @assert(I.dim==1 || I.dim<0 && dimension(Itest)==1, "I must be one-dimensional dimension")
+    DEG = hilbert_degree(Itest)
     # If generic variables must be added
     F, cfs_lfs = use_lfs ? add_genvars(I.gens, max(2, length(cfs_lfs)), cfs_lfs) :
              !isempty(cfs_lfs) ? add_genvars(I.gens, length(cfs_lfs), cfs_lfs) :
              (I.gens, Vector{ZZRingElem}[])
     R = parent(first(F))
     N = nvars(R)
-
     let # local code block test
-        local INEW = Ideal(vcat(F, gens(R)[N-1]-rand(ZZ(-100):ZZ(100))))
-        @assert(dimension(INEW)==0 && deg_Alg(INEW) == DEG, "The curve is not in generic position")
+        local INEW = change_base_ring.(Ref(GF(65521)), vcat(F, gens(R)[N-1]-rand(ZZ,-100:100))) |> Ideal
+        @assert(dimension(INEW)==0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
     end
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
@@ -68,7 +68,6 @@ function compute_param(
             _evals = [coeff(PARAM[i][count], deg) for i in 1:length(PARAM)]
             COEFFS[deg+1] = interpolate(A, _values, _evals)
         end
-
         ctx = MPolyBuildCtx(T)
         for (i, c) in enumerate(COEFFS)
             for (j, coeff) in enumerate(coefficients(c))
@@ -88,7 +87,7 @@ end
 function change_ringvar(
         F::Vector{P} where P <: MPolyRingElem,  # list of polynomials
         newvarias_S::Vector{Symbol}             # new variable symbols
-        ) 
+        )
     R = parent(first(F))
     # Locate variables of R in newvarias
     to_varias = Vector{Int}(undef,0)
@@ -113,18 +112,6 @@ function change_ringvar(
     end
 
     return res
-end
-
-function deg_Alg(I)
-    dim = I.dim >= 0 ? I.dim :  dimension(I)
-    if dim == 0
-        r = rational_parametrization(I)
-    else
-        varias = gens(parent(I))
-        planes = [ transpose(ZZ.(rand(-100:100, length(varias)+1)))*vcat(varias,1) for _ in 1:dim]
-        r = rational_parametrization(Ideal(vcat(I.gens, planes)))
-    end
-    return degree(r.elim)
 end
 
 function add_genvars(
