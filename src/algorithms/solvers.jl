@@ -135,7 +135,7 @@ function _core_msolve(
 
     if jl_dquot == 0
         C,x = polynomial_ring(QQ,"x")
-        I.rat_param = RationalParametrization(Symbol[], ZZRingElem[], C(-1), C(-1), PolyRingElem[])
+        I.rat_param = RationalParametrization(Symbol[], ZZRingElem[], C(-1), C(-1), QQPolyRingElem[])
         I.real_sols = QQFieldElem[]
         I.inter_sols = Vector{QQFieldElem}[]
         return I.rat_param, I.real_sols
@@ -147,7 +147,7 @@ function _core_msolve(
     jl_vnames = Base.unsafe_wrap(Array, res_vnames[], jl_rp_nr_vars)
     vsymbols  = [Symbol(unsafe_string(jl_vnames[i])) for i in 1:jl_rp_nr_vars]
     #= get possible variable permutation, ignoring additional variables=#
-    perm      = findfirst.(isequal.(R.S), Ref(vsymbols))
+    perm      = indexin(R.S, vsymbols)
 
     rat_param = _get_rational_parametrization(jl_ld, jl_len,
                                               jl_cf, jl_cf_lf, jl_rp_nr_vars)
@@ -240,7 +240,7 @@ julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1, 2*x1*x2+2*x2*x3-x2])
 QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x2*x3 - x2]
 
 julia> rational_parametrization(I)
-AlgebraicSolving.RationalParametrization([:x1, :x2, :x3], ZZRingElem[], 84*x^4 - 40*x^3 + x^2 + x, 336*x^3 - 120*x^2 + 2*x + 1, AbstractAlgebra.PolyRingElem[184*x^3 - 80*x^2 + 4*x + 1, 36*x^3 - 18*x^2 + 2*x])
+AlgebraicSolving.RationalParametrization([:x1, :x2, :x3], ZZRingElem[], 84*x^4 - 40*x^3 + x^2 + x, 336*x^3 - 120*x^2 + 2*x + 1, Nemo.QQPolyRingElem[184*x^3 - 80*x^2 + 4*x + 1, 36*x^3 - 18*x^2 + 2*x])
 ```
 """
 function rational_parametrization(
