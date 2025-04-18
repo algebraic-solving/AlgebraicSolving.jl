@@ -38,6 +38,7 @@ function rational_curve_parametrization(
         use_lfs::Bool = false,                                      # add generic variables
         cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]  # coeffs of linear forms
     )
+    info_level>0 && println("Compute ideal data and genericity check")
     Itest = Ideal(change_base_ring.(Ref(GF(65521)), I.gens))
     @assert(I.dim==1 || I.dim<0 && dimension(Itest)==1, "I must be one-dimensional")
     DEG = hilbert_degree(Itest)
@@ -48,7 +49,7 @@ function rational_curve_parametrization(
     R = parent(first(F))
     N = nvars(R)
     let # local code block test
-        local INEW = change_base_ring.(Ref(GF(65521)), vcat(F, gens(R)[N-1]-rand(ZZ,-100:100))) |> Ideal
+        local INEW = vcat(Itest.gens, change_base_ring(GF(65521), gens(R)[N-1]-rand(ZZ,-100:100))) |> Ideal
         @assert(dimension(INEW)==0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
     end
 
