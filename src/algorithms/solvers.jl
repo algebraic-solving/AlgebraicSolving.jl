@@ -123,8 +123,6 @@ function _core_msolve(
     jl_dquot      = res_dquot[]
     jl_nb_sols    = nb_sols[]
 
-    # set dimension
-    I.dim = jl_dim
     if jl_dim > 0
         error("Dimension of ideal is greater than zero, no solutions provided.")
     end

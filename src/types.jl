@@ -42,7 +42,7 @@ mutable struct Ideal{T <: MPolyRingElem}
 
         return I
     end
-end 
+end
 
 Base.parent(I::Ideal) = Nemo.parent(I.gens[1])
 
