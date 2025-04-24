@@ -19,10 +19,12 @@ julia> dimension(I)
 """
 function dimension(I::Ideal{T}) where T <: MPolyRingElem
 
+    !isnothing(I.dim) && return I.dim
     gb = get!(I.gb, 0) do
         groebner_basis(I, complete_reduction = true)
     end
     R = parent(first(gb))
+
     res = Set([trues(ngens(R))])
     lead_exps = (_drl_lead_exp).(gb)
     for lexp in lead_exps
