@@ -123,17 +123,17 @@ function _core_msolve(
     jl_dquot      = res_dquot[]
     jl_nb_sols    = nb_sols[]
 
-    # set dimension
-    I.dim = jl_dim
     if jl_dim > 0
         error("Dimension of ideal is greater than zero, no solutions provided.")
     end
+    I.dim = 0
 
     # get rational parametrization
     jl_len  = Base.unsafe_wrap(Array, res_len[], jl_ld)
     nterms  = 0
 
     if jl_dquot == 0
+        I.dim = -1
         C,x = polynomial_ring(QQ,"x")
         I.rat_param = RationalParametrization(Symbol[], ZZRingElem[], C(-1), C(-1), PolyRingElem[])
         I.real_sols = QQFieldElem[]
