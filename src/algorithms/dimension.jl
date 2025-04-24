@@ -32,7 +32,7 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
         nz_exps_ind = findall(nz_exps)
         next_res = Set{BitVector}()
         for mis in res
-            if nz_exps <= mis
+            if all_lesseq(nz_exps, mis)
                 @inbounds for j in nz_exps_ind
                     new_mis = copy(mis)
                     new_mis[j] = false
@@ -47,6 +47,15 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
 
     I.dim = isempty(res) ? -1 : maximum(sum, res)
     return I.dim
+end
+
+function all_lesseq(a::BitVector, b::BitVector)::Bool
+    @inbounds for i in eachindex(a)
+        if a[i] && !b[i]
+            return false
+        end
+    end
+    return true
 end
 
 function _drl_exp_vector(u::Vector{Int})
