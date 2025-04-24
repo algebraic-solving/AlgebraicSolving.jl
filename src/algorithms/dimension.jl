@@ -22,29 +22,27 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
     gb = get(I.gb, 0, groebner_basis(I, complete_reduction = true))
     R = parent(first(gb))
 
-    res = [trues(ngens(R))]
+    res = Set([trues(ngens(R))])
     lead_exps = (_drl_lead_exp).(gb)
     for lexp in lead_exps
-        to_del = Int[]
-        new_miss = BitVector[]
-        nz_exps_inds = findall(!iszero, lexp)
-        for (i, mis) in enumerate(res)
-            ind_var_inds = findall(mis)
-            if issubset(nz_exps_inds, ind_var_inds)
-                for j in nz_exps_inds
+        nz_exps = (!iszero).(lexp)
+        nz_exps_ind = findall(nz_exps)
+        next_res = Set{BitVector}()
+        for mis in res
+            if nz_exps <= mis
+                @inbounds for j in nz_exps_ind
                     new_mis = copy(mis)
                     new_mis[j] = false
-                    push!(new_miss, new_mis)
+                    push!(next_res, new_mis)
                 end
-                push!(to_del, i)
+            else
+                push!(next_res, mis)
             end
         end
-        deleteat!(res, to_del)
-        append!(res, new_miss)
-        unique!(res)
+        res = next_res
     end
 
-    I.dim = isempty(res) ? -1 : maximum(length ∘ findall, res)
+    I.dim = isempty(res) ? -1 : maximum(sum, res)
     return I.dim
 end
 
