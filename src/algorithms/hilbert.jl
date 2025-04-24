@@ -1,9 +1,12 @@
-export affine_hilbert_series, hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial
+export hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial
 
 @doc Markdown.doc"""
     hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
 
 Compute the Hilbert series of a given polynomial ideal `I`.
+
+Based on: Anna M. Bigatti, Computation of Hilbert-Poincaré series,
+Journal of Pure and Applied Algebra, 1997.
 
 **Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
 
@@ -20,6 +23,7 @@ julia> hilbert_series(I)
 ```
 """
 function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
+
     gb = get!(I.gb, 0) do
         groebner_basis(I, complete_reduction = true)
     end
@@ -47,6 +51,8 @@ julia> hilbert_degree(I)
 ```
 """
 function hilbert_degree(I::Ideal{T}) where T <: MPolyRingElem
+
+    !isnothing(I.deg) && return I.deg
     I.deg = numerator(hilbert_series(I))(1) |> abs
     return I.deg
 end
@@ -71,6 +77,7 @@ julia> hilbert_dimension(I)
 ```
 """
 function hilbert_dimension(I::Ideal{T}) where T <: MPolyRingElem
+
     H = hilbert_series(I)
     I.dim = iszero(H) ? -1 : degree(denominator(H))
     return I.dim
@@ -101,6 +108,7 @@ julia> hilbert_degree(I)
 ```
 """
 function hilbert_polynomial(I::Ideal{T}) where T <: MPolyRingElem
+
     A, s = polynomial_ring(QQ, :s)
     H = hilbert_series(I)
     dim = degree(denominator(H))
@@ -124,6 +132,7 @@ end
 
 # Computes hilbert series of a monomial ideal on input list of exponents
 function _hilbert_series_mono(exps::Vector{Vector{Int}})
+
     h = _num_hilbert_series_mono(exps)
     t = gen(parent(h))
     return h//(1-t)^length(first(exps))
@@ -131,6 +140,7 @@ end
 
 # Computes numerator hilbert series of a monomial ideal on input list of exponents
 function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
+
     A, t = polynomial_ring(ZZ, 't')
     r = length(exps)
     r == 0 && return one(A)
@@ -210,7 +220,7 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
     end
     if !trivialquo
         # Interreduce generators based on partition
-        for i in pivexp+1:-1:1
+        @inbounds for i in pivexp+1:-1:1
             non_min = [ k for (k,mono) in enumerate(Lquo[i]) if
                     any(all(mini .<= mono) for j in pivexp+1:-1:i+1 for mini in Lquo[j])]
             deleteat!(Lquo[i], non_min)
@@ -228,6 +238,7 @@ end
 
 # Build adjacency graph: connect variables that appear together in a monomial
 function _monomial_support_partition(L::Vector{Vector{Int}})
+
     n = length(first(L))
     adj = [Set{Int}() for _ in 1:n]
     active = falses(n)
