@@ -23,7 +23,6 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
         groebner_basis(I, complete_reduction = true)
     end
     R = parent(first(gb))
-
     res = Set([trues(ngens(R))])
     lead_exps = (_drl_lead_exp).(gb)
     for lexp in lead_exps
@@ -54,6 +53,6 @@ end
 
 function _drl_lead_exp(p::MPolyRingElem)
     exps = collect(Nemo.exponent_vectors(p))
-    _, i = findmax(_drl_exp_vector, exps)
+    _, i = findmax(_drl_exp_vector.(exps))
     return exps[i]
 end
