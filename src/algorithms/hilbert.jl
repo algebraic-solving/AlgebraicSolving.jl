@@ -10,7 +10,7 @@ Journal of Pure and Applied Algebra, 1997.
 
 **Notes**:
 * This requires a Gröbner basis of `I`, which is computed internally if not already known.
-* More efficient when internal_ordering is :degrevlex.
+* Significantly faster when internal_ordering is :degrevlex.
 
 # Examples
 ```jldoctest
