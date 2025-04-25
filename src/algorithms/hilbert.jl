@@ -1,5 +1,3 @@
-export hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial
-
 @doc Markdown.doc"""
     hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
 
