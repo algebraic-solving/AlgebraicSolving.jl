@@ -8,7 +8,9 @@ Compute the Hilbert series of a given polynomial ideal `I`.
 Based on: Anna M. Bigatti, Computation of Hilbert-Poincaré series,
 Journal of Pure and Applied Algebra, 1997.
 
-**Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
+**Notes**:
+* This requires a Gröbner basis of `I`, which is computed internally if not already known.
+* More efficient when internal_ordering is :degrevlex.
 
 # Examples
 ```jldoctest
@@ -27,8 +29,11 @@ function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
     gb = get!(I.gb, 0) do
         groebner_basis(I, complete_reduction = true)
     end
-    lexps = (_drl_lead_exp).(gb)
-    return _hilbert_series_mono(lexps)
+    lead_exps = Vector{Vector{Int}}(undef, length(gb))
+    Threads.@threads for i in eachindex(gb)
+        lead_exps[i] = _lead_exp_ord(gb[i], :degrevlex)
+    end
+    return _hilbert_series_mono(lead_exps)
 end
 
 @doc Markdown.doc"""
