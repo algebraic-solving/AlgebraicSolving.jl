@@ -19,7 +19,7 @@ julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
 julia> I = Ideal([x*y,x*z,y*z]);
 
 julia> hilbert_series(I)
-(3*t - 1)//(t - 1)
+(-2*t - 1)//(t - 1)
 ```
 """
 function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
@@ -106,7 +106,7 @@ julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
 
 julia> I = Ideal([x*y,x*z,y*z]);
 
-julia> hilbert_degree(I)
+julia> hilbert_polynomial(I)
 (3*s + 3, 1)
 ```
 """
