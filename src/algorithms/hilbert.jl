@@ -227,7 +227,7 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
         # Interreduce generators based on partition
         @inbounds for i in pivexp+1:-1:1
             non_min = [ k for (k,mono) in enumerate(Lquo[i]) if
-                    any(all(mini .<= mono) for j in pivexp+1:-1:i+1 for mini in Lquo[j])]
+                    any(_all_lesseq(mini, mono) for j in i+1:pivexp+1 for mini in Lquo[j])]
             deleteat!(Lquo[i], non_min)
         end
         # Merge all partitions
@@ -239,6 +239,15 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
     h += _num_hilbert_series_mono(exps)
 
     return h
+end
+
+function _all_lesseq(a::Vector{Int}, b::Vector{Int})::Bool
+    @inbounds for i in eachindex(a)
+        if a[i] > b[i]
+            return false
+        end
+    end
+    return true
 end
 
 # Build adjacency graph: connect variables that appear together in a monomial

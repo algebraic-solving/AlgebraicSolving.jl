@@ -35,7 +35,7 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
         nz_exps_ind = findall(nz_exps)
         next_res = Set{BitVector}()
         for mis in res
-            if all_lesseq(nz_exps, mis)
+            if _all_lesseq(nz_exps, mis)
                 @inbounds for j in nz_exps_ind
                     new_mis = copy(mis)
                     new_mis[j] = false
@@ -52,7 +52,7 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
     return I.dim
 end
 
-function all_lesseq(a::BitVector, b::BitVector)::Bool
+function _all_lesseq(a::BitVector, b::BitVector)::Bool
     @inbounds for i in eachindex(a)
         if a[i] && !b[i]
             return false
@@ -66,7 +66,7 @@ function _lead_exp_ord(p::MPolyRingElem, order::Symbol)
     internal_ordering(R)==order && return first(exponent_vectors(p))
 
     A = base_ring(R)
-    R1, _ = polynomial_ring(A, R.S, internal_ordering=order)
+    R1, _ = polynomial_ring(A, symbols(R), internal_ordering=order)
     ctx = MPolyBuildCtx(R1)
     for e in exponent_vectors(p)
         push_term!(ctx, one(A), e)
