@@ -27,7 +27,7 @@ end
 
 mutable struct Ideal{T <: MPolyRingElem}
     gens::Vector{T}
-    dim::Int
+    dim::Union{Int, Nothing}
     gb::Dict{Int, Vector{T}}
     inter_sols::Vector{Vector{Vector{QQFieldElem}}}
     real_sols::Vector{Vector{QQFieldElem}}
@@ -37,12 +37,11 @@ mutable struct Ideal{T <: MPolyRingElem}
     function Ideal(F::Vector{T}) where {T <: MPolyRingElem}
         I = new{T}()
         I.gens = F
-        I.dim  = -1
         I.gb   = Dict()
-
+        I.dim  = nothing
         return I
     end
-end 
+end
 
 Base.parent(I::Ideal) = Nemo.parent(I.gens[1])
 
