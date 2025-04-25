@@ -206,7 +206,7 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
     pivexp = max(1, minimum(mon[ivarmax] for mon in rand(exps, 2)))
     h = zero(A)
     #Compute and partition gens of (exps):pivot
-    Lquo = [Vector{Int64}[] for _ in 1:pivexp+2]
+    Lquo = [Vector{Int}[] for _ in 1:pivexp+2]
     trivialquo = false
     for mono in exps
         if mono[ivarmax] <= pivexp
