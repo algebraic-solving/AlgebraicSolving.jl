@@ -27,7 +27,7 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
 
     res = Set([trues(ngens(R))])
     lead_exps = Vector{Vector{Int}}(undef, length(gb))
-    Threads.@threads for i in eachindex(gb)
+    for i in eachindex(gb)
         lead_exps[i] = _lead_exp_ord(gb[i], :degrevlex)
     end
     for lexp in lead_exps

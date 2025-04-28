@@ -28,7 +28,7 @@ function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
         groebner_basis(I, complete_reduction = true)
     end
     lead_exps = Vector{Vector{Int}}(undef, length(gb))
-    Threads.@threads for i in eachindex(gb)
+    for i in eachindex(gb)
         lead_exps[i] = _lead_exp_ord(gb[i], :degrevlex)
     end
     return _hilbert_series_mono(lead_exps)
