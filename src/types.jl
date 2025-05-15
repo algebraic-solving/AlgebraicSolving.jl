@@ -28,6 +28,7 @@ end
 mutable struct Ideal{T <: MPolyRingElem}
     gens::Vector{T}
     dim::Union{Int, Nothing}
+    deg::Union{Int, Nothing}
     gb::Dict{Int, Vector{T}}
     inter_sols::Vector{Vector{Vector{QQFieldElem}}}
     real_sols::Vector{Vector{QQFieldElem}}
@@ -39,6 +40,7 @@ mutable struct Ideal{T <: MPolyRingElem}
         I.gens = F
         I.gb   = Dict()
         I.dim  = nothing
+        I.deg  = nothing
         return I
     end
 end
