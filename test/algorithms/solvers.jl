@@ -22,10 +22,10 @@
                                             ]
     rat_sols = Vector{QQFieldElem}[[1, 0, 0, 0], [1//3, 0, 0, 1//3]]
 
-    @test sols == real_solutions(I)
-    @test inter_sols == real_solutions(I, interval=true)
-    @test rat_sols == rational_solutions(I)
-    @test I.real_sols == real_solutions(I)
+    @test issetequal(sols, real_solutions(I))
+    @test issetequal(inter_sols, real_solutions(I, interval=true))
+    @test issetequal(rat_sols, rational_solutions(I))
+    @test issetequal(I.real_sols, real_solutions(I))
     @test iszero(I.dim)
 
     C, x = polynomial_ring(QQ, "x")
@@ -69,7 +69,7 @@
     I = Ideal([R(0)])
 	@test_throws ErrorException real_solutions(I)
     I = Ideal([x-1,y+2,R(0)])
-    @test sort(real_solutions(I)) == sort(Vector{QQFieldElem}[[1, -2]])
+    @test issetequal(real_solutions(I), Vector{QQFieldElem}[[1, -2]])
 
     # check variable permutation
     I = Ideal([x^2-1, y])
@@ -77,8 +77,8 @@
         [-1, 0],
         [1, 0]
             ]
-    @test sort(sols) == sort(real_solutions(I))
+    @test issetequal(sols, real_solutions(I))
 
     I = Ideal([x^2-1, y^2])
-    @test sort(sols) == sort(real_solutions(I))
+    @test issetequal(sols, real_solutions(I))
 end
