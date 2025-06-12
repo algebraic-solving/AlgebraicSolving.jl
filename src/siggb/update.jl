@@ -335,10 +335,10 @@ function update_pairset!(pairset::Pairset{N},
                         basis_pair_sig_mask, tags,
                         mod_ord == :DPOT || cmp_ind(new_sig_idx, basis_sig_idx, ind_order)) && continue
         rewriteable_koszul(basis, basis_ht, new_pair_sig,
-                           new_pair_sig_mask, ind_order, tags,
+                           new_pair_sig_mask, ind_order, tags, mod_ord,
                            mod_ord == :DPOT || cmp_ind(basis_sig_idx, new_sig_idx, ind_order)) && continue
         rewriteable_koszul(basis, basis_ht, basis_pair_sig,
-                           basis_pair_sig_mask, ind_order, tags,
+                           basis_pair_sig_mask, ind_order, tags, mod_ord,
                            mod_ord == :DPOT || cmp_ind(new_sig_idx, basis_sig_idx, ind_order)) && continue
 
         top_sig, top_sig_mask, top_index,

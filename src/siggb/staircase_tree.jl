@@ -1,8 +1,3 @@
-# Define a Tree structure to represent the staircase tree
-struct Tree
-    id::Int
-    edges::Vector{Tuple{Exp, Tree}}
-end
 
 function Base.hash(tree::Tree, h::UInt)
     return hash(tree.id, h)
@@ -16,24 +11,12 @@ function Base.show(io::IO, tree::Tree)
     print(tree.edges)
 end
 
-# Define a constant for an empty tree
-const nothing_tree = Tree(-1, Tuple{Int,Tree}[])
-
 # Function to print the tree structure
 function print_tree(tree::Tree, space::Int=0)
     for edge in tree.edges
         println(" " ^ space * " ", edge[1])
         print_tree(edge[2], space + 2)
     end
-end
-
-# Define an Edge as a tuple of an exponent and a Tree
-const Edge = Tuple{Exp, Tree}
-
-# Define a mutable struct to hold the hash state
-mutable struct HashState
-    hashtable::Dict{Vector{Edge}, Tree}
-    counter::Int
 end
 
 # Define a function to create a new hash state
@@ -202,4 +185,8 @@ function number_of_distinct_trees(tree::Tree, mem::Dict{Tree, Tree} = Dict{Tree,
     end
     mem[tree] = tree
     return number
+end
+
+function convert_to_monomial(m::MPolyRingElem, R::MPolyRing, ::Val{N}) where N
+    # convert m to Monomial{N}
 end
