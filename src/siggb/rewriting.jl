@@ -25,27 +25,38 @@ end
                                     sigmask::DivMask,
                                     ind_order::IndOrder,
                                     tags::Tags,
+                                    mod_ord::Symbol,
                                     check::Bool)
+
 
     if !check
         return false
     end
 
-    s_ind = index(sig)
+    if mod_ord == :DPOT
+        s_ind = index(sig)
 
-    @inbounds for i in basis.basis_offset:basis.basis_load
-        basis.is_red[i] && continue
-        b_ind = index(basis.sigs[i])
-        if (ind_order.ord[b_ind] < ind_order.ord[s_ind]
-            && !are_incompat(b_ind, s_ind, ind_order))
-            if divch(basis.lm_masks[i], sigmask)
-                if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
-                    return true
+        @inbounds for i in basis.basis_offset:basis.basis_load
+            basis.is_red[i] && continue
+            b_ind = index(basis.sigs[i])
+            if (ind_order.ord[b_ind] < ind_order.ord[s_ind]
+                && !are_incompat(b_ind, s_ind, ind_order))
+                if divch(basis.lm_masks[i], sigmask)
+                    if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
+                        return true
+                    end
                 end
             end
         end
+        return false
+    else
+        # todo Theo
+        # use monomial tree
+        m = monomial(sig)
+        # check if m is in ideal given by current monomial tree
+        # using basis.staircase_tree
+        # if yes return true, if no return false
     end
-    return false
 end
 
 @inline function rewriteable_basis(basis::Basis,
@@ -136,6 +147,6 @@ function rewriteable(basis::Basis,
 
     rewriteable_syz(basis, sig, sigmask, tags, check) && return true
     rewriteable_basis(basis, idx, sig, sigmask, tags, check, mod_ord) && return true
-    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags, check) && return true
+    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags, mod_ord, check) && return true
     return false
 end

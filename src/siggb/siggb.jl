@@ -19,6 +19,7 @@ include("normalform.jl")
 include("affine_cells.jl")
 include("interfaces.jl")
 include("helpers.jl")
+include("staircase_tree.jl")
 
 
 #---------------- user functions --------------------#
@@ -204,6 +205,15 @@ function siggb!(basis::Basis{N},
             # minimize à la F5c
             min_idx = iszero(p_idx) ? zero(SigIndex) : curr_ind
             minimize!(basis, basis_ht, min_idx, ind_order, tags)
+
+            if !iszero(p_idx)
+                for i in basis.basis_offset:basis.basis_load
+                    if !basis.is_red[i] && index(basis.sigs[i]) == curr_ind
+                        m = leading_monomial(basis, basis_ht, i)
+                        # TODO theo: insert m in basis.staircase_tree
+                    end
+                end
+            end
         end
     end
     return false, arit_ops, nz_conds
