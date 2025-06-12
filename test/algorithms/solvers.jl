@@ -26,6 +26,7 @@
     @test inter_sols == real_solutions(I, interval=true)
     @test rat_sols == rational_solutions(I)
     @test I.real_sols == real_solutions(I)
+    @test iszero(I.dim)
 
     C, x = polynomial_ring(QQ, "x")
     elim  = 128304*x^8 - 93312*x^7 + 15552*x^6 + 3144*x^5 - 1120*x^4 + 36*x^3 + 15*x^2 - x
@@ -55,11 +56,13 @@
     I = Ideal([x1^2-x2, x1*x3-x4, x2*x4-12, x4^3-x3^2])
     real_solutions(I)
     @test I.rat_param.vars == Symbol[]
+    @test I.dim == -1
 
     I = Ideal([x1^2-x2, x1*x3, x2-12])
 	@test_throws ErrorException real_solutions(I)
     @test_throws ErrorException real_solutions(I, interval=true)
 	@test_throws ErrorException rational_solutions(I)
+    @test isnothing(I.dim)
 
     R, (x, y) = polynomial_ring(QQ,["x","y"])
     # issue 54

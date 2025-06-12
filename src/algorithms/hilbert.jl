@@ -1,11 +1,14 @@
-export affine_hilbert_series, hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial
-
 @doc Markdown.doc"""
     hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
 
 Compute the Hilbert series of a given polynomial ideal `I`.
 
-**Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
+Based on: Anna M. Bigatti, Computation of Hilbert-Poincaré series,
+Journal of Pure and Applied Algebra, 1997.
+
+**Notes**:
+* This requires a Gröbner basis of `I`, which is computed internally if not already known.
+* Significantly faster when internal_ordering is :degrevlex.
 
 # Examples
 ```jldoctest
@@ -16,15 +19,19 @@ julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
 julia> I = Ideal([x*y,x*z,y*z]);
 
 julia> hilbert_series(I)
-(3*t - 1)//(t - 1)
+(-2*t - 1)//(t - 1)
 ```
 """
 function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
+
     gb = get!(I.gb, 0) do
         groebner_basis(I, complete_reduction = true)
     end
-    lexps = (_drl_lead_exp).(gb)
-    return _hilbert_series_mono(lexps)
+    lead_exps = Vector{Vector{Int}}(undef, length(gb))
+    for i in eachindex(gb)
+        lead_exps[i] = _lead_exp_ord(gb[i], :degrevlex)
+    end
+    return _hilbert_series_mono(lead_exps)
 end
 
 @doc Markdown.doc"""
@@ -47,6 +54,8 @@ julia> hilbert_degree(I)
 ```
 """
 function hilbert_degree(I::Ideal{T}) where T <: MPolyRingElem
+
+    !isnothing(I.deg) && return I.deg
     I.deg = numerator(hilbert_series(I))(1) |> abs
     return I.deg
 end
@@ -71,6 +80,7 @@ julia> hilbert_dimension(I)
 ```
 """
 function hilbert_dimension(I::Ideal{T}) where T <: MPolyRingElem
+
     H = hilbert_series(I)
     I.dim = iszero(H) ? -1 : degree(denominator(H))
     return I.dim
@@ -96,11 +106,12 @@ julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
 
 julia> I = Ideal([x*y,x*z,y*z]);
 
-julia> hilbert_degree(I)
+julia> hilbert_polynomial(I)
 (3*s + 3, 1)
 ```
 """
 function hilbert_polynomial(I::Ideal{T}) where T <: MPolyRingElem
+
     A, s = polynomial_ring(QQ, :s)
     H = hilbert_series(I)
     dim = degree(denominator(H))
@@ -124,6 +135,7 @@ end
 
 # Computes hilbert series of a monomial ideal on input list of exponents
 function _hilbert_series_mono(exps::Vector{Vector{Int}})
+
     h = _num_hilbert_series_mono(exps)
     t = gen(parent(h))
     return h//(1-t)^length(first(exps))
@@ -131,6 +143,7 @@ end
 
 # Computes numerator hilbert series of a monomial ideal on input list of exponents
 function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
+
     A, t = polynomial_ring(ZZ, 't')
     r = length(exps)
     r == 0 && return one(A)
@@ -193,7 +206,7 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
     pivexp = max(1, minimum(mon[ivarmax] for mon in rand(exps, 2)))
     h = zero(A)
     #Compute and partition gens of (exps):pivot
-    Lquo = [Vector{Int64}[] for _ in 1:pivexp+2]
+    Lquo = [Vector{Int}[] for _ in 1:pivexp+2]
     trivialquo = false
     for mono in exps
         if mono[ivarmax] <= pivexp
@@ -210,9 +223,9 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
     end
     if !trivialquo
         # Interreduce generators based on partition
-        for i in pivexp+1:-1:1
+        @inbounds for i in pivexp+1:-1:1
             non_min = [ k for (k,mono) in enumerate(Lquo[i]) if
-                    any(all(mini .<= mono) for j in pivexp+1:-1:i+1 for mini in Lquo[j])]
+                    any(_all_lesseq(mini, mono) for j in i+1:pivexp+1 for mini in Lquo[j])]
             deleteat!(Lquo[i], non_min)
         end
         # Merge all partitions
@@ -226,8 +239,18 @@ function _num_hilbert_series_mono(exps::Vector{Vector{Int}})
     return h
 end
 
+function _all_lesseq(a::Vector{Int}, b::Vector{Int})::Bool
+    @inbounds for i in eachindex(a)
+        if a[i] > b[i]
+            return false
+        end
+    end
+    return true
+end
+
 # Build adjacency graph: connect variables that appear together in a monomial
 function _monomial_support_partition(L::Vector{Vector{Int}})
+
     n = length(first(L))
     adj = [Set{Int}() for _ in 1:n]
     active = falses(n)

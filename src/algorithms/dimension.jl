@@ -19,46 +19,57 @@ julia> dimension(I)
 """
 function dimension(I::Ideal{T}) where T <: MPolyRingElem
 
+    !isnothing(I.dim) && return I.dim
     gb = get!(I.gb, 0) do
         groebner_basis(I, complete_reduction = true)
     end
     R = parent(first(gb))
-    res = [trues(ngens(R))]
 
-    lead_exps = (_drl_lead_exp).(gb)
+    res = Set([trues(ngens(R))])
+    lead_exps = Vector{Vector{Int}}(undef, length(gb))
+    for i in eachindex(gb)
+        lead_exps[i] = _lead_exp_ord(gb[i], :degrevlex)
+    end
     for lexp in lead_exps
-        to_del = Int[]
-        new_miss = BitVector[]
-        for (i, mis) in enumerate(res)
-            nz_exps_inds = findall(!iszero, lexp)
-            ind_var_inds = findall(mis)
-            if issubset(nz_exps_inds, ind_var_inds)
-                for j in nz_exps_inds
+        nz_exps = (!iszero).(lexp)
+        nz_exps_ind = findall(nz_exps)
+        next_res = Set{BitVector}()
+        for mis in res
+            if _all_lesseq(nz_exps, mis)
+                @inbounds for j in nz_exps_ind
                     new_mis = copy(mis)
                     new_mis[j] = false
-                    push!(new_miss, new_mis)
+                    push!(next_res, new_mis)
                 end
-                push!(to_del, i)
+            else
+                push!(next_res, mis)
             end
         end
-        deleteat!(res, to_del)
-        append!(res, new_miss)
-        unique!(res)
+        res = next_res
     end
 
-    length(res) == 0 && return -1
-    max_length = maximum(mis -> length(findall(mis)), res)
-
-    I.dim = max_length
+    I.dim = isempty(res) ? -1 : maximum(sum, res)
     return I.dim
 end
 
-function _drl_exp_vector(u::Vector{Int})
-    return [sum(u), -reverse(u)...]
+function _all_lesseq(a::BitVector, b::BitVector)::Bool
+    @inbounds for i in eachindex(a)
+        if a[i] && !b[i]
+            return false
+        end
+    end
+    return true
 end
 
-function _drl_lead_exp(p::MPolyRingElem)
-    exps = collect(Nemo.exponent_vectors(p))
-    _, i = findmax((u -> _drl_exp_vector(u)).(exps))
-    return exps[i]
+function _lead_exp_ord(p::MPolyRingElem, order::Symbol)
+    R = parent(p)
+    internal_ordering(R)==order && return first(exponent_vectors(p))
+
+    A = base_ring(R)
+    R1, _ = polynomial_ring(A, symbols(R), internal_ordering=order)
+    ctx = MPolyBuildCtx(R1)
+    for e in exponent_vectors(p)
+        push_term!(ctx, one(A), e)
+    end
+    return first(exponent_vectors(finish(ctx)))
 end
