@@ -40,7 +40,13 @@ function rational_curve_parametrization(
     )
     info_level>0 && println("Compute ideal data and genericity check")
     Itest = Ideal(change_base_ring.(Ref(GF(65521)), I.gens))
-    @assert(I.dim==1 || I.dim<0 && dimension(Itest)==1, "I must be one-dimensional")
+    Itest.dim = isnothing(I.dim) ? dimension(Itest) : I.dim
+    @assert(Itest.dim==1, "I must be one-dimensional")
+
+    if Itest.dim == -1
+        T = polynomial_ring(QQ, [:x,:y])[1]
+        return RationalCurveParametrization(Symbol[], Vector{ZZRingElem}[], T(-1), T(-1), Vector{QQMPolyRingElem}[])
+    end
     DEG = hilbert_degree(Itest)
     # If generic variables must be added
     F, cfs_lfs = use_lfs ? add_genvars(I.gens, max(2, length(cfs_lfs)), cfs_lfs) :
