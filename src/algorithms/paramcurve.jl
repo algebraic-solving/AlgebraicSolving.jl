@@ -60,7 +60,7 @@ function rational_curve_parametrization(
     end
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
-    PARAM  = Vector{Vector{AlgebraicSolving.QQPolyRingElem}}(undef,DEG+2)
+    PARAM  = Vector{Vector{QQPolyRingElem}}(undef,DEG+2)
     _values = Vector{QQFieldElem}(undef,DEG+2)
     i = 1
     free_ind = collect(1:DEG+2)
@@ -70,12 +70,12 @@ function rational_curve_parametrization(
             error("Too many bad specializations: permute variables or use_lfs=true")
         end
         # Evaluation of the generators
-        LFeval = Vector{AlgebraicSolving.Ideal}(undef, length(free_ind))
+        LFeval = Vector{Ideal}(undef, length(free_ind))
         Threads.@threads for j in 1:length(free_ind)
-            LFeval[j] = Ideal(change_ringvar(evaluate.(F, Ref([N-1]), Ref([QQ(i+j-1)])), [R.S[1:N-2]; R.S[N]]))
+            LFeval[j] = Ideal(change_ringvar(evaluate.(F, Ref([N-1]), Ref([QQ(i+j-1)])), [symbols(R)[1:N-2]; symbols(R)[N]]))
         end
         # Compute parametrization of each evaluation
-        Lr = Vector{AlgebraicSolving.RationalParametrization}(undef, length(free_ind))
+        Lr = Vector{RationalParametrization}(undef, length(free_ind))
         for j in 1:length(free_ind)
             info_level>0 && print("Evaluated parametrizations: $(j+DEG+2-length(free_ind))/$(DEG+2)", "\r")
             Lr[j] = rational_parametrization(LFeval[j], nr_thrds=Threads.nthreads())
@@ -83,7 +83,7 @@ function rational_curve_parametrization(
         info_level>0 && println()
         for j in 1:length(free_ind)
             # For lifting: the same variable must be chosen for the param
-            if  Lr[j].vars == [R.S[1:N-2]; R.S[N]]
+            if  Lr[j].vars == [symbols(R)[1:N-2]; symbols(R)[N]]
                 lc = leading_coefficient(Lr[j].elim)
                 rr = [ p/lc for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
                 PARAM[j] = rr
@@ -119,7 +119,7 @@ function rational_curve_parametrization(
     end
     info_level>0 && println()
     # Output: [vars, linear forms, elim, denom, [nums_param]]
-    return RationalCurveParametrization(R.S, cfs_lfs, POLY_PARAM[1],
+    return RationalCurveParametrization(symbols(R), cfs_lfs, POLY_PARAM[1],
                                         POLY_PARAM[2], POLY_PARAM[3:end])
 end
 
@@ -139,7 +139,7 @@ end
 R = parent(first(F))
 N = nvars(R)
 # Add new variables (reverse alphabetical order)
-newS = vcat(R.S, Symbol.(["_Z$i" for i in ngenvars:-1:1]))
+newS = vcat(symbols(R), Symbol.(["_Z$i" for i in ngenvars:-1:1]))
 R_ext, all_vars = polynomial_ring(base_ring(R), newS)
 Fnew = change_ringvar(F, newS)
 
@@ -169,11 +169,11 @@ function change_ringvar(
     # Locate variables of R in newvarias
     to_varias = Vector{Int}(undef,0)
     for v in newvarias_S
-        ind = findfirst(x->x==v, R.S)
-        push!(to_varias, typeof(ind)==Nothing ? length(R.S)+1 : ind)
+        ind = findfirst(x->x==v, symbols(R))
+        push!(to_varias, typeof(ind)==Nothing ? length(symbols(R))+1 : ind)
     end
 
-    ind_novarias = setdiff(eachindex(R.S), to_varias)
+    ind_novarias = setdiff(eachindex(symbols(R)), to_varias)
     newR, = polynomial_ring(base_ring(R), newvarias_S)
 
     res = typeof(first(F))[]
