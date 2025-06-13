@@ -185,10 +185,11 @@ function find_nearest_index(subtree::Vector{Tuple{Exp, Tree}}, exp::Exp)
 end
 
 # Function that test if a monomial is represented by a staircase tree
-function is_in_tree(m::Monomial, tree::Tree)
+function is_in_tree(m::Monomial{N}, tree::Tree) where N
     subtree = tree
 
-    for exp in m.exps
+    @inbounds for j in N:-1:1
+        exp = m.exps[j]
         i = find_nearest_index(subtree.edges, exp)
         if i == -1
             return false
