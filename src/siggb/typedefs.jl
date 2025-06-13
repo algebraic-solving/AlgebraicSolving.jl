@@ -61,6 +61,26 @@ const MaskSig = Tuple{SigIndex, DivMask}
 const Polynomial = Tuple{Vector{Coeff}, Vector{MonIdx}}
 const ModCache{N} = Dict{Tuple{Sig{N}, SigIndex}, Polynomial}
 
+# for staircase tree
+
+# Define a Tree structure to represent the staircase tree
+struct Tree
+    id::Int
+    edges::Vector{Tuple{Exp, Tree}}
+end
+
+# Define an Edge as a tuple of an exponent and a Tree
+const Edge = Tuple{Exp, Tree}
+
+# Define a mutable struct to hold the hash state
+mutable struct HashState
+    hashtable::Dict{Vector{Edge}, Tree}
+    counter::Int
+end
+
+# Define a constant for an empty tree
+const nothing_tree = Tree(-1, Tuple{Int,Tree}[])
+
 mutable struct Basis{N}
     sigs::Vector{Sig{N}}
     sigmasks::Vector{MaskSig}
@@ -203,26 +223,6 @@ mutable struct LocClosedSet{T<:MPolyRingElem}
     codim_upper_bound::Int
     gbs::Vector{Vector{T}}
 end
-
-# for staircase tree
-
-# Define a Tree structure to represent the staircase tree
-struct Tree
-    id::Int
-    edges::Vector{Tuple{Exp, Tree}}
-end
-
-# Define an Edge as a tuple of an exponent and a Tree
-const Edge = Tuple{Exp, Tree}
-
-# Define a mutable struct to hold the hash state
-mutable struct HashState
-    hashtable::Dict{Vector{Edge}, Tree}
-    counter::Int
-end
-
-# Define a constant for an empty tree
-const nothing_tree = Tree(-1, Tuple{Int,Tree}[])
 
 
 # for benchmarking

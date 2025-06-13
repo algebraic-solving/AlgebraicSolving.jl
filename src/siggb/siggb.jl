@@ -210,7 +210,7 @@ function siggb!(basis::Basis{N},
                 for i in basis.basis_offset:basis.basis_load
                     if !basis.is_red[i] && index(basis.sigs[i]) == curr_ind
                         m = leading_monomial(basis, basis_ht, i)
-                        # TODO theo: insert m in basis.staircase_tree
+                        basis.staircase_tree = insertion(basis.staircase_tree, m, basis.hashstate)
                     end
                 end
             end

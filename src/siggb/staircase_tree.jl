@@ -138,31 +138,15 @@ end
 
 
 # Function to create the staircase tree of a list of monomials
-function creation(monomial_list::Vector{<:Monomial})
+function create_staircase_tree(monomial_list::Vector{<:Monomial}, hashstate::HashState)
     tree = nothing_tree
-    hashstate = new_hashstate()
     for m in monomial_list
         tree = insertion(tree, m, hashstate)
     end
     return tree
 end
 
-function list_reading(filename::String)
-    monomial_list = Monomial[]
-    open(filename, "r") do fichier
-        for line in eachline(fichier)
-            line = strip(line)
-            if !isempty(line)
-                lst = JSON.parse(line)
-                n = length(lst)
-                mon = monomial(SVector{n}(lst))
-                push!(monomial_list, mon)
-            end
-        end
-    end
-    return monomial_list
-end
-
+# Function that determines the number of nodes in the staircase tree
 function size_of_tree(tree::Tree)
     if isempty(tree.edges) || tree == nothing_tree
         return 0
@@ -170,6 +154,7 @@ function size_of_tree(tree::Tree)
     return 1 + sum(size_of_tree(subtree[2]) for subtree in tree.edges)
 end
 
+# Function that determines the number of distinct subtrees in the staircase tree
 function number_of_distinct_trees(tree::Tree, mem::Dict{Tree, Tree} = Dict{Tree,Tree}())
     if isempty(tree.edges) || tree == nothing_tree
         return 0
@@ -187,6 +172,81 @@ function number_of_distinct_trees(tree::Tree, mem::Dict{Tree, Tree} = Dict{Tree,
     return number
 end
 
+# Function that determines the largest s such that s <= exp, returns -1 otherwise
+function find_nearest_index(subtree::Vector{Tuple{Exp, Tree}}, exp::Exp)
+    j = -1
+    for k in 1:length(subtree)
+        if subtree[k][1] > exp
+            return j
+        end
+        j = k
+    end
+    return j
+end
+
+# Function that test if a monomial is represented by a staircase tree
+function is_in_tree(m::Monomial, tree::Tree)
+    subtree = tree
+
+    for exp in m.exps
+        i = find_nearest_index(subtree.edges, exp)
+        if i == -1
+            return false
+        else
+            subtree = subtree.edges[i][2]
+        end
+    end
+    return true
+end
+
+# Function that converts a monomial::MPolyRingElem into an object of type Monomial{N}
 function convert_to_monomial(m::MPolyRingElem, R::MPolyRing, ::Val{N}) where N
-    # convert m to Monomial{N}
+    exts = first(collect(exponent_vectors(R(m))))
+    sv = SVector{N, Int}(exts)
+    return monomial(sv)
+end
+
+# Function that tests if a divides b
+function divides(a::Monomial, b::Monomial)
+    return all(ai <= bi for (ai, bi) in zip(a.exps, b.exps))
+end
+
+# Function that generates a random list of monomials
+function generate_random_vectors(r::Int, d::Int, n::Int)
+    N = 0
+    list_of_monomials = Monomial[]
+    while N < n
+        rd = monomial(SVector{r}(rand(Exp(0):Exp(d-1), r)))
+        if all(!divides(mon, rd) for mon in list_of_monomials)
+            push!(list_of_monomials, rd)
+        end
+        N += 1
+    end
+
+    return list_of_monomials
+end
+
+# Function that naively test if a monomial is in a monomial ideal
+function naive_is_in_ideal(mon::Monomial, list::Vector{Monomial})
+    for i in 1:length(list)
+        if divides(list[i], mon)
+            return true
+        end
+    end
+    return false
+end
+
+# Function that returns the list of all leaves of tree
+function get_leaves(tree::Tree)
+    if isempty(tree.edges)
+        return Vector{Exp}[Exp[]]
+    end
+
+    leaves = Vector{Exp}[]
+    for (label, subtree) in tree.edges
+        for path in get_leaves(subtree)
+            push!(leaves, vcat([label],path))
+        end
+    end
+    return leaves
 end
