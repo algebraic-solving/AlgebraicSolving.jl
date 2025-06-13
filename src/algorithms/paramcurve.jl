@@ -1,4 +1,4 @@
-export rational_curve_parametrization
+export rational_curve_parametrization, varincoeff
 
 @doc Markdown.doc"""
     rational_curve_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
@@ -70,16 +70,19 @@ function rational_curve_parametrization(
             error("Too many bad specializations: permute variables or use_lfs=true")
         end
         # Evaluation of the generators
+        @time begin
         LFeval = Vector{Ideal}(undef, length(free_ind))
-        Threads.@threads for j in 1:length(free_ind)
+        for j in 1:length(free_ind)
             LFeval[j] = Ideal(change_ringvar(evaluate.(F, Ref([N-1]), Ref([QQ(i+j-1)])), [symbols(R)[1:N-2]; symbols(R)[N]]))
-        end
+        end end
+        return true
         # Compute parametrization of each evaluation
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
+        @time begin
         for j in 1:length(free_ind)
             info_level>0 && print("Evaluated parametrizations: $(j+DEG+2-length(free_ind))/$(DEG+2)", "\r")
-            Lr[j] = rational_parametrization(LFeval[j], nr_thrds=Threads.nthreads())
-        end
+            Lr[j] = rational_parametrization(LFeval[j])
+        end end
         info_level>0 && println()
         for j in 1:length(free_ind)
             # For lifting: the same variable must be chosen for the param
@@ -102,10 +105,11 @@ function rational_curve_parametrization(
     A = polynomial_ring(QQ)[1]
 
     POLY_PARAM = Vector{QQMPolyRingElem}(undef,N)
+    @time begin
     for count in 1:N
         info_level>0 && print("Interpolate parametrizations: $count/$N\r")
         COEFFS = Vector{QQPolyRingElem}(undef, DEG+1)
-        Threads.@threads for deg in 0:DEG
+        for deg in 0:DEG
             _evals = [coeff(PARAM[i][count], deg) for i in 1:length(PARAM)]
             COEFFS[deg+1] = interpolate(A, _values, _evals)
         end
@@ -116,7 +120,7 @@ function rational_curve_parametrization(
             end
         end
         POLY_PARAM[count] = finish(ctx)
-    end
+    end end
     info_level>0 && println()
     # Output: [vars, linear forms, elim, denom, [nums_param]]
     return RationalCurveParametrization(symbols(R), cfs_lfs, POLY_PARAM[1],
@@ -191,3 +195,21 @@ function change_ringvar(
     return res
 end
 
+function varincoeff(F, i)
+    R = parent(first(F))
+    indnewvars = setdiff(1:nvars(R), i)
+    A, x = polynomial_ring(base_ring(R), symbols(R)[i])
+    B, = polynomial_ring(A, symbols(R)[indnewvars])
+
+    res = typeof(zero(B))[]
+    ctx = MPolyBuildCtx(B)
+
+    for f in F
+        for (e, c) in zip(exponent_vectors(f), coefficients(f))
+            push_term!(ctx, c*x^e[i], [e[j] for j in indnewvars ])
+        end
+        push!(res, finish(ctx))
+    end
+
+    return res
+end
