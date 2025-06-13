@@ -51,9 +51,7 @@ end
         return false
     else
         m = monomial(sig)
-        list_reversed = reverse([exp for exp in m.exps])
-        reversed_m = monomial(SVector{length(list_reversed)}(list_reversed))
-        return is_in_tree(reversed_m, basis.staircase_tree)
+        return is_in_tree(m, basis.staircase_tree)
     end
 end
 
