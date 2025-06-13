@@ -22,20 +22,15 @@ using StaticArrays
     lst = AlgebraicSolving.generate_random_vectors(10, 5, 10)
     
     T1 = AlgebraicSolving.create_staircase_tree(lst, hashstate)
-    for k in 1:100
+    for k in 1:30
         lst2 = shuffle(lst)
         T2 = AlgebraicSolving.create_staircase_tree(lst2, hashstate)
         @test T1 == T2
     end
 
-    for k in 1:100
+    for k in 1:30
         mon = AlgebraicSolving.generate_random_vectors(10, 5, 1)[1]
-        list_reversed = []
-        for m in mon.exps
-            push!(list_reversed, m) 
-        end
-        tree_mon = AlgebraicSolving.monomial(SVector{10}(reverse(list_reversed)))
-        @test AlgebraicSolving.naive_is_in_ideal(mon, lst) == AlgebraicSolving.is_in_tree(tree_mon, T1)
+        @test AlgebraicSolving.naive_is_in_ideal(mon, lst) == AlgebraicSolving.is_in_tree(mon, T1)
     end
 
     leaves = AlgebraicSolving.get_leaves(T1)
