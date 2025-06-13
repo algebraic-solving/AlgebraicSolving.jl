@@ -50,12 +50,10 @@ end
         end
         return false
     else
-        # todo Theo
-        # use monomial tree
         m = monomial(sig)
-        # check if m is in ideal given by current monomial tree
-        # using basis.staircase_tree
-        # if yes return true, if no return false
+        list_reversed = reverse([exp for exp in m.exps])
+        reversed_m = monomial(SVector{length(list_reversed)}(list_reversed))
+        return is_in_tree(reversed_m, basis.staircase_tree)
     end
 end
 
