@@ -1,4 +1,4 @@
-export rational_curve_parametrization, varincoeff
+export rational_curve_parametrization
 
 @doc Markdown.doc"""
     rational_curve_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
@@ -49,13 +49,13 @@ function rational_curve_parametrization(
     end
     DEG = hilbert_degree(Itest)
     # If generic variables must be added
-    F, cfs_lfs = use_lfs ? add_genvars(I.gens, max(2, length(cfs_lfs)), cfs_lfs) :
+    F, cfs_lfs = use_lfs ? _add_genvars(I.gens, max(2, length(cfs_lfs)), cfs_lfs) :
              !isempty(cfs_lfs) ? add_genvars(I.gens, length(cfs_lfs), cfs_lfs) :
              (I.gens, Vector{ZZRingElem}[])
     R = parent(first(F))
     N = nvars(R)
     let # local code block test
-        local INEW = vcat(Itest.gens, change_base_ring(GF(65521), gens(R)[N-1]-rand(ZZ,-100:100))) |> Ideal
+        local INEW = Ideal(change_base_ring.(Ref(GF(65521)), vcat(F, gens(R)[N-1]-rand(ZZ,-100:100))))
         @assert(dimension(INEW)==0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
     end
 
@@ -69,20 +69,14 @@ function rational_curve_parametrization(
         if i > 2*(DEG+2)
             error("Too many bad specializations: permute variables or use_lfs=true")
         end
-        # Evaluation of the generators
-        @time begin
-        LFeval = Vector{Ideal}(undef, length(free_ind))
-        for j in 1:length(free_ind)
-            LFeval[j] = Ideal(change_ringvar(evaluate.(F, Ref([N-1]), Ref([QQ(i+j-1)])), [symbols(R)[1:N-2]; symbols(R)[N]]))
-        end end
-        return true
+        # Evaluation of the generator
+        LFeval = Ideal.(_evalvar(F, N-1, QQ.(collect(i+j-1 for j in 1:length(free_ind)))))
         # Compute parametrization of each evaluation
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
-        @time begin
         for j in 1:length(free_ind)
             info_level>0 && print("Evaluated parametrizations: $(j+DEG+2-length(free_ind))/$(DEG+2)", "\r")
             Lr[j] = rational_parametrization(LFeval[j])
-        end end
+        end
         info_level>0 && println()
         for j in 1:length(free_ind)
             # For lifting: the same variable must be chosen for the param
@@ -105,7 +99,6 @@ function rational_curve_parametrization(
     A = polynomial_ring(QQ)[1]
 
     POLY_PARAM = Vector{QQMPolyRingElem}(undef,N)
-    @time begin
     for count in 1:N
         info_level>0 && print("Interpolate parametrizations: $count/$N\r")
         COEFFS = Vector{QQPolyRingElem}(undef, DEG+1)
@@ -120,7 +113,7 @@ function rational_curve_parametrization(
             end
         end
         POLY_PARAM[count] = finish(ctx)
-    end end
+    end
     info_level>0 && println()
     # Output: [vars, linear forms, elim, denom, [nums_param]]
     return RationalCurveParametrization(symbols(R), cfs_lfs, POLY_PARAM[1],
@@ -131,85 +124,70 @@ end
 # Inject polynomials in F in a polynomial ring with ngenvars new variables
 # return these polynomials
 # + newvars linear forms provided by coefficients in cfs_lfs + random ones
-function add_genvars(
+function _add_genvars(
     F::Vector{P} where P<:MPolyRingElem,
     ngenvars::Int,
     cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]
 )
 
-if length(cfs_lfs) > ngenvars
-    error("Too many linear forms provided ($(length(cfs_lfs))>$(ngenvars))")
-end
-R = parent(first(F))
-N = nvars(R)
-# Add new variables (reverse alphabetical order)
-newS = vcat(symbols(R), Symbol.(["_Z$i" for i in ngenvars:-1:1]))
-R_ext, all_vars = polynomial_ring(base_ring(R), newS)
-Fnew = change_ringvar(F, newS)
-
-# Complete possible incomplete provided linear forms
-for i in eachindex(cfs_lfs)
-    if N+ngenvars < length(cfs_lfs[i])
-        error("Too many coeffs ($(length(cfs_lfs[i]))>$(N+ngenvars)) for the $(i)th linear form")
-    else
-        append!(cfs_lfs[i], rand(ZZ.(setdiff(-100:100,0)), N+ngenvars - length(cfs_lfs[i])))
+    if length(cfs_lfs) > ngenvars
+        error("Too many linear forms provided ($(length(cfs_lfs))>$(ngenvars))")
     end
-end
-# Add missing linear forms if needed
-append!(cfs_lfs, [rand(ZZ.(setdiff(-100:100,0)), N+ngenvars) for _ in 1:ngenvars-length(cfs_lfs)])
-# Construct and append linear forms
-append!(Fnew, [transpose(cfs_lf) * all_vars for cfs_lf in cfs_lfs])
-
-return Fnew, cfs_lfs
-end
-
-
-# Return the polynomials in F, but injected in the polynomial ring with newvarias_S as new variables
-function change_ringvar(
-        F::Vector{P} where P <: MPolyRingElem,  # list of polynomials
-        newvarias_S::Vector{Symbol}             # new variable symbols
-        )
     R = parent(first(F))
-    # Locate variables of R in newvarias
-    to_varias = Vector{Int}(undef,0)
-    for v in newvarias_S
-        ind = findfirst(x->x==v, symbols(R))
-        push!(to_varias, typeof(ind)==Nothing ? length(symbols(R))+1 : ind)
-    end
-
-    ind_novarias = setdiff(eachindex(symbols(R)), to_varias)
-    newR, = polynomial_ring(base_ring(R), newvarias_S)
-
-    res = typeof(first(F))[]
-    ctx = MPolyBuildCtx(newR)
-
-    for f in F
-        for (e, c) in zip(exponent_vectors(f), coefficients(f))
-            @assert(all([ e[i]==0 for i in ind_novarias ]), "Occurence of old variable.s found!")
-            push!(e, 0)
-            push_term!(ctx, c, [e[i] for i in to_varias ])
+    N = nvars(R)
+    # Add new variables (reverse alphabetical order)
+    newS = vcat(symbols(R), Symbol.(["_Z$i" for i in ngenvars:-1:1]))
+    R_ext, all_vars = polynomial_ring(base_ring(R), newS)
+    # Inject F in this new ring
+    Fnew = Vector{MPolyRingElem}(undef, length(F))
+    ctx = MPolyBuildCtx(R_ext)
+    for i in eachindex(F)
+        for (e, c) in zip(exponent_vectors(F[i]), coefficients(F[i]))
+            push_term!(ctx, c, vcat(e, zeros(Int,ngenvars)))
         end
-        push!(res, finish(ctx))
+        Fnew[i] = finish(ctx)
     end
 
-    return res
+    # Complete possible incomplete provided linear forms
+    for i in eachindex(cfs_lfs)
+        if N+ngenvars < length(cfs_lfs[i])
+            error("Too many coeffs ($(length(cfs_lfs[i]))>$(N+ngenvars)) for the $(i)th linear form")
+        else
+            append!(cfs_lfs[i], rand(ZZ.(setdiff(-100:100,0)), N+ngenvars - length(cfs_lfs[i])))
+        end
+    end
+    # Add missing linear forms if needed
+    append!(cfs_lfs, [rand(ZZ.(setdiff(-100:100,0)), N+ngenvars) for _ in 1:ngenvars-length(cfs_lfs)])
+    # Construct and append linear forms
+    append!(Fnew, [transpose(cfs_lf) * all_vars for cfs_lf in cfs_lfs])
+
+    return Fnew, cfs_lfs
 end
 
-function varincoeff(F, i)
+# for each a in La, evaluate each poly in F in x_i=a
+function _evalvar(
+    F::Vector{P} where P<:MPolyRingElem,
+    i::Int,
+    La::Vector{T} where T<:RingElem
+    )
     R = parent(first(F))
     indnewvars = setdiff(1:nvars(R), i)
-    A, x = polynomial_ring(base_ring(R), symbols(R)[i])
-    B, = polynomial_ring(A, symbols(R)[indnewvars])
+    C, = polynomial_ring(base_ring(R), symbols(R)[indnewvars])
+    LFeval = Vector{typeof(zero(C))}[]
+    ctx = MPolyBuildCtx(C)
 
-    res = typeof(zero(B))[]
-    ctx = MPolyBuildCtx(B)
-
-    for f in F
-        for (e, c) in zip(exponent_vectors(f), coefficients(f))
-            push_term!(ctx, c*x^e[i], [e[j] for j in indnewvars ])
+    for a in La
+        powa = Dict(0=>one(parent(a)), 1=>a) #no recompute same powers
+        push!(LFeval, typeof(zero(C))[])
+        for f in F
+            for (e,c) in zip(exponent_vectors(f), coefficients(f))
+                aei = get!(powa, e[i]) do
+                    a^e[i]
+                end
+                push_term!(ctx, c*aei, [e[j] for j in indnewvars ])
+            end
+            push!(LFeval[end], finish(ctx))
         end
-        push!(res, finish(ctx))
     end
-
-    return res
+    return LFeval
 end
