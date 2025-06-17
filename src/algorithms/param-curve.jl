@@ -3,8 +3,8 @@ export rational_curve_parametrization
 @doc Markdown.doc"""
     rational_curve_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
-Given an ideal `I` with solution set being equidimensional of dimension 1 over the complex numbers, return
-the rational curve parametrization of the ideal.
+Given an ideal `I` with solution set X being of dimension 1 over the complex numbers, return
+the rational curve parametrization of the one-dimensional irreducible components of X.
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
 is not one an ErrorException is thrown.
@@ -14,12 +14,14 @@ is not one an ErrorException is thrown.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 - `use_lfs::Bool=false`: add new variables (_Z2, _Z1) + 2 generic linear forms
 - `cfs_lfs::Vector{Vector{ZZRingElem}} = []`: coefficients for the above linear forms
+- `nr_thrds::Int=1`: number of threads for msolve
+- `check_gen::Bool = true`: perform some genericity position checks on the last two variables
 
 # Examples
 ```jldoctest
 julia> using AlgebraicSolving
 
-julia> R,(x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
+julia> R, (x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
 (Multivariate polynomial ring in 3 variables over QQ, QQMPolyRingElem[x1, x2, x3])
 
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1])
@@ -28,7 +30,7 @@ QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2]
 julia> rational_curve_parametrization(I)
 AlgebraicSolving.RationalCurveParametrization([:x1, :x2, :x3], Vector{ZZRingElem}[], x^2 + 4//3*x*y - 1//3*x + y^2 - 1//3*y, 4//3*x + 2*y - 1//3, QQMPolyRingElem[4//3*x^2 - 4//3*x*y + 2//3*x + 4//3*y - 1//3])
 
-julia> rational_curve_parametrization(I, use_lfs=true, cfs_lfs=map.(Ref(ZZ),[[-8,2,2,-1,-8], [8,-7,-5,8,-7]]))
+julia> rational_curve_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-8,2,2,-1,-8], [8,-7,-5,8,-7]]))
 AlgebraicSolving.RationalCurveParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-8, 2, 2, -1, -8], [8, -7, -5, 8, -7]], 4963//30508*x^2 - 6134//7627*x*y - 647//7627*x + y^2 + 1640//7627*y + 88//7627, -6134//7627*x + 2*y + 1640//7627, QQMPolyRingElem[8662//22881*x^2 - 21442//22881*x*y - 2014//7627*x + 9458//22881*y + 1016//22881, -2769//30508*x^2 + 4047//15254*x*y - 875//7627*x + 3224//7627*y + 344//7627, -9017//91524*x^2 + 9301//45762*x*y - 1185//7627*x + 8480//22881*y + 920//22881])
 ```
 """
@@ -36,28 +38,33 @@ function rational_curve_parametrization(
         I::Ideal{P} where P<:QQMPolyRingElem;                       # input generators
         info_level::Int=0,                                          # info level for print outs
         use_lfs::Bool = false,                                      # add generic variables
-        cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]  # coeffs of linear forms
+        cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[], # coeffs of linear forms
+        nr_thrds::Int=1,                                            # number of threads (msolve)
+        check_gen::Bool = true                                      # perform genericity check
     )
     info_level>0 && println("Compute ideal data and genericity check")
     Itest = Ideal(change_base_ring.(Ref(GF(65521)), I.gens))
-    Itest.dim = isnothing(I.dim) ? dimension(Itest) : I.dim
-    @assert(Itest.dim==1, "I must be one-dimensional")
-
+    Itest.dim = I.dim
+    dimension(Itest)
     if Itest.dim == -1
         T = polynomial_ring(QQ, [:x,:y])[1]
-        return RationalCurveParametrization(Symbol[], Vector{ZZRingElem}[], T(-1), T(-1), Vector{QQMPolyRingElem}[])
+        I.dim = -1
+        I.rat_param = RationalCurveParametrization(Symbol[], Vector{ZZRingElem}[], T(-1), T(-1), QQMPolyRingElem[])
+        return I.rat_param
     end
+    @assert(Itest.dim==1, "I must be either empty or one-dimensional")
+
     DEG = hilbert_degree(Itest)
     # If generic variables must be added
     F, cfs_lfs = use_lfs ? _add_genvars(I.gens, max(2, length(cfs_lfs)), cfs_lfs) :
-             !isempty(cfs_lfs) ? add_genvars(I.gens, length(cfs_lfs), cfs_lfs) :
+             !isempty(cfs_lfs) ? _add_genvars(I.gens, length(cfs_lfs), cfs_lfs) :
              (I.gens, Vector{ZZRingElem}[])
     R = parent(first(F))
     N = nvars(R)
-    let # local code block test
+    if check_gen let
         local INEW = Ideal(change_base_ring.(Ref(GF(65521)), vcat(F, gens(R)[N-1]-rand(ZZ,-100:100))))
         @assert(dimension(INEW)==0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
-    end
+    end end
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
     PARAM  = Vector{Vector{QQPolyRingElem}}(undef,DEG+2)
@@ -75,7 +82,7 @@ function rational_curve_parametrization(
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
         for j in 1:length(free_ind)
             info_level>0 && print("Evaluated parametrizations: $(j+DEG+2-length(free_ind))/$(DEG+2)", "\r")
-            Lr[j] = rational_parametrization(LFeval[j])
+            Lr[j] = rational_parametrization(LFeval[j], nr_thrds=nr_thrds)
         end
         info_level>0 && println()
         for j in 1:length(free_ind)
@@ -94,6 +101,7 @@ function rational_curve_parametrization(
         free_ind = [ free_ind[j] for j in eachindex(free_ind) if !used_ind[j] ]
         used_ind = zeros(Bool, length(free_ind))
     end
+
     # Interpolate each coefficient of each poly in the param
     T = polynomial_ring(QQ, [:x,:y])[1]
     A = polynomial_ring(QQ)[1]
@@ -116,8 +124,10 @@ function rational_curve_parametrization(
     end
     info_level>0 && println()
     # Output: [vars, linear forms, elim, denom, [nums_param]]
-    return RationalCurveParametrization(symbols(R), cfs_lfs, POLY_PARAM[1],
-                                        POLY_PARAM[2], POLY_PARAM[3:end])
+    I.dim = 1 # If we reached here, I has necessarily dimension 1
+    I.rat_param = RationalCurveParametrization( symbols(R), cfs_lfs, POLY_PARAM[1],
+                                                POLY_PARAM[2], POLY_PARAM[3:end]    )
+    return I.rat_param
 end
 
 
@@ -177,7 +187,7 @@ function _evalvar(
     ctx = MPolyBuildCtx(C)
 
     for a in La
-        powa = Dict(0=>one(parent(a)), 1=>a) #no recompute same powers
+        powa = Dict(0=>one(parent(a)), 1=>a) #no recompute powers
         push!(LFeval, typeof(zero(C))[])
         for f in F
             for (e,c) in zip(exponent_vectors(f), coefficients(f))

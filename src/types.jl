@@ -58,7 +58,7 @@ mutable struct Ideal{T <: MPolyRingElem}
     inter_sols::Vector{Vector{Vector{QQFieldElem}}}
     real_sols::Vector{Vector{QQFieldElem}}
     rat_sols::Vector{Vector{QQFieldElem}}
-    rat_param::RationalParametrization
+    rat_param::Union{RationalParametrization, RationalCurveParametrization}
 
     function Ideal(F::Vector{T}) where {T <: MPolyRingElem}
         I = new{T}()
