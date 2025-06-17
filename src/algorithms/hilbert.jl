@@ -27,11 +27,8 @@ function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
     gb = get!(I.gb, 0) do
         groebner_basis(I, complete_reduction = true)
     end
-    lead_exps = Vector{Vector{Int}}(undef, length(gb))
-    for i in eachindex(gb)
-        lead_exps[i] = _lead_exp_ord(gb[i], :degrevlex)
-    end
-    return _hilbert_series_mono(lead_exps)
+    lead_exps = [ _lead_exp_ord(g, :degrevlex) for g in gb if !iszero(g) ]
+    return _hilbert_series_mono(lead_exps, nvars(parent(I)))
 end
 
 @doc Markdown.doc"""
@@ -134,11 +131,11 @@ function hilbert_polynomial(I::Ideal{T}) where T <: MPolyRingElem
 end
 
 # Computes hilbert series of a monomial ideal on input list of exponents
-function _hilbert_series_mono(exps::Vector{Vector{Int}})
+function _hilbert_series_mono(exps::Vector{Vector{Int}}, nr_vars::Int)
 
     h = _num_hilbert_series_mono(exps)
     t = gen(parent(h))
-    return h//(1-t)^length(first(exps))
+    return h//(1-t)^nr_vars
 end
 
 # Computes numerator hilbert series of a monomial ideal on input list of exponents
