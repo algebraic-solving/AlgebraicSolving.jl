@@ -53,6 +53,12 @@ function rational_curve_parametrization(
         return I.rat_param
     end
     @assert(Itest.dim==1, "I must be either empty or one-dimensional")
+    if nvars(parent(I)) == 1
+        T, (x,y) = polynomial_ring(QQ, [:x,:y])
+        I.dim = 1
+        I.rat_param = RationalCurveParametrization(Symbol[:x, :y], Vector{ZZRingElem}[[0,1]], y, T(1), QQMPolyRingElem[])
+        return I.rat_param
+    end
 
     DEG = hilbert_degree(Itest)
     # If generic variables must be added
