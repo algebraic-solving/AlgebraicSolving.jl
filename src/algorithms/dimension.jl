@@ -26,10 +26,7 @@ function dimension(I::Ideal{T}) where T <: MPolyRingElem
     R = parent(first(gb))
 
     res = Set([trues(ngens(R))])
-    lead_exps = Vector{Vector{Int}}(undef, length(gb))
-    for i in eachindex(gb)
-        lead_exps[i] = _lead_exp_ord(gb[i], :degrevlex)
-    end
+    lead_exps = [ _lead_exp_ord(g, :degrevlex) for g in gb if !iszero(g) ]
     for lexp in lead_exps
         nz_exps = (!iszero).(lexp)
         nz_exps_ind = findall(nz_exps)
@@ -62,6 +59,7 @@ function _all_lesseq(a::BitVector, b::BitVector)::Bool
 end
 
 function _lead_exp_ord(p::MPolyRingElem, order::Symbol)
+    @req !iszero(p) "Zero polynomial does not have a leading term"
     R = parent(p)
     internal_ordering(R)==order && return first(exponent_vectors(p))
 
