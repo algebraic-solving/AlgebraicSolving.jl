@@ -9,6 +9,10 @@
     @test iszero(dimension(I))
     @test iszero(I.dim)
 
+    I = Ideal([R(0)])
+    @test dimension(I) == ngens(R)
+    @test I.dim == ngens(R)
+
     I = Ideal([R(1)])
     @test dimension(I) == -1
     @test I.dim == -1
