@@ -100,7 +100,7 @@ function rational_curve_parametrization(
                 _values[j] = QQ(i+j-1)
                 used_ind[j] = true
             else
-                println("bad specialization: ", i+j-1)
+                info_level>0 && println("bad specialization: ", i+j-1)
             end
         end
         i += length(free_ind)
