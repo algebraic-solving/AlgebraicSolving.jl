@@ -1,5 +1,3 @@
-export rational_curve_parametrization
-
 @doc Markdown.doc"""
     rational_curve_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 

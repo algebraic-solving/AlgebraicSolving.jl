@@ -54,4 +54,10 @@
 	@test_throws AssertionException rational_curve_parametrization(I)
     @test_throws AssertionException rational_curve_parametrization(I, use_lfs=true)
     @test_throws AssertionException rational_curve_parametrization(I, check_gen=false)
+
+    I = Ideal([R(0)])
+    @test_throws AssertionException rational_curve_parametrization(I)
+
+    I = Ideal([R(1)])
+    @test rational_curve_parametrization(I).vars == Symbol[]
 end
