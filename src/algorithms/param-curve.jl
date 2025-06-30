@@ -40,8 +40,9 @@ function rational_curve_parametrization(
         nr_thrds::Int=1,                                            # number of threads (msolve)
         check_gen::Bool = true                                      # perform genericity check
     )
-    info_level>0 && println("Compute ideal data and genericity check")
-    Itest = Ideal(change_base_ring.(Ref(GF(65521)), I.gens))
+    info_level>0 && println("Compute ideal data" * (check_gen ? " and genericity check" : ""))
+    lucky_prime = _generate_lucky_primes(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+    Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
     Itest.dim = I.dim
     dimension(Itest)
     if Itest.dim == -1
@@ -66,13 +67,17 @@ function rational_curve_parametrization(
     R = parent(first(F))
     N = nvars(R)
     if check_gen let
-        local INEW = Ideal(change_base_ring.(Ref(GF(65521)), vcat(F, gens(R)[N-1]-rand(ZZ,-100:100))))
+        val = lucky_prime
+        while is_divisible_by(val, lucky_prime)
+            val = rand(ZZ,-100:100)
+        end
+        local INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), vcat(F, gens(R)[N-1] - val)))
         @assert(dimension(INEW)==0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
     end end
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
-    PARAM  = Vector{Vector{QQPolyRingElem}}(undef,DEG+2)
-    _values = Vector{QQFieldElem}(undef,DEG+2)
+    PARAM  = Vector{Vector{QQPolyRingElem}}(undef, DEG+2)
+    _values = Vector{QQFieldElem}(undef, DEG+2)
     i = 1
     free_ind = collect(1:DEG+2)
     used_ind = zeros(Bool, DEG+2)
@@ -204,4 +209,33 @@ function _evalvar(
         end
     end
     return LFeval
+end
+
+# Generate N primes > start that do not divide any numerator/denominator
+# of any coefficient in polynomials from LP
+function _generate_lucky_primes(LF, low, up, N)
+    # Avoid repetitive enumeration and redundant divisibility check
+    CF = ZZRingElem[]
+    for f in LF, c in coefficients(f), part in (numerator(c), denominator(c))
+        if !isone(part)
+            push!(CF, part)
+        end
+    end
+    sort!(CF, rev=true)
+    unique!(CF)
+
+    # Test primes
+    Lprim = ZZRingElem[]
+    while length(Lprim) < N
+        cur_prim = next_prime(rand(low:up))
+        is_lucky = !(cur_prim in Lprim)
+        i = firstindex(CF)
+        # Exploit decreasing order of CF
+        while is_lucky && i <= lastindex(CF) && CF[i] > cur_prim
+            is_lucky = !is_divisible_by(CF[i], cur_prim)
+            i += 1
+        end
+        is_lucky && push!(Lprim, cur_prim)
+    end
+    return Lprim
 end
