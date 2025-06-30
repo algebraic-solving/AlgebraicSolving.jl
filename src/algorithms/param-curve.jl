@@ -51,7 +51,7 @@ function rational_curve_parametrization(
         I.rat_param = RationalCurveParametrization(Symbol[], Vector{ZZRingElem}[], T(-1), T(-1), QQMPolyRingElem[])
         return I.rat_param
     end
-    @assert(Itest.dim==1, "I must be either empty or one-dimensional")
+    @assert(Itest.dim==1, "I must define a curve or an empty set")
     if nvars(parent(I)) == 1
         T, (x,y) = polynomial_ring(QQ, [:x,:y])
         I.dim = 1
