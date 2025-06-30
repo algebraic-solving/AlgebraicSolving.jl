@@ -83,6 +83,7 @@ function rational_curve_parametrization(
     i = 1
     free_ind = collect(1:DEG+2)
     used_ind = zeros(Bool, DEG+2)
+    lc = nothing
     while length(free_ind) > 0
         if i > 2*(DEG+2)
             error("Too many bad specializations: permute variables or use_lfs=true")
@@ -99,8 +100,14 @@ function rational_curve_parametrization(
         for j in 1:length(free_ind)
             # Specialization checks: same vars order, generic degree
             if  Lr[j].vars == [symbols(R)[1:N-2]; symbols(R)[N]] && degree(Lr[j].elim) == DEG
-                lc = leading_coefficient(Lr[j].elim)
-                rr = [ p/lc for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
+                if isnothing(lc)
+                    lc = leading_coefficient(Lr[j].elim)
+                    rr = [ p for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
+                else
+                    # Adjust when the rat_param is multiplied by some constant factor
+                    fact = lc / leading_coefficient(Lr[j].elim)
+                    rr = [ p*fact for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
+                end
                 PARAM[j] = rr
                 _values[j] = QQ(i+j-1)
                 used_ind[j] = true
@@ -123,7 +130,10 @@ function rational_curve_parametrization(
         COEFFS = Vector{QQPolyRingElem}(undef, DEG+1)
         for deg in 0:DEG
             _evals = [coeff(PARAM[i][count], deg) for i in 1:length(PARAM)]
-            COEFFS[deg+1] = interpolate(A, _values, _evals)
+            # Remove denominators for faster interpolation
+            den = lcm(denominator.(_evals))
+            _evals *= den
+            COEFFS[deg+1] = interpolate(A, _values, _evals) / (lc*den)
         end
         ctx = MPolyBuildCtx(T)
         for (i, c) in enumerate(COEFFS)
