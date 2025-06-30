@@ -9,5 +9,6 @@ include("algorithms/solvers.jl")
 include("algorithms/dimension.jl")
 include("algorithms/hilbert.jl")
 include("algorithms/decomposition.jl")
+include("algorithms/param-curves.jl")
 include("examples/katsura.jl")
 end
