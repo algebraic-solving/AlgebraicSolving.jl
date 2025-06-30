@@ -2,7 +2,7 @@
     rational_curve_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
 Given an ideal `I` with solution set X being of dimension 1 over the complex numbers, return
-the rational curve parametrization of the one-dimensional irreducible components of X.
+a rational curve parametrization of the one-dimensional irreducible components of X.
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
 is not one an ErrorException is thrown.
