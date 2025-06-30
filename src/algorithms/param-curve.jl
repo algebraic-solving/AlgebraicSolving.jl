@@ -97,8 +97,8 @@ function rational_curve_parametrization(
         end
         info_level>0 && println()
         for j in 1:length(free_ind)
-            # For lifting: the same variable must be chosen for the param
-            if  Lr[j].vars == [symbols(R)[1:N-2]; symbols(R)[N]]
+            # Specialization checks: same vars order, generic degree
+            if  Lr[j].vars == [symbols(R)[1:N-2]; symbols(R)[N]] && degree(Lr[j].elim) == DEG
                 lc = leading_coefficient(Lr[j].elim)
                 rr = [ p/lc for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
                 PARAM[j] = rr
