@@ -215,7 +215,12 @@ end
 
 # Generate N primes > start that do not divide any numerator/denominator
 # of any coefficient in polynomials from LP
-function _generate_lucky_primes(LF, low, up, N)
+function _generate_lucky_primes(
+    LF::Vector{P} where P<:MPolyRingElem,
+    low::ZZRingElem,
+    up::ZZRingElem,
+    N::Int64
+    )
     # Avoid repetitive enumeration and redundant divisibility check
     CF = ZZRingElem[]
     for f in LF, c in coefficients(f), part in (numerator(c), denominator(c))
