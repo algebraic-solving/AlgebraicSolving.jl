@@ -67,11 +67,13 @@ function rational_curve_parametrization(
     R = parent(first(F))
     N = nvars(R)
     if check_gen let
-        val = lucky_prime
-        while is_divisible_by(val, lucky_prime)
-            val = rand(ZZ,-100:100)
+        val = [ZZ(), ZZ()]
+        # Bound on bifurcation set degree (e.g. Jelonek & Kurdyka, 2005)
+        bif_bound = ZZ(1) << ( N * floor(Int, log2(maximum(total_degree.(F)))) + 1 )
+        while any(is_divisible_by.(val, Ref(lucky_prime)))
+            val = rand(-bif_bound:bif_bound, 2)
         end
-        local INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), vcat(F, gens(R)[N-1] - val)))
+        local INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), vcat(F, val[1]*gens(R)[N-1] - val[2])))
         @assert(dimension(INEW)==0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
     end end
 
