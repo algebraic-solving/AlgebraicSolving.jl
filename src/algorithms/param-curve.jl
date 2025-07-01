@@ -73,8 +73,10 @@ function rational_curve_parametrization(
         while any(is_divisible_by.(val, Ref(lucky_prime)))
             val = rand(-bif_bound:bif_bound, 2)
         end
-        local INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), vcat(F, val[1]*gens(R)[N-1] - val[2])))
-        @assert(dimension(INEW)==0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
+        Fnew = vcat(F, val[1]*gens(R)[N-1] + val[2])
+        @time new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
+        @assert(dimension(INEW) == 0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
     end end
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
@@ -160,7 +162,6 @@ function _add_genvars(
     ngenvars::Int,
     cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]
 )
-
     if length(cfs_lfs) > ngenvars
         error("Too many linear forms provided ($(length(cfs_lfs))>$(ngenvars))")
     end
