@@ -90,8 +90,11 @@ function rational_curve_parametrization(
         if i > 2*(DEG+2)
             error("Too many bad specializations: permute variables or use_lfs=true")
         end
-        # Evaluation of the generator
-        LFeval = Ideal.(_evalvar(F, N-1, QQ.(collect(i+j-1 for j in 1:length(free_ind)))))
+        # Evaluation of the generator at values x s.t. 0 <= |x|-i <= length(free_ind)/2
+        # plus one point at -(length(free_ind)+1)/2 if the length if odd.
+        # This reduces a bit the bitsize of the evaluation
+        curr_values = QQ.([-(i-1+(length(free_ind)+1)÷2):-i;i:(i-1+length(free_ind)÷2)])
+        LFeval = Ideal.(_evalvar(F, N-1, curr_values))
         # Compute parametrization of each evaluation
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
         for j in 1:length(free_ind)
@@ -111,7 +114,7 @@ function rational_curve_parametrization(
                     rr = [ p*fact for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
                 end
                 PARAM[j] = rr
-                _values[j] = QQ(i+j-1)
+                _values[j] = curr_values[j]
                 used_ind[j] = true
             else
                 info_level>0 && println("bad specialization: ", i+j-1)
