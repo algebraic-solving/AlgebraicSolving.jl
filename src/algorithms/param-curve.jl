@@ -74,7 +74,7 @@ function rational_curve_parametrization(
             val = rand(-bif_bound:bif_bound, 2)
         end
         Fnew = vcat(F, val[1]*gens(R)[N-1] + val[2])
-        @time new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+        new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
         local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
         @assert(dimension(INEW) == 0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
     end end
@@ -185,11 +185,11 @@ function _add_genvars(
         if N+ngenvars < length(cfs_lfs[i])
             error("Too many coeffs ($(length(cfs_lfs[i]))>$(N+ngenvars)) for the $(i)th linear form")
         else
-            append!(cfs_lfs[i], rand(ZZ.(setdiff(-100:100,0)), N+ngenvars - length(cfs_lfs[i])))
+            append!(cfs_lfs[i], rand(ZZ.(setdiff(-range:range,0)), N+ngenvars - length(cfs_lfs[i])))
         end
     end
     # Add missing linear forms if needed
-    append!(cfs_lfs, [rand(ZZ.(setdiff(-100:100,0)), N+ngenvars) for _ in 1:ngenvars-length(cfs_lfs)])
+    append!(cfs_lfs, [rand(ZZ.(setdiff(-range:range,0)), N+ngenvars) for _ in 1:ngenvars-length(cfs_lfs)])
     # Construct and append linear forms
     append!(Fnew, [transpose(cfs_lf) * all_vars for cfs_lf in cfs_lfs])
 
