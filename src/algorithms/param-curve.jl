@@ -4,6 +4,9 @@
 Given an ideal `I` with solution set X being of dimension 1 over the complex numbers, return
 a rational curve parametrization of the one-dimensional irreducible components of X.
 
+In the output, the variables `x`,`y` of the parametrization correspond to the last two
+entries of the `vars` attribute, in that order.
+
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
 is not one an ErrorException is thrown.
 
