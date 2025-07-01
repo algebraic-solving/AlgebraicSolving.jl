@@ -185,11 +185,11 @@ function _add_genvars(
         if N+ngenvars < length(cfs_lfs[i])
             error("Too many coeffs ($(length(cfs_lfs[i]))>$(N+ngenvars)) for the $(i)th linear form")
         else
-            append!(cfs_lfs[i], rand(ZZ.(setdiff(-range:range,0)), N+ngenvars - length(cfs_lfs[i])))
+            append!(cfs_lfs[i], rand(ZZ.(setdiff(-100:100,0)), N+ngenvars - length(cfs_lfs[i])))
         end
     end
     # Add missing linear forms if needed
-    append!(cfs_lfs, [rand(ZZ.(setdiff(-range:range,0)), N+ngenvars) for _ in 1:ngenvars-length(cfs_lfs)])
+    append!(cfs_lfs, [rand(ZZ.(setdiff(-100:100,0)), N+ngenvars) for _ in 1:ngenvars-length(cfs_lfs)])
     # Construct and append linear forms
     append!(Fnew, [transpose(cfs_lf) * all_vars for cfs_lf in cfs_lfs])
 
