@@ -51,7 +51,7 @@ end
         return false
     else
         m = monomial(sig)
-        return is_in_tree(m, basis.staircase_tree)
+        return is_in_diagram(m, basis.diagram)
     end
 end
 
@@ -78,13 +78,13 @@ function find_canonical_rewriter(basis::Basis,
                                  mod_ord::Symbol)
 
     if mod_ord == :DPOT
-        return find_canonical_rewriter_tree(basis, sig, sigmask)
+        return find_canonical_rewriter_diagram(basis, sig, sigmask)
     else
         return find_canonical_rewriter_rat(basis, sig, sigmask)
     end
 end
 
-function find_canonical_rewriter_tree(basis::Basis,
+function find_canonical_rewriter_diagram(basis::Basis,
                                       sig::Sig,
                                       sigmask::DivMask)
 

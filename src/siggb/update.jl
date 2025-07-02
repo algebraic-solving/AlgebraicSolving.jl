@@ -105,18 +105,18 @@ function add_basis_elem!(basis::Basis{N},
 
     basis.is_red[l] = false
 
-    tree_data = basis.rewrite_nodes[parent_ind+1]
+    diagram_data = basis.rewrite_nodes[parent_ind+1]
     insind = 3 
-    @inbounds for j in insind:insind+tree_data[1]
-        child_ind = tree_data[j]
+    @inbounds for j in insind:insind+diagram_data[1]
+        child_ind = diagram_data[j]
         rat = basis.sigratios[child_ind-1]
         if lt_drl(new_sig_ratio, rat)
             break
         end
         insind += 1
     end
-    insert!(tree_data, insind, l+1)
-    tree_data[1] += 1
+    insert!(diagram_data, insind, l+1)
+    diagram_data[1] += 1
 
     # if an existing sig further reduced we dont need the old element
     # if basis.sigs[parent_ind] == new_sig && parent_ind >= basis.basis_offset
