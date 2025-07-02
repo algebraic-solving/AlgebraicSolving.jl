@@ -19,7 +19,7 @@ include("normalform.jl")
 include("affine_cells.jl")
 include("interfaces.jl")
 include("helpers.jl")
-include("staircase_tree.jl")
+include("monomial_diagram.jl")
 
 
 #---------------- user functions --------------------#
@@ -210,7 +210,7 @@ function siggb!(basis::Basis{N},
                 for i in basis.basis_offset:basis.basis_load
                     if !basis.is_red[i] && index(basis.sigs[i]) == curr_ind
                         m = leading_monomial(basis, basis_ht, i)
-                        basis.staircase_tree = insertion(basis.staircase_tree, m, basis.hashstate)
+                        basis.diagram = insertion(basis.diagram, m, basis.hashstate)
                     end
                 end
             end

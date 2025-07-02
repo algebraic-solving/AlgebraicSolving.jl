@@ -61,25 +61,25 @@ const MaskSig = Tuple{SigIndex, DivMask}
 const Polynomial = Tuple{Vector{Coeff}, Vector{MonIdx}}
 const ModCache{N} = Dict{Tuple{Sig{N}, SigIndex}, Polynomial}
 
-# for staircase tree
+# For monomial diagram
 
-# Define a Tree structure to represent the staircase tree
-struct Tree
+# Define a monomial structure for representing monomial ideals
+struct Diagram
     id::Int
-    edges::Vector{Tuple{Exp, Tree}}
+    edges::Vector{Tuple{Exp, Diagram}}
 end
 
-# Define an Edge as a tuple of an exponent and a Tree
-const Edge = Tuple{Exp, Tree}
+# Define an Edge as a tuple of an exponent and a Diagram
+const Edge = Tuple{Exp, Diagram}
 
 # Define a mutable struct to hold the hash state
 mutable struct HashState
-    hashtable::Dict{Vector{Edge}, Tree}
+    hashtable::Dict{Vector{Edge}, Diagram}
     counter::Int
 end
 
-# Define a constant for an empty tree
-const nothing_tree = Tree(-1, Tuple{Int,Tree}[])
+# Define a constant for an empty diagram
+const empty_diagram = Diagram(-1, Tuple{Int,Diagram}[])
 
 mutable struct Basis{N}
     sigs::Vector{Sig{N}}
@@ -87,7 +87,7 @@ mutable struct Basis{N}
 
     sigratios::Vector{Monomial{N}}
 
-    # tree structure:
+    # monomial divisibility diagram:
     #   - length of data for i is rewrite_nodes[i][1]
     #   - parent of i is rewrite_nodes[i][2]
     #   - children of i are rewrite_nodes[i][3:end]
@@ -96,8 +96,8 @@ mutable struct Basis{N}
 
     lm_masks::Vector{DivMask}
 
-    # staircase tree
-    staircase_tree::Tree
+    # monomial divisibility diagram
+    diagram::Diagram
     hashstate::HashState
 
     monomials::Vector{Vector{MonIdx}}

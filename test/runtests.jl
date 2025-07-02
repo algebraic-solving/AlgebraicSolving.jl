@@ -4,7 +4,7 @@ using Test
 @testset verbose = true "AlgebraicSolving Tests" begin
 include("interfaces/nemo.jl")
 include("algorithms/groebner-bases.jl")
-include("algorithms/staircase_tree.jl")
+include("algorithms/monomial_diagram.jl")
 include("algorithms/normal-forms.jl")
 include("algorithms/solvers.jl")
 include("algorithms/dimension.jl")
