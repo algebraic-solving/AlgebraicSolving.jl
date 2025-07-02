@@ -251,3 +251,129 @@ function get_leaves(diagram::Diagram)
     end
     return leaves
 end
+
+
+function depth(diagram::Diagram)::Int
+    if isempty(diagram.edges)
+        return 0
+    end
+
+    return 1 + depth(diagram.edges[1][2])
+end
+
+
+
+function hilbert_series_mdd_aux(R, i::Int, diagram::Diagram)
+    t = gens(R)[1]
+
+    if i == 1
+        somme = R(0)
+        for j in 0:(diagram.edges[1][1]-1)
+            somme += t^j
+        end
+        return (R(1)-t) * somme
+    end
+
+    hilbert_series = R(1) - t^(diagram.edges[1][1])
+    for j in 1:length(diagram.edges)
+        if j == length(diagram.edges)
+            hilbert_series += t^(diagram.edges[j][1]) * hilbert_series_mdd_aux(R, i-1, diagram.edges[j][2])
+        else
+            hilbert_series += (t^(diagram.edges[j][1]) - t^(diagram.edges[j+1][1])) * hilbert_series_mdd_aux(R, i-1, diagram.edges[j][2])
+        end
+    end
+
+    return hilbert_series
+end
+
+
+
+@doc Markdown.doc"""
+    hilbert_series_mdd(diagram::Diagram)
+
+Compute the Hilbert series of a given monomial divisibility diagram.
+
+**Notes**:
+* This requires a monomial divisibility diagram of an ideal.
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
+
+# This represents the monomials [x*y, x*z, y*z].
+julia> list_of_monomials = [monomial(SVector{3}([0,1,1])), monomial(SVector{3}([1,0,1])), monomial(SVector{3}([1,1,0]))]
+
+julia> diagram = create_diagram(list_of_monomials)
+
+julia> hilbert_series_mdd(diagram)
+(-2*t - 1)//(t - 1)
+```
+"""
+function hilbert_series_mdd(diagram::Diagram)
+    n = depth(diagram)
+    R, t = polynomial_ring(ZZ, :t)
+    K = fraction_field(R)
+    return K(hilbert_series_mdd_aux(R, n, diagram)) / (K(1)-K(t))^n
+end
+
+
+
+function multi_hilbert_series_mdd_aux(R, i::Int, diagram::Diagram)
+    vars = gens(R)
+    if i == 1
+        somme = R(0)
+        for j in 0:(diagram.edges[1][1]-1)
+            somme += vars[1]^j
+        end
+        return (R(1)-vars[1]) * somme
+    end
+
+    hilbert_series = 1 - vars[i]^(diagram.edges[1][1])
+    for j in 1:length(diagram.edges)
+        if j == length(diagram.edges)
+            hilbert_series += vars[i]^(diagram.edges[j][1]) * multi_hilbert_series_mdd_aux(R, i-1, diagram.edges[j][2])
+        else
+            hilbert_series += (vars[i]^(diagram.edges[j][1]) - vars[i]^(diagram.edges[j+1][1])) * multi_hilbert_series_mdd_aux(R, i-1, diagram.edges[j][2])
+        end
+    end
+
+    return hilbert_series
+end
+
+
+
+@doc Markdown.doc"""
+    hilbert_series_mdd(diagram::Diagram)
+
+Compute the multivariate Hilbert series of a given monomial divisibility diagram.
+
+**Notes**:
+* This requires a monomial divisibility diagram of an ideal.
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
+
+# This represents the monomials [x*y, x*z, y*z].
+julia> list_of_monomials = [monomial(SVector{3}([0,1,1])), monomial(SVector{3}([1,0,1])), monomial(SVector{3}([1,1,0]))]
+
+julia> diagram = create_diagram(list_of_monomials)
+
+julia> multi_hilbert_series_mdd(diagram)
+(-2*x1*x2*x3 + x1*x2 + x1*x3 + x2*x3 - 1)//(x1*x2*x3 - x1*x2 - x1*x3 + x1 - x2*x3 + x2 + x3 - 1)
+```
+"""
+function multi_hilbert_series_mdd(diagram::Diagram)
+    n = depth(diagram)
+    R, vars = polynomial_ring(ZZ, ["x$i" for i in 1:n])
+    K = fraction_field(R)
+    prodn = K(1)
+    for x in vars
+        prodn *= K(R(1)-x)
+    end
+    return K(multi_hilbert_series_mdd_aux(R, n, diagram)) / prodn
+end

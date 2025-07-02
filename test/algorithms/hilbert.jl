@@ -1,12 +1,19 @@
 @testset "Algorithms -> Hilbert" begin
     R, (x,y) = polynomial_ring(QQ,["x","y"])
     I =  Ideal([x^2,x*y])
+    list_of_I = [AlgebraicSolving.monomial(SVector{2}([0,2])), AlgebraicSolving.monomial(SVector{2}([1,1]))]
+    hashstate = AlgebraicSolving.new_hashstate()
+    diagram = AlgebraicSolving.create_diagram(list_of_I, hashstate)
     A, t = polynomial_ring(ZZ, :t)
     B, s = polynomial_ring(QQ, :s)
     HS = (t^2 - t - 1)//(t - 1)
     HP = (s + 1, 2)
+    
+    P = AlgebraicSolving.hilbert_series_mdd(diagram)
+    R = parent(P)
 
     @test HS == hilbert_series(I)
+    @test R(HS) == P
     @test HP == hilbert_polynomial(I)
     @test isone(hilbert_dimension(I))
     @test isone(hilbert_degree(I))
