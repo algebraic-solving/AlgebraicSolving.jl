@@ -84,7 +84,7 @@ function rational_curve_parametrization(
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
     PARAM  = Vector{Vector{QQPolyRingElem}}(undef, DEG+2)
-    _values = Vector{QQFieldElem}(undef, DEG+2)
+    _values = Vector{ZZRingElem}(undef, DEG+2)
     i = 1
     free_ind = collect(1:DEG+2)
     used_ind = zeros(Bool, DEG+2)
@@ -96,7 +96,7 @@ function rational_curve_parametrization(
         # Evaluation of the generator at values x s.t. 0 <= |x|-i <= length(free_ind)/2
         # plus one point at -(length(free_ind)+1)/2 if the length if odd.
         # This reduces a bit the bitsize of the evaluation
-        curr_values = QQ.([-(i-1+(length(free_ind)+1)÷2):-i;i:(i-1+length(free_ind)÷2)])
+        curr_values = ZZ.([-(i-1+(length(free_ind)+1)÷2):-i;i:(i-1+length(free_ind)÷2)])
         LFeval = Ideal.(_evalvar(F, N-1, curr_values))
         # Compute parametrization of each evaluation
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
@@ -137,11 +137,11 @@ function rational_curve_parametrization(
         info_level>0 && print("Interpolate parametrizations: $count/$N\r")
         COEFFS = Vector{QQPolyRingElem}(undef, DEG+1)
         for deg in 0:DEG
-            _evals = [coeff(PARAM[i][count], deg) for i in 1:length(PARAM)]
-            # Remove denominators for faster interpolation
-            den = lcm(denominator.(_evals))
-            _evals *= den
-            COEFFS[deg+1] = interpolate(A, _values, _evals) / (lc*den)
+            _evals = [coeff(PARAM[i][count], deg) for i in eachindex(PARAM)]
+            # Remove denominators for faster interpolation with FLINT
+            den = foldl(lcm, denominator.(_evals))
+            scaled_evals = [ZZ(_evals[i] * den) for i in eachindex(_evals)]
+            COEFFS[deg+1] = interpolate(A, _values, scaled_evals) / (lc*den)
         end
         ctx = MPolyBuildCtx(T)
         for (i, c) in enumerate(COEFFS)
