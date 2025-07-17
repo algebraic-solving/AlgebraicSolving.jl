@@ -123,9 +123,8 @@ function groebner_basis(
         truncate_lifting::Int=0,
         info_level::Int=0
         )
-
     return get!(I.gb, eliminate) do
-        _core_groebner_basis(I, initial_hts = initial_hts, nr_thrds = nr_thrds, 
+        _core_groebner_basis(I, initial_hts = initial_hts, nr_thrds = nr_thrds,
                              max_nr_pairs = max_nr_pairs, la_option = la_option,
                              eliminate = eliminate, intersect = intersect,
                              complete_reduction = complete_reduction,
@@ -148,7 +147,6 @@ function _core_groebner_basis(
         truncate_lifting::Int=0,
         info_level::Int=0
         )
-
     F = I.gens
 
     if iszero(F)
