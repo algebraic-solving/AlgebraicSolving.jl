@@ -325,7 +325,7 @@ function rational_solutions(
     param_t = I.rat_param
 
     nvars = length(param_t.vars)
-    lpol = filter(l->degree(l) == 1, keys(factor(param_t.elim).fac))
+    lpol = filter(l->degree(l) == 1, first.(collect(factor(param_t.elim))))
     nb = length(lpol)
 
     rat_elim = [-coeff(l, 0)// coeff(l, 1) for l in lpol]
