@@ -54,7 +54,14 @@
     I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
     G = eliminate(I, 2)
     H = MPolyRingElem[
-        84*z^4 - 38
+        84*z^4+y-39
+    ]
+    @test G == H
+    R, (a,b,c,d,x,y,z,w) = polynomial_ring(QQ, ["a", "b", "c", "d", "x", "y", "z", "w"])
+    I = Ideal([x - a*c, y - a*c*d, z - a*c^2 - b, w - a*c^2*d - b*d]);
+    G = eliminate(I, 4)
+    H = MPolyRingElem[
+        -x*w + y*z
     ]
     @test G == H
 end
