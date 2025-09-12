@@ -1,8 +1,8 @@
 @doc Markdown.doc"""
     rational_curve_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
-Given an ideal `I` with solution set X being of dimension 1 over the complex numbers, return
-a rational curve parametrization of the one-dimensional irreducible components of X.
+Given a **radical** ideal `I` with solution set X being of dimension 1 over the complex numbers,
+return a rational curve parametrization of the one-dimensional irreducible components of X.
 
 In the output, the variables `x`,`y` of the parametrization correspond to the last two
 entries of the `vars` attribute, in that order.
@@ -76,10 +76,12 @@ function rational_curve_parametrization(
         while any(is_divisible_by.(val, Ref(lucky_prime)))
             val = rand(-bif_bound:bif_bound, 2)
         end
-        Fnew = vcat(F, val[1]*gens(R)[N-1] + val[2])
-        new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
-        @assert(dimension(INEW) == 0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
+        for ivar in [N-1, N]
+            Fnew = vcat(F, val[1]*gens(R)[ivar] + val[2])
+            new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+            local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
+            @assert(dimension(INEW) == 0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
+        end
     end end
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
@@ -91,7 +93,7 @@ function rational_curve_parametrization(
     lc = nothing
     while length(free_ind) > 0
         if i > 2*(DEG+2)
-            error("Too many bad specializations: permute variables or use_lfs=true")
+            error("Too many bad specializations. Check radicality, else permute variables or use_lfs=true")
         end
         # Evaluation of the generator at values x s.t. 0 <= |x|-i <= length(free_ind)/2
         # plus one point at -(length(free_ind)+1)/2 if the length if odd.

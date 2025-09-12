@@ -59,4 +59,11 @@
 
     I = Ideal([R(1)])
     @test rational_curve_parametrization(I).vars == Symbol[]
+
+    # Non-generic variables
+    A,(x,t,u) = polynomial_ring(QQ, [:x,:u,:t])
+    I = Ideal([t^2+u, u-x])
+	@test_throws AssertionError rational_curve_parametrization(I)
+    I = Ideal([u^2+t, t-x])
+    @test_throws AssertionError rational_curve_parametrization(I)
 end
