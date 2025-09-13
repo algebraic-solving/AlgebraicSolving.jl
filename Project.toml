@@ -1,6 +1,6 @@
 name = "AlgebraicSolving"
 uuid = "66b61cbe-0446-4d5d-9090-1ff510639f9d"
-authors = ["ederc <ederc@mathematik.uni-kl.de>", "Mohab Safey El Din <Mohab.Safey@lip6.fr", "Rafael Mohr <rafael.mohr@lip6.fr>"]
+authors = ["ederc <ederc@mathematik.uni-kl.de>", "Mohab Safey El Din <Mohab.Safey@lip6.fr", "Rafael Mohr <rafael.mohr@lip6.fr>", "Rémi Prebet" <remi.prebet@ens-lyon.fr>]
 version = "0.10.0"
 
 [deps]
