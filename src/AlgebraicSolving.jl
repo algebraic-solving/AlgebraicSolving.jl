@@ -14,6 +14,7 @@ include("algorithms/normal-forms.jl")
 include("algorithms/solvers.jl")
 include("algorithms/dimension.jl")
 include("algorithms/decomposition.jl")
+include("algorithms/param-curve.jl")
 include("algorithms/hilbert.jl")
 #= siggb =#
 include("siggb/siggb.jl")

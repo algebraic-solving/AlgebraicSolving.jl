@@ -53,5 +53,14 @@ The underlying engine is provided by msolve.
         info_level::Int=0,
         precision::Int=32
         )
+
+    rational_curve_parametrization(
+        I::Ideal{P} where P<:QQMPolyRingElem;
+        info_level::Int=0,
+        use_lfs::Bool = false,
+        cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[],
+        nr_thrds::Int=1,
+        check_gen::Bool = true
+    )
 ```
 
