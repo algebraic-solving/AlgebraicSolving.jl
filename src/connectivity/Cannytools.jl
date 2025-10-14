@@ -4,16 +4,16 @@ function computepolar(
         V::Ideal{P};            # input ideal
         phi::Vector{P} = P[],   # polynomial map in consideration (completed by sufficiently many projections)
         dimproj = j-1,          # maximum dimension of tangent space of phi
-        v=0,                    # verbosity level
         only_mins = false          # return only minors without eqns of V
     ) where (P <: MPolyRingElem)
-    V.dim == -1 && dimension(V)
+    isnothing(V.dim) && dimension(V)
     R = parent(V)
     n = nvars(R)
     c = n - V.dim
     nphi = length(phi)
 
-    JW = transpose([ derivative(f, k) for k=max(j+1-nphi,0):n, f in vcat(V.gens, phi[1:min(j,nphi)])])
+    psi = vcat(phi, V.gens[nphi+1:end])
+    JW = transpose([ derivative(f, k) for k=max(j+1-nphi,0):n, f in psi])
     sizeminors = c + min(nphi,j) + min(dimproj,j-1) - (j-1)
     minors = compute_minors(sizeminors, JW, R)
 
@@ -23,6 +23,7 @@ function computepolar(
         return vcat(V.gens, minors)
     end
 end
+
 
 function compute_minors(p, A, R)
     #Computes the p-minors of a matrix A
