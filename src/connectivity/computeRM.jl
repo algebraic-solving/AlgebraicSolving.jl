@@ -4,7 +4,7 @@
 #using AlgebraicSolving
 #using Nemo
 
-export roadmap, computepolar, MidRationalPoints, fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis
+export roadmap, computepolar, MidRationalPoints, fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis, computepolarL
 include("Cannytools.jl")
 
 @doc Markdown.doc"""
@@ -89,19 +89,19 @@ function roadmap(
     ## sing(Fq) ##
     if checks
         info_level>0 && println("Check real quasi-smoothness")
-        singFq = computepolar(e, I) |> Ideal
+        singFq = computepolar(1:e, I) |> Ideal
         @assert(isempty(real_solutions(fbr(singFq, q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads())),
                 "Non-empty real sing locus!")
     end
 
     ## K(pi_1,Fq) ##
     info_level>0 && println("I-critical points")
-    K1Fq = computepolar(e+1, I) |> Ideal
+    K1Fq = computepolar(1:e+1, I) |> Ideal
     K1Fq = real_solutions(fbr(K1Fq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
     ## K(pi_2, Fq) ##
     info_level>0 && println("Polar variety")
-    K2Fqmins = computepolar(e+2, I, only_mins=true)
+    K2Fqmins = computepolar(1:e+2, I, only_mins=true)
     K2Fq = vcat(I.gens, K2Fqmins) |> Ideal
     if checks
         @assert(fbr(K2Fq, q) |> dimension == 1, "Non-generic polar variety")
@@ -112,7 +112,7 @@ function roadmap(
 
     ## Points with vertical tg in K(pi_2, Fq) ##
     info_level>0 && println("W-critical points with vertical tangent")
-    K1WmFq = computepolar(e+2, K2Fq, dimproj=e) |> Ideal
+    K1WmFq = computepolar(1:e+2, K2Fq, dimproj=e) |> Ideal
     K1WmFq = real_solutions(fbr(K1WmFq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
     ## New base and query points ##

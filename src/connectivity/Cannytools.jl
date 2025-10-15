@@ -1,20 +1,32 @@
-# Compute the set of points x where phi_j(T_x(V)) has dimension < dimproj
+# Compute the set of points x where, if psi in the map whose elts are the ones in [phi_1,..,phi_p, x_{p+1},...x_n] indexed in J,
+# then psi(T_x(V)) has dimension < dimproj
 function computepolar(
-        j::Int,                 # j-th first coordinate images of phi
-        V::Ideal{P};            # input ideal
-        phi::Vector{P} = P[],   # polynomial map in consideration (completed by sufficiently many projections)
-        dimproj = j-1,          # maximum dimension of tangent space of phi
-        only_mins = false          # return only minors without eqns of V
+        J::Union{Vector{Int},UnitRange{Int}},   # coordinate images of [phi,proj] (as above)
+        V::Ideal{P};                            # input ideal
+        phi::Vector{P} = P[],                   # polynomial map in consideration (completed by sufficiently many projections)
+        dimproj = length(J)-1,                  # maximum dimension of tangent space of phi
+        only_mins = false                       # return only minors without eqns of V
     ) where (P <: MPolyRingElem)
-    isnothing(V.dim) && dimension(V)
+
     R = parent(V)
     n = nvars(R)
-    c = n - V.dim
     nphi = length(phi)
+    @assert all([1<=j<=n for j in J])
 
-    psi = vcat(phi, V.gens[nphi+1:end])
-    JW = transpose([ derivative(f, k) for k=max(j+1-nphi,0):n, f in psi])
-    sizeminors = c + min(nphi,j) + min(dimproj,j-1) - (j-1)
+    isnothing(V.dim) && dimension(V)
+    c = n - V.dim
+
+    ## Is it correct AND useful?
+    sort!(J)
+    ##
+    Jphi = [ j for j in J if j <= nphi ]
+    Jproj = setdiff(J, Jphi)
+
+    # Construct the truncated Jacobian matrix
+    psi = vcat(V.gens, phi[Jphi])
+    JW = transpose([ derivative(f, k) for k in setdiff(1:n, Jproj), f in psi])
+    # Compute the minors
+    sizeminors = c + length(Jphi) + min(dimproj, length(J)-1) - (length(J)-1)
     minors = compute_minors(sizeminors, JW, R)
 
     if only_mins
@@ -23,7 +35,6 @@ function computepolar(
         return vcat(V.gens, minors)
     end
 end
-
 
 function compute_minors(p, A, R)
     #Computes the p-minors of a matrix A
