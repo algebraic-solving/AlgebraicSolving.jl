@@ -5,7 +5,7 @@
 #using Nemo
 
 export roadmap, computepolar, _mid_rational_points, _fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis, computepolarL, detmpoly
-include("Cannytools.jl")
+include("polar.jl")
 
 @doc Markdown.doc"""
     roadmap(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
@@ -20,7 +20,6 @@ Moreover it is linked to fibers, that share the same base point.
 
 # Arguments
 - `I::Ideal{T} where T <: QQMPolyRingElem`: input generators.
-- `q::Vector{QQFieldElem}=QQFieldElem[]`: single base point with rational coefficients
 - `C::Vector{Vector{QQFieldElem}}=Vector{QQFieldElem}[]`: query points with rational coefficients
 - `info_level::Int=0`: verbosity level
 - `checks::Bool=false`: whether perform checks (dimension, regularity, etc.)
@@ -57,11 +56,31 @@ julia> all_eqs(RM)
 ```
 """
 function roadmap(
-    I::Ideal{T} where T <: QQMPolyRingElem;                 # input ideal
-    q::Vector{QQFieldElem}=QQFieldElem[],                   # single base point with rational coefficients
+    I::Ideal{P};                                            # input ideal
     C::Vector{Vector{QQFieldElem}}=Vector{QQFieldElem}[],   # query points with rational coefficients
-    info_level::Int=0,                                               # verbosity level
+    info_level::Int=0,                                      # verbosity level
     checks::Bool=false                                      # perform checks (dimension, regularity, etc.)
+) where (P <: QQMPolyRingElem)
+    return _roadmap_rec(I, QQFieldElem[], C, info_level, checks)
+end
+
+function roadmap(
+    I::Ideal{P},                # input ideal
+    C::Ideal{P};                # ideal defining query points
+    info_level::Int=0,          # verbosity level
+    checks::Bool=false          # perform checks (dimension, regularity, etc.)
+) where (P <: QQMPolyRingElem)
+    @assert(parent(I)==parent(C), "Equations for variety and query points must live the same ring")
+    CI = real_solutions(C, info_level=max(info_level-1,0), nr_thrds=Threads.nthreads())
+    return _roadmap_rec(I, QFieldElem[], CI, info_level, checks)
+end
+
+function _roadmap_rec(
+    I::Ideal{T} where T <: QQMPolyRingElem,     # input ideal
+    q::Vector{QQFieldElem},                     # single base point with rational coefficients
+    C::Vector{Vector{QQFieldElem}},             # query points with rational coefficients
+    info_level::Int,                            # verbosity level
+    checks::Bool                                # perform checks (dimension, regularity, etc.)
 )
     # Some base cases
     if nvars(parent(I))<=2
@@ -136,7 +155,7 @@ function roadmap(
     # Recursively compute roadmap of possible fibers
     if !isempty(newQ)
         for newq in newQ
-            RMFq = roadmap(I, q=newq, C=Cq)
+            RMFq = _roadmap_rec(I, newq, Cq, info_level, checks)
             push!(RM.children, RMFq)
         end
     end
@@ -147,18 +166,6 @@ function roadmap(
         return RM
     end
 end
-
-function roadmap(
-    I::Ideal{P},                # input ideal
-    C::Ideal{P};                # ideal defining query points
-    info_level::Int=0,                   # verbosity level
-    checks::Bool=false          # perform checks (dimension, regularity, etc.)
-) where (P <: QQMPolyRingElem)
-    @assert(parent(I)==parent(C), "Equations for variety and query points must live the same ring")
-    CQ = real_solutions(C, info_level=max(info_level-1,0), nr_thrds=Threads.nthreads())
-    return roadmap(I, C=CQ, info_level=info_level, checks=checks)
-end
-
 
 function _fbr(I::Ideal{P} where P <: QQMPolyRingElem, Q::Vector{QQFieldElem})
     @assert(!isempty(I.gens), "Empty polynomial vector")
@@ -220,36 +227,3 @@ function _mid_rational_points(S::Vector{Vector{T}}, Q::Vector{T} = T[]) where {T
 end
 
 
-# Generate N primes > start that do not divide any numerator/denominator
-# of any coefficient in polynomials from LP
-function _generate_lucky_primes(
-    LF::Vector{P} where P<:MPolyRingElem,
-    low::ZZRingElem,
-    up::ZZRingElem,
-    N::Int64
-    )
-    # Avoid repetitive enumeration and redundant divisibility check
-    CF = ZZRingElem[]
-    for f in LF, c in coefficients(f), part in (numerator(c), denominator(c))
-        if !isone(part)
-            push!(CF, part)
-        end
-    end
-    sort!(CF, rev=true)
-    unique!(CF)
-
-    # Test primes
-    Lprim = ZZRingElem[]
-    while length(Lprim) < N
-        cur_prim = next_prime(rand(low:up))
-        is_lucky = !(cur_prim in Lprim)
-        i = firstindex(CF)
-        # Exploit decreasing order of CF
-        while is_lucky && i <= lastindex(CF) && CF[i] > cur_prim
-            is_lucky = !is_divisible_by(CF[i], cur_prim)
-            i += 1
-        end
-        is_lucky && push!(Lprim, cur_prim)
-    end
-    return Lprim
-end

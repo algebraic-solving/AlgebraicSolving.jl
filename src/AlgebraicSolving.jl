@@ -19,7 +19,7 @@ include("algorithms/hilbert.jl")
 #= siggb =#
 include("siggb/siggb.jl")
 #= connectivity =#
-include("connectivity/computeRM.jl")
+include("connectivity/roadmap.jl")
 #= examples =#
 include("examples/katsura.jl")
 include("examples/cyclic.jl")
