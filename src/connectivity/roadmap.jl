@@ -4,7 +4,7 @@
 #using AlgebraicSolving
 #using Nemo
 
-export roadmap, computepolar, _mid_rational_points, _fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis, computepolarL, detmpoly
+export roadmap, computepolar, _mid_rational_points, _mid_rational_points_inter, _fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis, computepolarL, detmpoly
 include("polar.jl")
 
 @doc Markdown.doc"""
@@ -224,6 +224,68 @@ function _mid_rational_points(S::Vector{Vector{T}}, Q::Vector{T} = T[]) where {T
     end
 
     return ratioP
+end
+
+function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} = Vector{T}[]) where {T <: QQFieldElem}
+    # * S is a list of [ [l_1,r_1], ..., [l_n, r_n] ]
+    # such that the [l_i, r_i] are rational and disjoint open intervals.
+    # * Same assumptions on Q
+    # * Intervals in S and Q do not intersect as well
+    #
+    # It orders the [l_i,r_i], and compute a list ratioP such that
+    # strictly between each of these intervals there is:
+    # - either at least one element inside an interval of Q
+    # - or the simplest rational number
+    # TODO:
+    isempty(S) && return Q
+
+    S1, Q1 = sort(S, lt=(x, y) -> x[2] <= y[1]), sort(Q, lt=(x, y) -> x[2] <= y[1])
+    ratioP = T[]
+    qidx = 1
+    qlen = length(Q1)
+
+    # Handle left gap before first interval
+    while qidx <= qlen && Q1[qidx][2] < S1[1][1]
+        ql, qr = Q1[qidx]
+        push!(ratioP, _open_simplest_between(ql, qr, abs(qr - ql)//1000))
+        qidx += 1
+    end
+
+    # Loop through gaps between sorted disjoint intervals
+    for i in 1:(length(S1) - 1)
+        ri, li1 = S1[i][2], S1[i+1][1]
+        @assert ri < li1 "Intervals are not disjoint."
+        inserted = false
+        while qidx <= qlen && Q1[qidx][2] < li1
+            ql, qr = Q1[qidx]
+            @assert(ql > ri, "A query point might be singular")
+            push!(ratioP, _open_simplest_between(ql, qr, abs(qr - ql)//1000))
+            inserted = true
+            qidx += 1
+        end
+        @assert qidx > qlen || Q1[qidx][1] > S1[i+1][2] "A query point might be singular"
+        # If there's already rational betwee no need to add new
+        !inserted && push!(ratioP, _open_simplest_between(ri, li1, abs(li1 - ri)//1000))
+    end
+
+    # Append remaining right-side Q points
+    while qidx <= qlen
+        ql, qr = Q1[qidx]
+        push!(ratioP, _open_simplest_between(ql, qr, abs(qr - ql)//1000))
+        qidx += 1
+    end
+
+    return ratioP
+end
+
+
+function _open_simplest_between(a::QQFieldElem, b::QQFieldElem, eps::QQFieldElem)
+    # We choose the simplest in absolute value
+    if -a > b # this means a is negative and the largest in absolute value
+        return -simplest_between(-a - eps, -b + eps)
+    else
+        return  simplest_between( a + eps,  b - eps)
+    end
 end
 
 
