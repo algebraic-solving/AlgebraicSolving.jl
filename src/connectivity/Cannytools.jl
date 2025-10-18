@@ -82,7 +82,7 @@ function computepolar(
 
     # Construct the truncated Jacobian matrix
     psi = vcat(V.gens, phi[Jphi])
-    JW = transpose([ derivative(f, k) for k in setdiff(1:n, Jproj), f in psi])
+    JW = matrix(R, QQMPolyRingElem[ derivative(f, k) for f in psi, k in setdiff(1:n, Jproj)])
     # Compute the minors
     sizeminors = c + length(Jphi) + min(dimproj, length(J)-1) - (length(J)-1)
     minors = compute_minors(sizeminors, JW, R)
@@ -101,9 +101,24 @@ function compute_minors(p, A, R)
     colsmins = collect(combinations(1:m, p))
     mins = Vector{eltype(A)}(undef, length(rowsmins) * length(colsmins))
     k = 1
+    # for performance tweaks, check if there are non-linear polynomials or if all are linear or constant
+    degmax = 0
+    for a in A
+        degmax = min(2, max(degmax, total_degree(a)))
+        if degmax > 1
+            break
+        end
+    end
+    # TODO: use algos from FLINT (in particular berkowitz)
+    # Naive function performs better for high degree or small matrices
+    if (degmax == 0 && p <= 2) || (degmax == 1 && p <= 6) || (degmax == 2)
+        detfct = s->detmpoly(s, R)
+    else # else use fraction-free LU from AbstractAlgebra.jl
+        detfct = det
+    end
     for rowsmin in rowsmins
         for colsmin in colsmins
-            mins[k] = detmpoly(A[rowsmin, colsmin], R)
+            mins[k] = detfct(A[rowsmin, colsmin])
             k += 1
         end
     end
@@ -129,7 +144,7 @@ function combinations(a, n)
     return _combinations(a, n, 1, Vector{Int}([]))
 end
 
-function detmpoly(A::Matrix{T} where T<:MPolyRingElem, R)
+function detmpoly(A, R)
     # Get the size of the matrix
     n = size(A, 1)
     if n != size(A, 2)
@@ -138,6 +153,10 @@ function detmpoly(A::Matrix{T} where T<:MPolyRingElem, R)
 
     if n == 1
         return A[1, 1]
+    end
+
+    if n == 2
+        return A[1, 1] * A[2, 2] - A[1,2] * A[2, 1]
     end
 
     # Initialize the determinant polynomial

@@ -4,7 +4,7 @@
 #using AlgebraicSolving
 #using Nemo
 
-export roadmap, computepolar, MidRationalPoints, fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis, computepolarL
+export roadmap, computepolar, MidRationalPoints, fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis, computepolarL, detmpoly
 include("Cannytools.jl")
 
 @doc Markdown.doc"""
@@ -67,15 +67,23 @@ function roadmap(
     if nvars(parent(I))<=2
         return [I.gens]
     end
-    # Some preprocessing
-    isnothing(I.dim) && dimension(I)
-    # Base points
+
+    # Some preprocessng
+    if isnothing(I.dim)
+        lucky_prime = _generate_lucky_primes(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+        local INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
+        dimension(INEW)
+        I.dim = INEW.dim
+    end
     e = length(q)
 
     ## Fq ##
     # Genericity assumption (can be checked)
     if checks
-        @assert(dimension(fbr(I,q)) == I.dim - e, "Non-generic coordinates")
+        local Fnew = fbr(I,q).gens
+        new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
+        @assert(dimension(INEW) == I.dim - e, "Non-generic coordinates")
     end
 
     # Terminal case (dim <=1)
@@ -85,30 +93,34 @@ function roadmap(
 
     ## sing(Fq) ##
     if checks
-        info_level>0 && println("Check real quasi-smoothness")
-        singFq = computepolar(1:e, I) |> Ideal
-        @assert(isempty(real_solutions(fbr(singFq, q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads())),
-                "Non-empty real sing locus!")
+        info_level>0 && println("Check smoothness")
+        local FNEW = fbr(computepolar(1:e, I)|> Ideal, q).gens
+        new_lucky_prime = _generate_lucky_primes(FNEW, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), FNEW))
+        @assert(dimension(INEW) == -1, "Non-empty sing locus!")
     end
 
     ## K(pi_1,Fq) ##
-    info_level>0 && println("I-critical points")
+    info_level>0 && println("Compute x1-critical points: K1")
     K1Fq = computepolar(1:e+1, I) |> Ideal
     K1Fq = real_solutions(fbr(K1Fq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
     ## K(pi_2, Fq) ##
-    info_level>0 && println("Polar variety")
+    info_level>0 && println("Compute (x1,x2)-polar variety: W")
     K2Fqmins = computepolar(1:e+2, I, only_mins=true)
     K2Fq = vcat(I.gens, K2Fqmins) |> Ideal
     if checks
-        @assert(fbr(K2Fq, q) |> dimension == 1, "Non-generic polar variety")
+        local FNEW = fbr(K2Fq, q).gens
+        new_lucky_prime = _generate_lucky_primes(FNEW, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), FNEW))
+        @assert(dimension(INEW) == 1, "Non-generic polar variety")
     else
         K2Fq.dim = e + 1
     end
     RM = RMnode(K2Fqmins, q, RMnode[])
 
     ## Points with vertical tg in K(pi_2, Fq) ##
-    info_level>0 && println("W-critical points with vertical tangent")
+    info_level>0 && println("Compute W-critical points with vertical tangent: K1W")
     K1WmFq = computepolar(1:e+2, K2Fq, dimproj=e) |> Ideal
     K1WmFq = real_solutions(fbr(K1WmFq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
@@ -148,26 +160,43 @@ function roadmap(
 end
 
 
-function fbr(F::Vector{P} where P <: QQMPolyRingElem, Q::Vector{QQFieldElem})
-    @assert(!isempty(F), "Empty polynomial vector")
-    vars = gens(parent(first(F)))
-    return Ideal(vcat(F, [vars[i] - Q[i] for i in 1:min(length(vars),length(Q))]))
-end
-
 function fbr(I::Ideal{P} where P <: QQMPolyRingElem, Q::Vector{QQFieldElem})
-    return fbr(I.gens, Q)
+    @assert(!isempty(I.gens), "Empty polynomial vector")
+    vars = gens(parent(first(I.gens)))
+    return Ideal(vcat(I.gens, [vars[i] - Q[i] for i in 1:min(length(vars),length(Q))]))
 end
 
-#=
-## Test ##
-R,(x1,x2,x3,x4) = polynomial_ring(QQ, ["x1","x2","x3","x4"])
-#h = x1^2+x2^2+x3^2+x4^2-1
-h = (x1^2+x2^2+x3^2+x4^2+9-1)^2-4*9*(x1^2+x2^2+x3^2)
-h = evaluate(h,[x1,x2,x3],[x1+rand(-10:10)*x2+rand(-10:10)*x3+rand(-10:10)*x4,x2+rand(-10:10)*x3+rand(-10:10)*x4,x3+rand(-10:10)*x4])
-I = Ideal([h])
 
-carte = (computeRM(I, 3, [Vector{QQFieldElem}(undef,0)]))
-#println(carte)
-=#
+# Generate N primes > start that do not divide any numerator/denominator
+# of any coefficient in polynomials from LP
+function _generate_lucky_primes(
+    LF::Vector{P} where P<:MPolyRingElem,
+    low::ZZRingElem,
+    up::ZZRingElem,
+    N::Int64
+    )
+    # Avoid repetitive enumeration and redundant divisibility check
+    CF = ZZRingElem[]
+    for f in LF, c in coefficients(f), part in (numerator(c), denominator(c))
+        if !isone(part)
+            push!(CF, part)
+        end
+    end
+    sort!(CF, rev=true)
+    unique!(CF)
 
-
+    # Test primes
+    Lprim = ZZRingElem[]
+    while length(Lprim) < N
+        cur_prim = next_prime(rand(low:up))
+        is_lucky = !(cur_prim in Lprim)
+        i = firstindex(CF)
+        # Exploit decreasing order of CF
+        while is_lucky && i <= lastindex(CF) && CF[i] > cur_prim
+            is_lucky = !is_divisible_by(CF[i], cur_prim)
+            i += 1
+        end
+        is_lucky && push!(Lprim, cur_prim)
+    end
+    return Lprim
+end
