@@ -85,7 +85,7 @@ function computepolar(
     JW = matrix(R, QQMPolyRingElem[ derivative(f, k) for f in psi, k in setdiff(1:n, Jproj)])
     # Compute the minors
     sizeminors = c + length(Jphi) + min(dimproj, length(J)-1) - (length(J)-1)
-    minors = compute_minors(sizeminors, JW, R)
+    minors = _compute_minors(sizeminors, JW, R)
 
     if only_mins
         return minors
@@ -94,11 +94,11 @@ function computepolar(
     end
 end
 
-function compute_minors(p, A, R)
+function _compute_minors(p, A, R)
     #Computes the p-minors of a matrix A
     n, m = size(A)
-    rowsmins = collect(combinations(1:n, p))
-    colsmins = collect(combinations(1:m, p))
+    rowsmins = collect(_combinations(1:n, p, 1, Vector{Int}([])))
+    colsmins = collect(_combinations(1:m, p, 1, Vector{Int}([])))
     mins = Vector{eltype(A)}(undef, length(rowsmins) * length(colsmins))
     k = 1
     # for performance tweaks, check if there are non-linear polynomials or if all are linear or constant
@@ -126,22 +126,18 @@ function compute_minors(p, A, R)
     return mins
 end
 
-function combinations(a, n)
-    # Helper function to recursively generate combinations
-    function _combinations(a, n, start, chosen)
-        if length(chosen) == n
-            return [chosen]
-        elseif start > length(a)
-            return Vector{Int}([])
-        else
-            # Include the current element and recurse
-            include_current = _combinations(a, n, start + 1, [chosen; a[start]])
-            # Exclude the current element and recurse
-            exclude_current = _combinations(a, n, start + 1, chosen)
-            return vcat(include_current, exclude_current)
-        end
+function _combinations(a, n, start, chosen)
+    if length(chosen) == n
+        return [chosen]
+    elseif start > length(a)
+        return Vector{Int}([])
+    else
+        # Include the current element and recurse
+        include_current = _combinations(a, n, start + 1, [chosen; a[start]])
+        # Exclude the current element and recurse
+        exclude_current = _combinations(a, n, start + 1, chosen)
+        return vcat(include_current, exclude_current)
     end
-    return _combinations(a, n, 1, Vector{Int}([]))
 end
 
 function detmpoly(A, R)

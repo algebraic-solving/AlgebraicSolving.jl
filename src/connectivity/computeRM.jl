@@ -4,7 +4,7 @@
 #using AlgebraicSolving
 #using Nemo
 
-export roadmap, computepolar, MidRationalPoints, fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis, computepolarL, detmpoly
+export roadmap, computepolar, _mid_rational_points, _fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis, computepolarL, detmpoly
 include("Cannytools.jl")
 
 @doc Markdown.doc"""
@@ -80,7 +80,7 @@ function roadmap(
     ## Fq ##
     # Genericity assumption (can be checked)
     if checks
-        local Fnew = fbr(I,q).gens
+        local Fnew = _fbr(I,q).gens
         new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
         local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
         @assert(dimension(INEW) == I.dim - e, "Non-generic coordinates")
@@ -94,7 +94,7 @@ function roadmap(
     ## sing(Fq) ##
     if checks
         info_level>0 && println("Check smoothness")
-        local FNEW = fbr(computepolar(1:e, I)|> Ideal, q).gens
+        local FNEW = _fbr(computepolar(1:e, I)|> Ideal, q).gens
         new_lucky_prime = _generate_lucky_primes(FNEW, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
         local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), FNEW))
         @assert(dimension(INEW) == -1, "Non-empty sing locus!")
@@ -103,14 +103,14 @@ function roadmap(
     ## K(pi_1,Fq) ##
     info_level>0 && println("Compute x1-critical points: K1")
     K1Fq = computepolar(1:e+1, I) |> Ideal
-    K1Fq = real_solutions(fbr(K1Fq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
+    K1Fq = real_solutions(_fbr(K1Fq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
     ## K(pi_2, Fq) ##
     info_level>0 && println("Compute (x1,x2)-polar variety: W")
     K2Fqmins = computepolar(1:e+2, I, only_mins=true)
     K2Fq = vcat(I.gens, K2Fqmins) |> Ideal
     if checks
-        local FNEW = fbr(K2Fq, q).gens
+        local FNEW = _fbr(K2Fq, q).gens
         new_lucky_prime = _generate_lucky_primes(FNEW, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
         local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), FNEW))
         @assert(dimension(INEW) == 1, "Non-generic polar variety")
@@ -122,7 +122,7 @@ function roadmap(
     ## Points with vertical tg in K(pi_2, Fq) ##
     info_level>0 && println("Compute W-critical points with vertical tangent: K1W")
     K1WmFq = computepolar(1:e+2, K2Fq, dimproj=e) |> Ideal
-    K1WmFq = real_solutions(fbr(K1WmFq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
+    K1WmFq = real_solutions(_fbr(K1WmFq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
     ## New base and query points ##
     Cq = isempty(q) ? C : [ c for c in C if c[e] == q[e]]
@@ -130,7 +130,7 @@ function roadmap(
     # Heuristic to be proven (Reeb's th)
     #K1W = K1W[2:end-1]
     ##########
-    K1WRat = MidRationalPoints(getindex.(K1W,e+1), unique(getindex.(Cq, e+1)))
+    K1WRat = _mid_rational_points(getindex.(K1W,e+1), unique(getindex.(Cq, e+1)))
     newQ = vcat.(Ref(q), K1WRat)
 
     # Recursively compute roadmap of possible fibers
@@ -160,10 +160,63 @@ function roadmap(
 end
 
 
-function fbr(I::Ideal{P} where P <: QQMPolyRingElem, Q::Vector{QQFieldElem})
+function _fbr(I::Ideal{P} where P <: QQMPolyRingElem, Q::Vector{QQFieldElem})
     @assert(!isempty(I.gens), "Empty polynomial vector")
     vars = gens(parent(first(I.gens)))
     return Ideal(vcat(I.gens, [vars[i] - Q[i] for i in 1:min(length(vars),length(Q))]))
+end
+
+function _mid_rational_points(S::Vector{Vector{T}}, Q::Vector{T} = T[]) where {T <: QQFieldElem}
+    # * S is a list of [ [l_1,r_1], ..., [l_n, r_n] ]
+    # such that the [l_i, r_i] are rational and disjoint open intervals.
+    # * Q is a list of rationals that intersects no [l_i,r_i]
+    #
+    # It orders the [l_i,r_i], and compute a list ratioP such that
+    # strictly between each of these intervals there is:
+    # - either at least one element of Q
+    # - or the simplest rational number
+    isempty(S) && return Q
+
+    S1, Q1 = sort(S, lt=(x, y) -> x[2] <= y[1]), sort(Q)
+    ratioP = T[]
+    qidx = 1
+    qlen = length(Q1)
+
+    # Handle left gap before first interval
+    while qidx <= qlen && Q1[qidx] < S1[1][1]
+        push!(ratioP, Q1[qidx])
+        qidx += 1
+    end
+
+    # Loop through gaps between sorted disjoint intervals
+    for i in 1:(length(S1) - 1)
+        ri, li1 = S1[i][2], S1[i+1][1]
+        @assert ri < li1 "Intervals are not disjoint."
+        inserted = false
+        while qidx <= qlen && Q1[qidx] < li1
+            @assert(Q1[qidx] > ri, "A query point is singular")
+            push!(ratioP, Q1[qidx])
+            inserted = true
+            qidx += 1
+        end
+        if !inserted
+            eps = (li1 - ri)//1000 # for open interval
+            # We choose the simplest in absolute value
+            if -ri > li1 # this means ri is negative and the largest in absolute value
+                push!(ratioP, -simplest_between(-ri - eps, -li1 + eps))
+            else
+                push!(ratioP, simplest_between(ri + eps, li1 - eps))
+            end
+        end
+    end
+
+    # Append remaining right-side Q points
+    while qidx <= qlen
+        push!(ratioP, Q1[qidx])
+        qidx += 1
+    end
+
+    return ratioP
 end
 
 
