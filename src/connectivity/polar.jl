@@ -112,7 +112,7 @@ function _compute_minors(p, A, R)
     # TODO: use algos from FLINT (in particular berkowitz)
     # Naive function performs better for high degree or small matrices
     if (degmax == 0 && p <= 2) || (degmax == 1 && p <= 6) || (degmax == 2)
-        detfct = s->detmpoly(s, R)
+        detfct = s->_detmpoly(s, R)
     else # else use fraction-free LU from AbstractAlgebra.jl
         detfct = det
     end
@@ -140,7 +140,7 @@ function _combinations(a, n, start, chosen)
     end
 end
 
-function detmpoly(A, R)
+function _detmpoly(A, R)
     # Get the size of the matrix
     n = size(A, 1)
     if n != size(A, 2)
@@ -161,62 +161,11 @@ function detmpoly(A, R)
     # Compute the determinant polynomial
     for j = 1:n
         submatrix = A[2:end, [i for i = 1:n if i != j]]
-        detA += (-1)^(1+j)*A[1, j] * detmpoly(submatrix, R)
+        detA += (-1)^(1+j)*A[1, j] * _detmpoly(submatrix, R)
     end
 
     return detA
 end
 
-function MidRationalPoints(S::Vector{Vector{T}}, Q::Vector{T} = T[]) where {T <: QQFieldElem}
-    # * S is a list of [ [l_1,r_1], ..., [l_n, r_n] ]
-    # such that the [l_i, r_i] are rational and disjoint open intervals.
-    # * Q is a list of rationals that intersects no [l_i,r_i]
-    #
-    # It orders the [l_i,r_i], and compute a list ratioP such that
-    # strictly between each of these intervals there is:
-    # - either at least one element of Q
-    # - or the simplest rational number
-    isempty(S) && return Q
 
-    S1, Q1 = sort(S, lt=(x, y) -> x[2] <= y[1]), sort(Q)
-    ratioP = T[]
-    qidx = 1
-    qlen = length(Q1)
-
-    # Handle left gap before first interval
-    while qidx <= qlen && Q1[qidx] < S1[1][1]
-        push!(ratioP, Q1[qidx])
-        qidx += 1
-    end
-
-    # Loop through gaps between sorted disjoint intervals
-    for i in 1:(length(S1) - 1)
-        ri, li1 = S1[i][2], S1[i+1][1]
-        @assert ri < li1 "Intervals are not disjoint."
-        inserted = false
-        while qidx <= qlen && Q1[qidx] < li1
-            @assert(Q1[qidx] > ri, "A query point is singular")
-            push!(ratioP, Q1[qidx])
-            inserted = true
-            qidx += 1
-        end
-        if !inserted
-            eps = (li1 - ri)//1000 # for open interval
-            # We choose the simplest in absolute value
-            if -ri > li1 # this means ri is negative and the largest in absolute value
-                push!(ratioP, -simplest_between(-ri - eps, -li1 + eps))
-            else
-                push!(ratioP, simplest_between(ri + eps, li1 - eps))
-            end
-        end
-    end
-
-    # Append remaining right-side Q points
-    while qidx <= qlen
-        push!(ratioP, Q1[qidx])
-        qidx += 1
-    end
-
-    return ratioP
-end
 
