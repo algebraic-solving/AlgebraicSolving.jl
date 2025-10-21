@@ -74,8 +74,6 @@ function computepolar(
     isnothing(V.dim) && dimension(V)
     c = n - V.dim
 
-    ## Is it correct AND useful?
-    sort!(J)
     ##
     Jphi = [ j for j in J if j <= nphi ]
     Jproj = setdiff(J, Jphi)
@@ -85,7 +83,7 @@ function computepolar(
     JW = matrix(R, QQMPolyRingElem[ derivative(f, k) for f in psi, k in setdiff(1:n, Jproj)])
     # Compute the minors
     sizeminors = c + length(Jphi) + min(dimproj, length(J)-1) - (length(J)-1)
-    minors = _compute_minors(sizeminors, JW, R)
+    minors = _compute_minors(sizeminors, JW)
 
     if only_mins
         return minors
@@ -94,78 +92,27 @@ function computepolar(
     end
 end
 
-function _compute_minors(p, A, R)
-    #Computes the p-minors of a matrix A
-    n, m = size(A)
-    rowsmins = collect(_combinations(1:n, p, 1, Vector{Int}([])))
-    colsmins = collect(_combinations(1:m, p, 1, Vector{Int}([])))
-    mins = Vector{eltype(A)}(undef, length(rowsmins) * length(colsmins))
-    k = 1
-    # for performance tweaks, check if there are non-linear polynomials or if all are linear or constant
-    degmax = 0
-    for a in A
-        degmax = min(2, max(degmax, total_degree(a)))
-        if degmax > 1
-            break
-        end
-    end
-    # TODO: use algos from FLINT (in particular berkowitz)
-    # Naive function performs better for high degree or small matrices
-    if (degmax == 0 && p <= 2) || (degmax == 1 && p <= 6) || (degmax == 2)
-        detfct = s->_detmpoly(s, R)
-    else # else use fraction-free LU from AbstractAlgebra.jl
-        detfct = det
-    end
-    for rowsmin in rowsmins
-        for colsmin in colsmins
-            mins[k] = detfct(A[rowsmin, colsmin])
-            k += 1
-        end
-    end
-
-    return mins
+function _compute_minors(p, A)
+    # Computes the p-minors of a matrix A
+    rowsmins = _combinations(1:nrows(A), p)
+    colsmins = _combinations(1:ncols(A), p)
+    # We use charpoly for a division-free determinant method
+    return [ coeff(charpoly(A[rows, cols]), 0) for rows in rowsmins for cols in colsmins ]
 end
 
-function _combinations(a, n, start, chosen)
-    if length(chosen) == n
-        return [chosen]
-    elseif start > length(a)
-        return Vector{Int}([])
-    else
-        # Include the current element and recurse
-        include_current = _combinations(a, n, start + 1, [chosen; a[start]])
-        # Exclude the current element and recurse
-        exclude_current = _combinations(a, n, start + 1, chosen)
-        return vcat(include_current, exclude_current)
-    end
+function _combinations(v::UnitRange{Int}, k::Int) 
+    # Compute the k-subsets of v
+    n = length(v)
+    ans = Vector{Int}[]
+    k > n && return ans
+    _combinations_dfs!(ans, Vector{Int}(undef, k), v, n, k)
+    return ans
 end
 
-function _detmpoly(A, R)
-    # Get the size of the matrix
-    n = size(A, 1)
-    if n != size(A, 2)
-        throw(ArgumentError("Matrix must be square"))
+function _combinations_dfs!(ans::Vector{Vector{Int}}, comb::Vector{Int}, v::UnitRange{Int}, n::Int, k::Int)
+    k < 1 && (pushfirst!(ans, comb[:]); return)
+    for m in n:-1:k
+        comb[k] = v[m]
+        _combinations_dfs!(ans, comb, v, m - 1, k - 1)
     end
-
-    if n == 1
-        return A[1, 1]
-    end
-
-    if n == 2
-        return A[1, 1] * A[2, 2] - A[1,2] * A[2, 1]
-    end
-
-    # Initialize the determinant polynomial
-    detA = zero(R)
-
-    # Compute the determinant polynomial
-    for j = 1:n
-        submatrix = A[2:end, [i for i = 1:n if i != j]]
-        detA += (-1)^(1+j)*A[1, j] * _detmpoly(submatrix, R)
-    end
-
-    return detA
 end
-
-
-

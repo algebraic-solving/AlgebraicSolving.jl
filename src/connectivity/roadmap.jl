@@ -4,7 +4,7 @@
 #using AlgebraicSolving
 #using Nemo
 
-export roadmap, computepolar, _mid_rational_points, _mid_rational_points_inter, _fbr, all_eqs, all_base_pts, nb_nodes, compute_minors, compute_minors_bis, computepolarL, detmpoly
+export roadmap, computepolar, _mid_rational_points, _mid_rational_points_inter, _fbr, all_eqs, all_base_pts, nb_nodes, computepolar
 include("polar.jl")
 
 @doc Markdown.doc"""
