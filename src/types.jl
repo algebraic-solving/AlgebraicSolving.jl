@@ -97,8 +97,14 @@ function _collect_roadmap(RMn::RMnode, F)
     return data
 end
 
+function _fbr(I::Ideal{P} where P <: QQMPolyRingElem, Q::Vector{QQFieldElem})
+    @assert(!isempty(I.gens), "Empty polynomial vector")
+    vars = gens(parent(first(I.gens)))
+    return Ideal(vcat(I.gens, [vars[i] - Q[i] for i in 1:min(length(vars),length(Q))]))
+end
+
 function all_eqs(RM::Roadmap)
-    func(s) = fbr(vcat(RM.initial_ideal.gens, s.polar_eqs), s.base_pt)
+    func(s) = _fbr(vcat(RM.initial_ideal.gens, s.polar_eqs) |> Ideal, s.base_pt)
     return _collect_roadmap(RM.root, func)
 end
 

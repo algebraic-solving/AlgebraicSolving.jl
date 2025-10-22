@@ -1,11 +1,5 @@
 @doc Markdown.doc"""
-    computepolar(
-        J::Union{Vector{Int},UnitRange{Int}},
-        V::Ideal{P};
-        phi::Vector{P}=P[],
-        dimproj::Int=length(J)-1,
-        only_mins::Bool=false
-    ) where {P <: MPolyRingElem}
+    computepolar(J::Union{Vector{Int},UnitRange{Int}}, V::Ideal{P} where P <: MPolyRingElem; <keyword arguments>)
 
 Compute the **polar variety** associated with the map whose components are
 `[phi_1, …, phi_p, x_{p+1}, …, x_n]` indexed by `J`, for an algebraic variety defined
@@ -46,16 +40,16 @@ julia> using AlgebraicSolving
 julia> R,(x1,x2,x3,x4) = polynomial_ring(QQ, ["x1","x2","x3","x4"])
 (Multivariate polynomial ring in 4 variables over QQ, QQMPolyRingElem[x1, x2, x3, x4])
 
-julia> I = Ideal([(x1^2+x2^2+x3^2+x4^2+9-1)^2-4*9*(x1^2+x2^2+x3^2)])
-QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64]
+julia> I = Ideal([(x1^2+x2^2+x3^2+x4^2+9-1)^2-4*9*(x1^2+x2^2+x3^2) + 1])
+QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65]
 
 julia> computepolar(1:3, I, dimproj=1, phi=[x1^2+x2^2+x3^2+x4^2])
 5-element Vector{QQMPolyRingElem}:
- x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64
- 4*x1^3 + 4*x1*x2^2 + 4*x1*x3^2 + 4*x1*x4^2 - 40*x1
- 4*x1^2*x4 + 4*x2^2*x4 + 4*x3^2*x4 + 4*x4^3 + 32*x4
- 2*x1
- 2*x4
+ x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65
+ -4*x1^3 - 4*x1*x2^2 - 4*x1*x3^2 - 4*x1*x4^2 + 40*x1
+ -4*x1^2*x4 - 4*x2^2*x4 - 4*x3^2*x4 - 4*x4^3 - 32*x4
+ -2*x1
+ -2*x4
 ```
 """
 function computepolar(
@@ -100,7 +94,7 @@ function _compute_minors(p, A)
     return [ coeff(charpoly(A[rows, cols]), 0) for rows in rowsmins for cols in colsmins ]
 end
 
-function _combinations(v::UnitRange{Int}, k::Int) 
+function _combinations(v::UnitRange{Int}, k::Int)
     # Compute the k-subsets of v
     n = length(v)
     ans = Vector{Int}[]

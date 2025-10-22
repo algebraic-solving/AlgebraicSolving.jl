@@ -31,39 +31,43 @@ Moreover it is linked to fibers, that share the same base point.
 julia> using AlgebraicSolving
 
 julia> R,(x1,x2,x3,x4) = polynomial_ring(QQ, ["x1","x2","x3","x4"])
-(Multivariate polynomial ring in 3 variables over QQ, QQMPolyRingElem[x1, x2, x3, x4])
+(Multivariate polynomial ring in 4 variables over QQ, QQMPolyRingElem[x1, x2, x3, x4])
 
-julia> I = Ideal([x1^2+x2^2+x3^2+x4^2+9-1)^2-4*9*(x1^2+x2^2+x3^2)])
-QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64]
+julia> I = Ideal([(x1^2+x2^2+x3^2+x4^2+9-1)^2-4*9*(x1^2+x2^2+x3^2) + 1])
+QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65]
 
-julia> RM = roadmap(I)
-Vector{QQFieldElem}[[], [-3], [-3, -2], [-1], [-1, -2], [-1, -1], [-1, 2], [3], [3, 2]]
+julia> RM = roadmap(I, checks=true)
+Vector{QQFieldElem}[[], [-3], [-3, -2], [-2], [-2, -1], [-2, 0], [-2, 1], [3], [3, 2]]
 
 julia> nb_nodes(RM)
 9
 
 julia> all_eqs(RM)
 9-element Vector{Ideal{QQMPolyRingElem}}:
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64, 4*x1^2*x3 + 4*x2^2*x3 + 4*x3^3 + 4*x3*x4^2 - 40*x3, 4*x1^2*x4 + 4*x2^2*x4 + 4*x3^2*x4 + 4*x4^3 + 32*x4]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64, 4*x1^2*x4 + 4*x2^2*x4 + 4*x3^2*x4 + 4*x4^3 + 32*x4, x1 + 3]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64, x1 + 3, x2 + 2]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64, 4*x1^2*x4 + 4*x2^2*x4 + 4*x3^2*x4 + 4*x4^3 + 32*x4, x1 + 1]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64, x1 + 1, x2 + 2]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64, x1 + 1, x2 + 1]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64, x1 + 1, x2 - 2]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64, 4*x1^2*x4 + 4*x2^2*x4 + 4*x3^2*x4 + 4*x4^3 + 32*x4, x1 - 3]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 64, x1 - 3, x2 - 2]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^2*x3 - 4*x2^2*x3 - 4*x3^3 - 4*x3*x4^2 + 40*x3, -4*x1^2*x4 - 4*x2^2*x4 - 4*x3^2*x4 - 4*x4^3 - 32*x4]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^2*x4 - 4*x2^2*x4 - 4*x3^2*x4 - 4*x4^3 - 32*x4, x1 + 3]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 + 3, x2 + 2]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^2*x4 - 4*x2^2*x4 - 4*x3^2*x4 - 4*x4^3 - 32*x4, x1 + 2]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 + 2, x2 + 1]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 + 2, x2]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 + 2, x2 - 1]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^2*x4 - 4*x2^2*x4 - 4*x3^2*x4 - 4*x4^3 - 32*x4, x1 - 3]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 - 3, x2 - 2]
 ```
 """
 function roadmap(
-    I::Ideal{P};                                            # input ideal
-    C::Vector{Vector{QQFieldElem}}=Vector{QQFieldElem}[],   # query points with rational coefficients
-    info_level::Int=0,                                      # verbosity level
-    checks::Bool=false                                      # perform checks (dimension, regularity, etc.)
+    I::Ideal{P};                                                            # input ideal
+    C::Vector{Vector{Vector{QQFieldElem}}}=Vector{Vector{QQFieldElem}}[],   # query points: interval with rational coefficients
+    info_level::Int=0,                                                      # verbosity level
+    checks::Bool=false                                                      # perform checks (dimension, regularity, etc.)
 ) where (P <: QQMPolyRingElem)
     return _roadmap_rec(I, QQFieldElem[], C, info_level, checks)
 end
 
+@doc Markdown.doc"""
+    roadmap(I::Ideal{T} where T <: MPolyRingElem, I::Ideal{P}, C::Ideal{P}; info_level::Int=0, checks::Bool=false)
+```
+"""
 function roadmap(
     I::Ideal{P},                # input ideal
     C::Ideal{P};                # ideal defining query points
@@ -78,7 +82,7 @@ end
 function _roadmap_rec(
     I::Ideal{T} where T <: QQMPolyRingElem,     # input ideal
     q::Vector{QQFieldElem},                     # single base point with rational coefficients
-    C::Vector{Vector{QQFieldElem}},             # query points with rational coefficients
+    C::Vector{Vector{Vector{QQFieldElem}}},             # query points with rational coefficients
     info_level::Int,                            # verbosity level
     checks::Bool                                # perform checks (dimension, regularity, etc.)
 )
@@ -144,12 +148,12 @@ function _roadmap_rec(
     K1WmFq = real_solutions(_fbr(K1WmFq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
     ## New base and query points ##
-    Cq = isempty(q) ? C : [ c for c in C if c[e] == q[e]]
+    Cq = isempty(q) ? C : [ c for c in C if q[e] in c[e]]
     K1W = vcat(K1Fq, K1WmFq)
     # Heuristic to be proven (Reeb's th)
     #K1W = K1W[2:end-1]
     ##########
-    K1WRat = _mid_rational_points(getindex.(K1W,e+1), unique(getindex.(Cq, e+1)))
+    K1WRat = _mid_rational_points_inter(getindex.(K1W,e+1), unique(getindex.(Cq, e+1)))
     newQ = vcat.(Ref(q), K1WRat)
 
     # Recursively compute roadmap of possible fibers
@@ -167,72 +171,14 @@ function _roadmap_rec(
     end
 end
 
-function _fbr(I::Ideal{P} where P <: QQMPolyRingElem, Q::Vector{QQFieldElem})
-    @assert(!isempty(I.gens), "Empty polynomial vector")
-    vars = gens(parent(first(I.gens)))
-    return Ideal(vcat(I.gens, [vars[i] - Q[i] for i in 1:min(length(vars),length(Q))]))
-end
-
-function _mid_rational_points(S::Vector{Vector{T}}, Q::Vector{T} = T[]) where {T <: QQFieldElem}
-    # * S is a list of [ [l_1,r_1], ..., [l_n, r_n] ]
-    # such that the [l_i, r_i] are rational and disjoint open intervals.
-    # * Q is a list of rationals that intersects no [l_i,r_i]
-    #
-    # It orders the [l_i,r_i], and compute a list ratioP such that
-    # strictly between each of these intervals there is:
-    # - either at least one element of Q
-    # - or the simplest rational number
-    isempty(S) && return Q
-
-    S1, Q1 = sort(S, lt=(x, y) -> x[2] <= y[1]), sort(Q)
-    ratioP = T[]
-    qidx = 1
-    qlen = length(Q1)
-
-    # Handle left gap before first interval
-    while qidx <= qlen && Q1[qidx] < S1[1][1]
-        push!(ratioP, Q1[qidx])
-        qidx += 1
-    end
-
-    # Loop through gaps between sorted disjoint intervals
-    for i in 1:(length(S1) - 1)
-        ri, li1 = S1[i][2], S1[i+1][1]
-        @assert ri < li1 "Intervals are not disjoint."
-        inserted = false
-        while qidx <= qlen && Q1[qidx] < li1
-            @assert(Q1[qidx] > ri, "A query point is singular")
-            push!(ratioP, Q1[qidx])
-            inserted = true
-            qidx += 1
-        end
-        if !inserted
-            eps = (li1 - ri)//1000 # for open interval
-            # We choose the simplest in absolute value
-            if -ri > li1 # this means ri is negative and the largest in absolute value
-                push!(ratioP, -simplest_between(-ri - eps, -li1 + eps))
-            else
-                push!(ratioP, simplest_between(ri + eps, li1 - eps))
-            end
-        end
-    end
-
-    # Append remaining right-side Q points
-    while qidx <= qlen
-        push!(ratioP, Q1[qidx])
-        qidx += 1
-    end
-
-    return ratioP
-end
-
 function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} = Vector{T}[]) where {T <: QQFieldElem}
     # * S is a list of [ [l_1,r_1], ..., [l_n, r_n] ]
     # such that the [l_i, r_i] are rational and disjoint open intervals.
     # * Same assumptions on Q
     # * Intervals in S and Q do not intersect as well
     #
-    # It orders the [l_i,r_i], and compute a list ratioP such that
+    # It orders the [l_i,r_i], and compute a list ratioP
+    # intersecting all intervals of Q and such that
     # strictly between each of these intervals there is:
     # - either at least one element inside an interval of Q
     # - or the simplest rational number
