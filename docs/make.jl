@@ -1,5 +1,3 @@
-using Pkg
-Pkg.activate("../../AlgebraicSolving.jl")
 using AlgebraicSolving
 using Documenter
 
