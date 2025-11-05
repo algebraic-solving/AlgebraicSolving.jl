@@ -79,8 +79,8 @@ Base.getindex(I::Ideal, idx::Union{Int, UnitRange}) = I.gens[idx]
 Base.lastindex(I::Ideal) = lastindex(I.gens)
 
 mutable struct RMnode
-    polar_eqs::Vector{QQMPolyRingElem}
     base_pt::Vector{QQFieldElem}
+    polar_eqs::Vector{QQMPolyRingElem}
     children::Vector{RMnode}
 end
 

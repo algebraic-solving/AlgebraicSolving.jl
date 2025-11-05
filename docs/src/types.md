@@ -54,13 +54,19 @@ computational algebra more effective. Assume that `T <: MPolyRingElem`, then
   * `gens::Vector{T}`: generators of the Ideal provded by the user;
   * `deg::Int`: degree of the ideal (`Nothing` if unknown);
   * `dim::Int`: Krull dimension of the Ideal (`Nothing` if unknown);
-  * `gb::Dict{Int, Vector{T}}`: Gröbner bases of the Ideal where the key correspond to the number of variables eliminated (starting with the first);
-  * `inter_sols::Vector{Vector{Vector{QQFieldElem}}}`: intervals with rational endpoints, containing the real solutions of the system (if `dim=0`);
+  * `gb::Dict{Int, Vector{T}}`: Gröbner bases of the Ideal where the key
+    correspond to the number of variables eliminated (starting with the first);
+  * `inter_sols::Vector{Vector{Vector{QQFieldElem}}}`: intervals with rational
+    endpoints, containing the real solutions of the system (if `dim=0`);
   * `real_sols::Vector{Vector{QQFieldElem}}`: midpoints of the above intervals;
-  * `rat_sols::Vector{Vector{QQFieldElem}}`: rational solutions of the system (if `dim=0`).
-  * `rat_param::Union{RationalParametrization, RationalCurveParametrization}`: rational parametrization encoding the complex solution set of the Ideal (see below).
-## Rational Parametrizations
+  * `rat_sols::Vector{Vector{QQFieldElem}}`: rational solutions of the system
+    (if `dim=0`).
+  * `rat_param::Union{RationalParametrization, RationalCurveParametrization}`:
+    rational parametrization encoding the complex solution set of the Ideal (see
+    below).
 
+
+## Rational Parametrizations
 Rational Parametrizations are special data structure for representing equidimensionnal
 algebraic sets of dimension 0 and 1. They are typical outputs of algorithm for solving
 polynomial systems encoding such algebraic sets thanks to their nice behaviour with
@@ -123,21 +129,39 @@ $$
 According to this definition, the roots of $w$ are exactly the
 values taken by $l$ on this set.
 
-The type `RationalCurveParametrization` therefore caches the following attributes:
-  * `vars::Vector{Symbol}`: variables used for the parametrization the last two ones playing the role of the above $(t,s)$
-  (hence, maybe with up to two more variable than the ones given as input);;
-  * `cfs_lfs::Vector{Vector{ZZRingElem}}`: coefficients on the linear form $l$ (when variables are added);
+The type `RationalCurveParametrization` therefore caches the following
+attributes:
+  * `vars::Vector{Symbol}`: variables used for the parametrization the last two
+  ones playing the role of the above $(t,s)$ (hence, maybe with up to two more
+  variable than the ones given as input);;
+  * `cfs_lfs::Vector{Vector{ZZRingElem}}`: coefficients on the linear form $l$
+    (when variables are added);
   * `elim::QQMPolyRingElem`: elimination polynomial $w$ ;
   * `denom::QQMPolyRingElem`: denominator polynomial (usually $w'$);
   * `param::Vector{QQMPolyRingElem}`: numerators $\rho_i$'s.
 
-See the documentation of the [rational_curve_parametrization](@ref) function for further details.
+See the documentation of the [rational_curve_parametrization](@ref) function for
+further details.
 
 ## Roadmaps
 
-Roadmaps are algebraic curves capturing the connectivity properties of an algebraic
-set containing it. They are computed as union of several curves, organized in a tree
-due to the recursive nature of the roadmap algorithms.
+Consider an algebraic set $V\subset \mathbb{C}^n$ and a finite set of query
+points $\mathcal{P} \subset V$, both defined by polynomials with coefficients in
+$\mathbb{Q}$. A *roadmap* $\mathcal{R}$ associated to $(V,\mathcal{P})$ is an
+algebraic curve such that
+  * $\mathcal{P} \subset \mathcal{R} \subset V$;
+  * $C \cap \mathcal{R}$ is non-empty and connected, for each connected
+    component $C$ of $V\cap \mathbb{R}^n$.
+
+Roadmaps are algebraic curves capturing the connectivity properties of an
+algebraic set containing it so that points in $\mathcal{P}$ are equivalently
+connected both on $\mathcal{R}$ and $V\cap \mathbb{R}^n$.
+
+The effective construction of roadmaps relies on connectivity statements which
+allow one to construct real algebraic subsets of $V\cap \mathbb{R}^n$, of
+smaller dimension, having a connected intersection with the connected components
+of $V\cap \mathbb{R}^n$ Therefore, the output is union of several curves,
+organized in a tree due to the recursive nature of the roadmap algorithms.
 
 ```julia
 mutable struct Roadmap
@@ -146,24 +170,33 @@ mutable struct Roadmap
 end
 ```
 
-Hence, it is composed of a main node, containing the equations of the initial algebraic set and a reference to the root node of the tree.
+Hence, it is composed of a main node, containing the equations of the initial
+algebraic set $V$ and a reference to the root node of the tree.
 
 ```julia
 mutable struct RMnode
-    polar_eqs::Vector{QQMPolyRingElem}
     base_pt::Vector{QQFieldElem}
+    polar_eqs::Vector{QQMPolyRingElem}
     children::Vector{RMnode}
 end
 ```
 
-Each roadmap node (including the root) correspond to a curve component of the roadmap. These are defined in fibers of the initial variety, and are arranged w.r.t. to the specialized variables they share. In particular, all child nodes (referenced in `children`) of a node will have the same specialized variable, plus a new distinct one.
+Each roadmap node (including the root) correspond to a curve component of the
+roadmap. More precisely, they are defined by as an algebraic subset $W$ (called
+polar variety) of a fiber $F$ of the initial variety $V$ such that:
+  * if `base_pt` contains $\mathbf{q}=(q_1,\dotsc,q_e) \in \mathbb{Q}^e$ then $$
+  F = V \cap \left\{x_1=q_1,\,\dotsc,\, x_e=q_e\right\}; $$
+  * if `polar_eqs` contains the polynomials $g_1,\dotsc,g_s \in
+  \mathbb{Q}[x_1,\dotsc,x_n]$ then $$ W = F \cap \{g_1=0,\, \ldots,\, g_s = 0\}.
+    $$
 
-Each of these components is defined as the polar variety (whose equations are in `polar_eqs`) over a fiber of the initial algebraic set, which are defined by specializing the first variables to the `base_pt` of its parents, and of itsef (in this order).
+Moreover, `children` rassembles all the tree nodes that contains curves
+component for which their attribute `base_pt` contains a point $\mathbf{q}'$
+that shares the same first $e$ coordinates with $\mathbf{q}$.
+
+The reason of this tree arrangement is mainly because of the following property:
+*two roadmap components intersects if, and only if, one's node is a descendant
+of the other's*. In many cases, one can even replace "descendant" by "parent".
 
 
 See the documentation of the [roadmap](@ref) function for further details.
-
-
-```
-TODO : un dessin ? les fonctions all_eqs, all_base_pts et nb_nodes (utiliser la doc du code?)
-```
