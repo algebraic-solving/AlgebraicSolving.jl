@@ -34,7 +34,7 @@ jobs:
           - ubuntu-latest
         include:
           # Add a few macOS jobs (not too many, the number we can run in parallel is limited)
-          - julia-version: '1.6'
+          - julia-version: '1.10'
             julia-arch: x64
             os: macOS-latest
           - julia-version: 'nightly'
