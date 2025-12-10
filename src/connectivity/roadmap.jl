@@ -82,7 +82,7 @@ end
 function _roadmap_rec(
     I::Ideal{T} where T <: QQMPolyRingElem,     # input ideal
     q::Vector{QQFieldElem},                     # single base point with rational coefficients
-    C::Vector{Vector{Vector{QQFieldElem}}},             # query points with rational coefficients
+    C::Vector{Vector{Vector{QQFieldElem}}},     # query points with rational coefficients
     info_level::Int,                            # verbosity level
     checks::Bool                                # perform checks (dimension, regularity, etc.)
 )
@@ -111,7 +111,7 @@ function _roadmap_rec(
 
     # Terminal case (dim <=1)
     if I.dim - e <= 1
-        return RMnode([], q, RMnode[])
+        return RMnode(q, [], RMnode[])
     end
 
     ## sing(Fq) ##
@@ -140,7 +140,7 @@ function _roadmap_rec(
     else
         K2Fq.dim = e + 1
     end
-    RM = RMnode(K2Fqmins, q, RMnode[])
+    RM = RMnode(q, K2Fqmins, RMnode[])
 
     ## Points with vertical tg in K(pi_2, Fq) ##
     info_level>0 && println("Compute W-critical points with vertical tangent: K1W")
