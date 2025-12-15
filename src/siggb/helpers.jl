@@ -10,7 +10,8 @@ function new_basis(basis_size, syz_size,
     sigratios = Vector{Monomial{N}}(undef, basis_size)
     rewrite_nodes = Vector{Vector{Int}}(undef, basis_size+1)
     lm_masks = Vector{DivMask}(undef, basis_size)
-    diagram = empty_diagram
+    koszul_diagram = empty_diagram
+    lm_diagram = empty_diagram
     hashstate = new_hashstate()
     monomials = Vector{Vector{MonIdx}}(undef, basis_size)
     coeffs = Vector{Vector{Coeff}}(undef, basis_size)
@@ -20,7 +21,7 @@ function new_basis(basis_size, syz_size,
     syz_sigs = Vector{Monomial{N}}(undef, syz_size)
     syz_masks = Vector{MaskSig}(undef, syz_size)
     basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
-                  lm_masks, diagram, hashstate,
+                  lm_masks, lm_diagram, koszul_diagram, hashstate,
                   monomials, coeffs, is_red,
                   mod_rep_known, mod_reps,
                   syz_sigs, syz_masks, Exp[],

@@ -51,7 +51,7 @@ end
         return false
     else
         m = monomial(sig)
-        return is_in_diagram(m, basis.diagram)
+        return is_in_diagram(m, basis.koszul_diagram)
     end
 end
 
