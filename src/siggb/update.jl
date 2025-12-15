@@ -80,6 +80,8 @@ function add_basis_elem!(basis::Basis{N},
     # add to basis hashtable
     insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
     lm = basis_ht.exponents[first(row)]
+    # add to lm diagram
+    basis.lm_diagram = insertion(basis.lm_diagram, lm, basis.hashstate)
     @debug "new lm $(lm)"
     lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
     s = new_sig

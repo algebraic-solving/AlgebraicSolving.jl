@@ -97,7 +97,8 @@ mutable struct Basis{N}
     lm_masks::Vector{DivMask}
 
     # monomial divisibility diagram
-    diagram::Diagram
+    lm_diagram::Diagram
+    koszul_diagram::Diagram
     hashstate::HashState
 
     monomials::Vector{Vector{MonIdx}}

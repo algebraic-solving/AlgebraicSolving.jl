@@ -231,6 +231,11 @@ function symbolic_pp!(basis::Basis{N},
 
         exp = symbol_ht.exponents[i]
         divm = symbol_ht.hashdata[i].divmask
+
+        if !is_in_diagram(exp, basis.lm_diagram)
+            i += one(MonIdx)
+            continue
+        end
         
         j = basis.basis_offset 
         @label target
