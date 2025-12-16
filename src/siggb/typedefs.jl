@@ -75,7 +75,9 @@ const Edge = Tuple{Exp, Diagram}
 # Define a mutable struct to hold the hash state
 mutable struct HashState
     hashtable::Dict{Vector{Edge}, Diagram}
-    counter::Int
+    counter::Int64
+    numberofinsertion::Int64
+    numberofmembershiptests::Int64
 end
 
 # Define a constant for an empty diagram
@@ -235,4 +237,6 @@ mutable struct Timings
     arit_ops::Int64
     module_time::Float32
     comp_lc_time::Float32
+    time_for_mdd::Float32
+    time_for_membership::Float32
 end

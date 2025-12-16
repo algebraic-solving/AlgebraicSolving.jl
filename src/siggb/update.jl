@@ -1,7 +1,8 @@
 # updating the pairset and basis
 
 # add new reduced rows to basis/syzygies
-function update_siggb!(basis::Basis,
+function update_siggb!(timer::Timings,
+                       basis::Basis,
                        matrix::MacaulayMatrix,
                        pairset::Pairset{N},
                        symbol_ht::MonomialHashtable,
@@ -45,7 +46,7 @@ function update_siggb!(basis::Basis,
             added_unit = add_basis_elem!(basis, pairset, basis_ht, symbol_ht,
                                          row, coeffs,
                                          new_sig, new_sig_mask, parent_ind,
-                                         tr, ind_order, tags, mod_ord)
+                                         tr, ind_order, tags, mod_ord, timer)
         end
     end
 
@@ -71,7 +72,8 @@ function add_basis_elem!(basis::Basis{N},
                          tr::Tracer,
                          ind_order::IndOrder,
                          tags::Tags,
-                         mod_ord::Symbol) where N
+                         mod_ord::Symbol,
+                         timer::Timings) where N
 
 
     # make sure we have enough space
@@ -80,8 +82,10 @@ function add_basis_elem!(basis::Basis{N},
     # add to basis hashtable
     insert_in_basis_hash_table_pivots!(row, basis_ht, symbol_ht)
     lm = basis_ht.exponents[first(row)]
-    # add to lm diagram
-    basis.lm_diagram = insertion(basis.lm_diagram, lm, basis.hashstate)
+    # add to lm diagramn
+    timeinsertion = @elapsed begin basis.lm_diagram = insertion(basis.lm_diagram, lm, basis.hashstate) end
+    timer.time_for_mdd += timeinsertion
+    basis.hashstate.numberofinsertion += 1
     @debug "new lm $(lm)"
     lm_mask = divmask(lm, basis_ht.divmap, basis_ht.ndivbits)
     s = new_sig
@@ -132,7 +136,7 @@ function add_basis_elem!(basis::Basis{N},
     store_basis_elem!(tr, new_sig, l, basis.basis_size)
     
     # build new pairs
-    update_pairset!(pairset, basis, basis_ht, l, ind_order, tags, mod_ord)
+    update_pairset!(timer, pairset, basis, basis_ht, l, ind_order, tags, mod_ord)
 
     return false
 end
@@ -252,7 +256,8 @@ end
 # construct all pairs with basis element at new_basis_idx
 # and perform corresponding rewrite checks
 # assumes DPOT
-function update_pairset!(pairset::Pairset{N},
+function update_pairset!(timer::Timings,
+                         pairset::Pairset{N},
                          basis::Basis,
                          basis_ht::MonomialHashtable,
                          new_basis_idx::Int,
@@ -338,10 +343,10 @@ function update_pairset!(pairset::Pairset{N},
                         mod_ord == :DPOT || cmp_ind(new_sig_idx, basis_sig_idx, ind_order)) && continue
         rewriteable_koszul(basis, basis_ht, new_pair_sig,
                            new_pair_sig_mask, ind_order, tags, mod_ord,
-                           mod_ord == :DPOT || cmp_ind(basis_sig_idx, new_sig_idx, ind_order)) && continue
+                           mod_ord == :DPOT || cmp_ind(basis_sig_idx, new_sig_idx, ind_order), timer) && continue
         rewriteable_koszul(basis, basis_ht, basis_pair_sig,
                            basis_pair_sig_mask, ind_order, tags, mod_ord,
-                           mod_ord == :DPOT || cmp_ind(new_sig_idx, basis_sig_idx, ind_order)) && continue
+                           mod_ord == :DPOT || cmp_ind(new_sig_idx, basis_sig_idx, ind_order), timer) && continue
 
         top_sig, top_sig_mask, top_index,
         bot_sig, bot_sig_mask, bot_index = begin

@@ -21,7 +21,7 @@ end
 
 # Define a function to create a new hash state
 function new_hashstate()
-    return HashState(Dict{Vector{Edge}, Diagram}(), 0)
+    return HashState(Dict{Vector{Edge}, Diagram}(), 0, 0, 0)
 end
 
 function troncate!(children::Vector{Edge}, i::Int)

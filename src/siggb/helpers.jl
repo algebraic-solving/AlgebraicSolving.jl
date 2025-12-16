@@ -377,7 +377,7 @@ function sort_pairset!(pairset::Pairset, from::Int, sz::Int,
 end
 
 function new_timer()
-    return Timings(0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0)
+    return Timings(0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0)
 end
 
 function Base.show(io::IO, timer::Timings)
@@ -386,6 +386,8 @@ function Base.show(io::IO, timer::Timings)
     @printf io "linear algebra:      %.2f\n" timer.lin_alg_time
     @printf io "select:              %.2f\n" timer.select_time
     @printf io "update:              %.2f\n" timer.update_time
+    @printf io "mdd creation:        %.2f\n" timer.time_for_mdd
+    @printf io "membership tests:    %.2f\n" timer.time_for_membership
     !iszero(timer.module_time) && @printf io "module construction: %.2f\n" timer.module_time
     !iszero(timer.comp_lc_time) && @printf io "splitting:           %.2f\n" timer.comp_lc_time
 end
