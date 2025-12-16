@@ -26,7 +26,8 @@ end
                                     ind_order::IndOrder,
                                     tags::Tags,
                                     mod_ord::Symbol,
-                                    check::Bool)
+                                    check::Bool,
+                                    timer::Timings)
 
 
     if !check
@@ -51,7 +52,10 @@ end
         return false
     else
         m = monomial(sig)
-        return is_in_diagram(m, basis.koszul_diagram)
+        basis.hashstate.numberofmembershiptests += 1
+        tmt = @elapsed begin is_in = is_in_diagram(m, basis.koszul_diagram) end
+        timer.time_for_membership += tmt
+        return is_in
     end
 end
 
@@ -137,12 +141,13 @@ function rewriteable(basis::Basis,
                      ind_order::IndOrder,
                      tags::Tags,
                      check::Bool,
-                     mod_ord::Symbol)
+                     mod_ord::Symbol,
+                     timer::Timings)
 
     s_ind = index(sig)
 
     rewriteable_syz(basis, sig, sigmask, tags, check) && return true
     rewriteable_basis(basis, idx, sig, sigmask, tags, check, mod_ord) && return true
-    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags, mod_ord, check) && return true
+    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags, mod_ord, check, timer) && return true
     return false
 end
