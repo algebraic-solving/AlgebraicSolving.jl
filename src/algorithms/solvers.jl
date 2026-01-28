@@ -295,8 +295,8 @@ QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2, 2*x1*x2 + 2*x
 
 julia> rat_sols = rational_solutions(I)
 2-element Vector{Vector{QQFieldElem}}:
- [1, 0, 0]
  [1//3, 0, 1//3]
+ [1, 0, 0]
 
 julia> map(r->map(p->evaluate(p, r), I.gens), rat_sols)
 2-element Vector{Vector{QQFieldElem}}:
