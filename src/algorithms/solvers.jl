@@ -325,6 +325,9 @@ function rational_solutions(
                  precision = precision)
     param_t = I.rat_param
 
+    # ge(t variable permutation
+    R = parent(first(I.gens))
+    perm = indexin(R.S, param_t.vars)
     nvars = length(param_t.vars)
     lpol = filter(l->degree(l) == 1, first.(collect(factor(param_t.elim))))
     nb = length(lpol)
@@ -356,7 +359,7 @@ function rational_solutions(
 
     end
 
-    I.rat_sols = rat_sols
+    I.rat_sols = [r[perm] for r in rat_sols]
 
     return I.rat_sols
 end
