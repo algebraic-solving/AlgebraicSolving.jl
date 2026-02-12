@@ -8,6 +8,9 @@ import Random: MersenneTwister
 import Logging: ConsoleLogger, with_logger, Warn, Info
 import Printf: @sprintf, @printf
 
+import Nemo.Generic:
+    FracFieldElem
+
 import Nemo:
     bell,
     binomial,
