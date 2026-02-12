@@ -18,6 +18,10 @@ include("algorithms/param-curve.jl")
 include("algorithms/hilbert.jl")
 #= siggb =#
 include("siggb/siggb.jl")
+#= progress =#
+include("progress/main.jl")
+#= interp =#
+include("interp/main.jl")
 #= examples =#
 include("examples/katsura.jl")
 include("examples/cyclic.jl")
