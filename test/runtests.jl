@@ -11,4 +11,7 @@ include("algorithms/hilbert.jl")
 include("algorithms/decomposition.jl")
 include("algorithms/param-curves.jl")
 include("examples/katsura.jl")
+include("interp/thiele.jl") 
+include("interp/newton.jl")
+include("interp/cuyt_lee.jl")
 end
