@@ -385,7 +385,7 @@ function write_to_matrix_row!(matrix::MacaulayMatrix,
                               sig::Sig,
                               row_ind=matrix.nrows+1)
 
-    hsh = Base.hash(mult)
+    hsh = hash_monomial(mult)
     poly = basis.monomials[basis_idx]
     row = similar(basis.monomials[basis_idx])
     check_enlarge_hashtable!(symbol_ht, length(basis.monomials[basis_idx]))

@@ -123,7 +123,7 @@ function construct_module_core(sig::Sig{N},
             res_mod_mns[i] = rewr_mod_mns[i]
         end
     else
-        hsh = Base.hash(mult)
+        hsh = hash_monomial(mult)
         check_enlarge_hashtable!(basis_ht, plength)
         insert_multiplied_poly_in_hash_table!(res_mod_mns, hsh, mult,
                                               rewr_mod_mns,
