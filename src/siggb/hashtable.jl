@@ -159,7 +159,7 @@ end
 
 function insert_in_hash_table!(ht::MonomialHashtable{N}, e::Monomial{N}) where {N}
     # generate hash
-    he = Base.hash(e)
+    he = hash_monomial(e)
 
     # find new elem position in the table
     hidx = he
@@ -201,7 +201,7 @@ end
 
 function find_in_hash_table(ht::MonomialHashtable{N}, e::Monomial{N}) where {N}
     # generate hash
-    he = Base.hash(e)
+    he = hash_monomial(e)
 
     # find new elem position in the table
     hidx = he
@@ -278,7 +278,7 @@ function fill_divmask!(ht::MonomialHashtable{N}) where N
     @inbounds for vidx in 1:ht.load
         m = ht.exponents[vidx]
         divm = divmask(m, ht.divmap, ht.ndivbits)
-        hsh = Base.hash(m)
+        hsh = hash_monomial(m)
         ht.hashdata[vidx] = Hashvalue(hsh, divm)
     end
 
