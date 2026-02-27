@@ -210,7 +210,7 @@ function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} =
             qidx += 1
         end
         @assert qidx > qlen || Q1[qidx][1] > S1[i+1][2] "A query point might be singular"
-        # If there's already rational betwee no need to add new
+        # If there's already rational between no need to add new
         !inserted && push!(ratioP, _open_simplest_between(ri, li1, abs(li1 - ri)//1000))
     end
 
