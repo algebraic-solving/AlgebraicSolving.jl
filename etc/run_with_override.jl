@@ -42,9 +42,10 @@ tmpdepot = mktempdir(; cleanup=true)
 add_jll_override(tmpdepot, "msolve", msolveoverride)
 
 # prepend our temporary depot to the depot list...
-try
+withenv(
+    "JULIA_DEPOT_PATH"=>tmpdepot*":"*join(DEPOT_PATH, ":"),
+) do
+
     # ... and start Julia, by default with the same project environment
     run(`$(Base.julia_cmd()) --project=$(Base.active_project()) $(ARGS)`)
-finally
-   # rm(libmsolve_src_marker; force=true)
 end
