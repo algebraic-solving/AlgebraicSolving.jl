@@ -1,5 +1,8 @@
+#using Pkg
+#Pkg.activate("../../AlgebraicSolving.jl/")
 using AlgebraicSolving
 using Documenter
+
 
 push!(LOAD_PATH, "../src")
 
@@ -21,9 +24,11 @@ makedocs(
         "types.md",
         "Algorithms" => ["groebner-bases.md",
                          "normal-forms.md",
+                         "hilbert.md",
                          "dimension.md",
                          "solvers.md",
-                         "decomposition.md"],
+                         "decomposition.md",
+                         "connectivity.md"],
         "Examples" => "katsura.md"
         ]
 )

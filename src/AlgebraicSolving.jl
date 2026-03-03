@@ -14,14 +14,13 @@ include("algorithms/normal-forms.jl")
 include("algorithms/solvers.jl")
 include("algorithms/dimension.jl")
 include("algorithms/decomposition.jl")
-include("algorithms/paramcurve.jl")
+include("algorithms/param-curve.jl")
 include("algorithms/hilbert.jl")
 #= siggb =#
 include("siggb/siggb.jl")
 #= connectivity =#
-include("connectivity/computeRM.jl")
-include("connectivity/paramcurve.jl")
 include("connectivity/connectcurves.jl")
+include("connectivity/roadmap.jl")
 #= examples =#
 include("examples/katsura.jl")
 include("examples/cyclic.jl")

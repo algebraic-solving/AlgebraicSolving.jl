@@ -134,16 +134,18 @@ function divmask(e::Monomial{N},
     res
 end
 
-@generated function makehash(::Val{N}, m) where {N}
+@generated function makehash(::Val{N}, m, h::UInt) where {N}
     rng = MersenneTwister(18121987)
-    hash = :( $(UInt64(0)) )
+    hash = :(h)
     for i in 1:N
         hash = :($hash + $(rand(rng, MonHash))*(m[$i]))
     end
     return :($hash % MonHash)
 end
 
-Base.hash(a::Monomial{N}) where N = makehash(Val(N), a.exps)
+hash_monomial(a::Monomial{N}, h::UInt) where N = makehash(Val(N), a.exps, h)
+hash_monomial(a::Monomial{N}) where N = hash_monomial(a, zero(UInt))
+Base.hash(a::Monomial{N}, h::UInt) where N = UInt(hash_monomial(a, h))
 
 function leading_monomial(basis::Basis,
                           basis_ht::MonomialHashtable,

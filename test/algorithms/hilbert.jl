@@ -21,6 +21,15 @@
     @test iszero(hilbert_dimension(I))
     @test 4 == hilbert_degree(I)
 
+    I = Ideal([R(0)])
+    HS = 1//(1-t)^(nvars(R))
+    HP = (1//6*s^3 + s^2 + 11//6*s + 1, 0)
+
+    @test HS == hilbert_series(I)
+    @test HP == hilbert_polynomial(I)
+    @test nvars(R) == hilbert_dimension(I)
+    @test isone(hilbert_degree(I))
+
     I = Ideal([R(1)])
     @test iszero(hilbert_series(I))
     @test all(iszero, hilbert_polynomial(I))
