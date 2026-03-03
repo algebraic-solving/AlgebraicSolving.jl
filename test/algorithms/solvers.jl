@@ -81,4 +81,10 @@
 
     I = Ideal([x^2-1, y^2])
     @test issetequal(sols, real_solutions(I))
+
+    # issue 5741 from Oscar
+    R, (x,y,z) = polynomial_ring(QQ, ["x","y","z"])
+    I = Ideal([(x-1)*x, y-2, z-3])
+    rat_sols = Vector{QQFieldElem}[[1, 2, 3], [0, 2, 3]]
+    @test issetequal(rat_sols, rational_solutions(I))
 end

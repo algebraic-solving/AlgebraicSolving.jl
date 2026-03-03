@@ -1,7 +1,7 @@
 # Getting Started
 
 AlgebraicSolving is a computer algebra package for the Julia programming 
-language, maintained by Christian Eder and Mohab Safey El Din.
+language, maintained by Christian Eder, Mohab Safey El Din, Rafael Mohr, Rémi Prébet.
 
 - <https://github.com/algebraic-solving/AlgebraicSolving.jl> (Source code)
 
