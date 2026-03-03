@@ -1,12 +1,3 @@
-#using Pkg
-#Pkg.activate("AlgebraicSolving.jl")
-#using Revise
-#using AlgebraicSolving
-#using Nemo
-
-export roadmap, computepolar, _mid_rational_points, _mid_rational_points_inter, _fbr, all_eqs, all_base_pts, nb_nodes, computepolar
-include("polar.jl")
-
 @doc Markdown.doc"""
     roadmap(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
@@ -179,10 +170,9 @@ function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} =
     #
     # It orders the [l_i,r_i], and compute a list ratioP
     # intersecting all intervals of Q and such that
-    # strictly between each of the [l_i,r_i] there is:
+    # *strictly* between each of the [l_i,r_i] there is:
     # - either at least one element inside an interval of Q
     # - or the simplest rational number
-    # TODO:
     isempty(S) && return Q
 
     S1, Q1 = sort(S, lt=(x, y) -> x[2] <= y[1]), sort(Q, lt=(x, y) -> x[2] <= y[1])
@@ -223,7 +213,6 @@ function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} =
 
     return ratioP
 end
-
 
 function _open_simplest_between(a::QQFieldElem, b::QQFieldElem, eps::QQFieldElem)
     # We choose the simplest in absolute value
