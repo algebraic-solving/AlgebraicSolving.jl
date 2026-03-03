@@ -78,20 +78,15 @@ A *zero-dimensional parametrization* $\mathscr{P}$ with
 coefficients in a field $\mathbb{Q}$ consists of:
 * polynomials $(w, w', v_1, \ldots, v_n)$ in $\mathbb{K}[t]$ where $t$ is
   a new variable and such that
-    * $w$ is a monic square-free polynomial;
-    * $w'=1$ when $\mathbb{K}$ is a prime field, $w'=\frac{dw}{dt}$ else;
-    * $\deg(v_i) < \deg(w)$.
-*  a linear form $l$  in the variables $x_1,\dotsc, x_n$,
+  *  $w$ is a monic square-free polynomial;
+  *  $w'=1$ when $\mathbb{K}$ is a prime field, $w'=\frac{dw}{dt}$ else;
+  *  $\deg(v_i) < \deg(w)$.
+* a linear form $l$  in the variables $x_1,\dotsc, x_n$,
 such that
-$$
-l(\rho_1,\dotsc,\rho_n) = t \mod w.
-$$
+$l(\rho_1,\dotsc,\rho_n) = t \mod w$.
 
 Such a data-structure encodes the following finite set of points
-$$
-\left\{\left (\frac{\rho_1(\vartheta)}{w'(\vartheta)},
-\ldots, \frac{\rho_n(\vartheta)}{w'(\vartheta)} \right) \middle|\, w(\vartheta) = 0\right\}.
-$$
+*  $\left\{\left(\frac{\rho_1(\vartheta)}{w'(\vartheta)}, \ldots, \frac{\rho_n(\vartheta)}{w'(\vartheta)} \right) \middle|\, w(\vartheta) = 0\right\}$.
 According to this definition, the roots of $w$ are exactly the
 values taken by $l$ on this set.
 
@@ -103,7 +98,7 @@ The type `RationalParametrization` therefore caches the following attributes:
   * `denom::QQPolyRingElem`: denominator polynomial (usually $w'$);
   * `param::Vector{QQPolyRingElem}`: numerators $\rho_i$'s.
 
-See the documentation of the [rational_parametrization](@ref) function for further details.
+See the documentation of the [`rational_parametrization`](@ref) function for further details.
 
 ### One-dimensionnal parametrizations: algebraic curves
 
@@ -111,21 +106,14 @@ A *one-dimensional parametrization* $\mathscr{C}$ with
 coefficients in a field $\mathbb{C}$ consists of:
 * polynomials $(w, w', v_1, \ldots, v_n)$ in $\mathbb{K}[t,s]$ where $t,s$ are
   new variables and such that
-    * $w$ is a monic square-free polynomial and $w'=\frac{\partial w}{\partial t}$;
-    * $\deg(v_i) < \deg(w)$.
+    *  $w$ is a monic square-free polynomial and $w'=\frac{\partial w}{\partial t}$;
+    *  $\deg(v_i) < \deg(w)$.
 *  two linear forms $(l,l')$  in the variables $x_1,\dotsc, x_n$,
 such that
-$$
-l(\rho_1,\dotsc,\rho_n) = t\, w'\mod w \quad \text{and} \quad
-l'(\rho_1,\dotsc,\rho_n) = s\,w' \mod w
-$$
+$l(\rho_1,\dotsc,\rho_n) = t\, w'\mod w \quad \text{and} \quad l'(\rho_1,\dotsc,\rho_n) = s\,w' \mod w$
 
 Such a data-structure encodes the curve defined as the Zariski closure of the following set
-$$
-\left\{\left (\frac{\rho_1(\vartheta,\eta)}{w'(\vartheta,\eta)},
-\ldots, \frac{\rho_n(\vartheta,\eta)}{w'(\vartheta,\eta)} \right)
-\middle|\, w(\vartheta,\eta) = 0,\, w'(\vartheta, \eta) \neq 0\right\}.
-$$
+*  $\left\{\left(\frac{\rho_1(\vartheta,\eta)}{w'(\vartheta,\eta)}, \ldots, \frac{\rho_n(\vartheta,\eta)}{w'(\vartheta,\eta)} \right) \middle|\, w(\vartheta,\eta) = 0,\, w'(\vartheta, \eta) \neq 0\right\}$.
 According to this definition, the roots of $w$ are exactly the
 values taken by $l$ on this set.
 
@@ -140,7 +128,7 @@ attributes:
   * `denom::QQMPolyRingElem`: denominator polynomial (usually $w'$);
   * `param::Vector{QQMPolyRingElem}`: numerators $\rho_i$'s.
 
-See the documentation of the [rational_curve_parametrization](@ref) function for
+See the documentation of the [`rational_curve_parametrization`](@ref) function for
 further details.
 
 ## Roadmaps
@@ -149,8 +137,8 @@ Consider an algebraic set $V\subset \mathbb{C}^n$ and a finite set of query
 points $\mathcal{P} \subset V$, both defined by polynomials with coefficients in
 $\mathbb{Q}$. A *roadmap* $\mathcal{R}$ associated to $(V,\mathcal{P})$ is an
 algebraic curve such that
-  * $\mathcal{P} \subset \mathcal{R} \subset V$;
-  * $C \cap \mathcal{R}$ is non-empty and connected, for each connected
+  *  $\mathcal{P} \subset \mathcal{R} \subset V$;
+  *  $C \cap \mathcal{R}$ is non-empty and connected, for each connected
     component $C$ of $V\cap \mathbb{R}^n$.
 
 Roadmaps are algebraic curves capturing the connectivity properties of an
@@ -184,11 +172,10 @@ end
 Each roadmap node (including the root) correspond to a curve component of the
 roadmap. More precisely, they are defined by as an algebraic subset $W$ (called
 polar variety) of a fiber $F$ of the initial variety $V$ such that:
-  * if `base_pt` contains $\mathbf{q}=(q_1,\dotsc,q_e) \in \mathbb{Q}^e$ then $$
-  F = V \cap \left\{x_1=q_1,\,\dotsc,\, x_e=q_e\right\}; $$
-  * if `polar_eqs` contains the polynomials $g_1,\dotsc,g_s \in
-  \mathbb{Q}[x_1,\dotsc,x_n]$ then $$ W = F \cap \{g_1=0,\, \ldots,\, g_s = 0\}.
-    $$
+  * if `base_pt` contains $\mathbf{q}=(q_1,\dotsc,q_e) \in \mathbb{Q}^e$ then
+    *  $F = V \cap \left\{x_1=q_1,\,\dotsc,\, x_e=q_e\right\}$;
+  * if `polar_eqs` contains the polynomials $g_1,\dotsc,g_s \in   \mathbb{Q}[x_1,\dotsc,x_n]$ then 
+    *  $W = F \cap \{g_1=0,\, \ldots,\, g_s = 0\}$.
 
 Moreover, `children` rassembles all the tree nodes that contains curves
 component for which their attribute `base_pt` contains a point $\mathbf{q}'$

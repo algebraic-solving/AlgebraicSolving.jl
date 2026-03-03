@@ -179,7 +179,7 @@ function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} =
     #
     # It orders the [l_i,r_i], and compute a list ratioP
     # intersecting all intervals of Q and such that
-    # strictly between each of these intervals there is:
+    # strictly between each of the [l_i,r_i] there is:
     # - either at least one element inside an interval of Q
     # - or the simplest rational number
     # TODO:
