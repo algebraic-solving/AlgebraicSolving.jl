@@ -12,7 +12,7 @@ library](https://msolve.lip6.fr/) .
 
 ## Installation
 
-AlgebraicSolving requires Julia 1.6 or higher. Please see
+AlgebraicSolving requires Julia 1.10 or higher. Please see
 <https://julialang.org/downloads/> for instructions on
 how to obtain julia for your system.
 
