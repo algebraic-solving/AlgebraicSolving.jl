@@ -103,7 +103,65 @@
         R(1)
     ]
     @test G == H
-	
+end
+
+@testset "Algorithms -> Gröbner bases (array interface)" begin
+    # Test 1: finite field
+    field_char = 101
+    # we represent [x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y] in msolve format
+    lens = Int32[4, 4, 3]
+    cfs = Int32[
+        1, 2, 2, 100, # 1, 2, 2, -1
+        1, 2, 2, 100, # 1, 2, 2, -1
+        2, 2, 100 # 2, 2, -1
+    ]
+    exps = Int32[
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, # x, y, z, 1
+        2, 0, 0, 0, 2, 0, 0, 0, 2, 1, 0, 0, # x^2, y^2, z^2, x
+        1, 1, 0, 0, 1, 1, 0, 1, 0 # x*y, y*z, y
+    ]
+    # the expected GB is [x+2*y+2*z+100, y*z+82*z^2+10*y+40*z, y^2+60*z^2+20*y+81*z, z^3+28*z^2+64*y+13*z]
+    # we also represent it in msolve format
+    gb_lens = Int32[4, 4, 4, 4]
+    gb_cfs = Int32[
+        1, 2, 2, 100,
+        1, 82, 10, 40,
+        1, 60, 20, 81,
+        1, 28, 64, 13
+    ]
+    gb_exps = Int32[
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, # x, y, z, 1
+        0, 1, 1, 0, 0, 2, 0, 1, 0, 0, 0, 1, # y*z, z^2, y, z
+        0, 2, 0, 0, 0, 2, 0, 1, 0, 0, 0, 1, # y^2, z^2, y, z
+        0, 0, 3, 0, 0, 2, 0, 1, 0, 0, 0, 1 # z^3, z^2, y, z
+    ]
+    @test (gb_lens, gb_cfs, gb_exps) == AlgebraicSolving._core_groebner_basis_array(lens, cfs, exps, field_char)
+
+    # Test 2: rational field
+    field_char = 0
+    # we represent [x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y] in msolve format
+    # lens and exps are the same as Test 1
+    cfs = BigInt[
+        1, 1, 2, 1, 2, 1, -1, 1, # 1/1, 2/1, 2/1, -1/1
+        1, 1, 2, 1, 2, 1, -1, 1, # 1/1, 2/1, 2/1, -1/1
+        2, 1, 2, 1, -1, 1 # 2/1, 2/1, -1/1
+    ]
+    # the expected GB is [x+2*y+2*z-1, 10*y*z+12*z^2-y-4*z, 5*y^2-3*z^2-y+z, 210*z^3-79*z^2+7*y+3*z]
+    # we represent the expected GB in msolve format
+    gb_lens = Int32[4, 4, 4, 4]
+    gb_cfs = BigInt[
+        1, 2, 2, -1,
+        10, 12, -1, -4,
+        5, -3, -1, 1,
+        210, -79, 7, 3
+    ]
+    gb_exps = Int32[
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, # x, y, z, 1
+        0, 1, 1, 0, 0, 2, 0, 1, 0, 0, 0, 1, # y*z, z^2, y, z
+        0, 2, 0, 0, 0, 2, 0, 1, 0, 0, 0, 1, # y^2, z^2, y, z
+        0, 0, 3, 0, 0, 2, 0, 1, 0, 0, 0, 1 # z^3, z^2, y, z
+    ]
+    @test (gb_lens, gb_cfs, gb_exps) == AlgebraicSolving._core_groebner_basis_array(lens, cfs, exps, field_char)
 end
 
 @testset "Algorithms -> Sig Gröbner bases" begin
