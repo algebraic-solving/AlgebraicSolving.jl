@@ -134,6 +134,97 @@ function groebner_basis(
     end
 end
 
+@doc Markdown.doc"""
+    _core_groebner_basis_array(lens::Vector{Int32}, cfs::Union{Vector{Int32},Vector{BigInt}}, exps::Vector{Int32}, field_char::Int, <keyword arguments>)
+
+Compute a Gröbner basis of the ideal defined by the input data w.r.t. to the degree reverse lexicographical monomial ordering using Faugère's F4 algorithm.
+
+**Note**: Both the input and output of this function are given as flattened arrays of integers instead of polynomials.
+
+# Arguments
+- `lens::Vector{Int32}`: vector of number of terms per generator.
+- `cfs::Union{Vector{Int32},Vector{BigInt}}`: vector of coefficients of all generators, concatenated. When working over the rationals, the coefficients are given as pairs of numerators and denominators, i.e. `cfs[2*i-1]` is the numerator and `cfs[2*i]` the denominator of the `i`-th coefficient.
+- `exps::Vector{Int32}`: vector of exponent vectors of all generators, concatenated.
+- `field_char::Int`: characteristic of the ground field, `0` for the rationals.
+- `initial_hts::Int=17`: initial hash table size `log_2`.
+- `nr_thrds::Int=1`: number of threads for parallel linear algebra.
+- `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
+- `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
+- `eliminate::Int=0`: size of first block of variables to be eliminated.
+- `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`.
+- `truncate_lifting::Int=0`: truncates the lifting process to given number of elements, only applicable when working over the rationals.
+- `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
+```
+
+**Note**: This is an internal function.
+"""
+function _core_groebner_basis_array(
+    lens::Vector{Int32},
+    cfs::Union{Vector{Int32},Vector{BigInt}},
+    exps::Vector{Int32},
+    field_char::Int;
+    initial_hts::Int=17,
+    nr_thrds::Int=1,
+    max_nr_pairs::Int=0,
+    la_option::Int=2,
+    eliminate::Int=0,
+    complete_reduction::Bool=true,
+    truncate_lifting::Int=0,
+    info_level::Int=0
+)::Tuple{Vector{Int32},Union{Vector{Int32},Vector{BigInt}},Vector{Int32}}
+    nr_gens = length(lens)
+    nr_vars = length(exps) ÷ sum(lens)
+
+    mon_order = 0
+    elim_block_size = eliminate
+    reduce_gb = Int(complete_reduction)
+
+    gb_ld = Ref(Cint(0))
+    gb_len = Ref(Ptr{Cint}(0))
+    gb_exp = Ref(Ptr{Cint}(0))
+    gb_cf = Ref(Ptr{Cvoid}(0))
+
+    if field_char == 0
+        nr_terms = ccall((:export_groebner_qq, libmsolve), Int,
+            (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
+                Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
+                Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+            cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
+            field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
+            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, truncate_lifting, info_level)
+
+    else
+        nr_terms = ccall((:export_f4, libneogb), Int,
+            (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
+                Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
+                Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+            cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
+            field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
+            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, info_level)
+    end
+
+    # convert to julia array, also give memory management to julia
+    jl_ld = gb_ld[]
+    jl_len = Int32.(Base.unsafe_wrap(Array, gb_len[], jl_ld))
+    jl_exp = Int32.(Base.unsafe_wrap(Array, gb_exp[], nr_terms * nr_vars))
+
+    # coefficient handling depending on field characteristic
+    if field_char == 0
+        ptr = reinterpret(Ptr{BigInt}, gb_cf[])
+        jl_cf = BigInt.([deepcopy(unsafe_load(ptr, i)) for i in 1:nr_terms])
+    else
+        ptr = reinterpret(Ptr{Int32}, gb_cf[])
+        jl_cf = Int32.(Base.unsafe_wrap(Array, ptr, nr_terms))
+    end
+
+    ccall((:free_f4_julia_result_data, libneogb), Nothing,
+        (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
+            Ptr{Ptr{Cvoid}}, Int, Int),
+        cglobal(:jl_free), gb_len, gb_exp, gb_cf, jl_ld, field_char)
+
+    return jl_len, jl_cf, jl_exp
+end
+
 function _core_groebner_basis(
         I::Ideal{T} where T <: MPolyRingElem;
         initial_hts::Int=17,
@@ -181,47 +272,24 @@ function _core_groebner_basis(
         I.gb[eliminate] = F
         return I.gb[eliminate]
     end
-    gb_ld  = Ref(Cint(0))
-    gb_len = Ref(Ptr{Cint}(0))
-    gb_exp = Ref(Ptr{Cint}(0))
-    gb_cf  = Ref(Ptr{Cvoid}(0))
 
-    if field_char == 0
-        nr_terms  = ccall((:export_groebner_qq, libmsolve), Int,
-            (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
-            Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
-            Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint),
-            cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
-            field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
-            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, truncate_lifting, info_level)
+    jl_len, jl_cf, jl_exp = _core_groebner_basis_array(
+        lens, cfs, exps, field_char;
+        initial_hts=initial_hts, nr_thrds=nr_thrds,
+        max_nr_pairs=max_nr_pairs, la_option=la_option, eliminate=eliminate,
+        complete_reduction=complete_reduction, truncate_lifting=truncate_lifting,
+        info_level=info_level)
 
-    else
-        nr_terms  = ccall((:export_f4, libneogb), Int,
-            (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
-            Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
-            Cint, Cint, Cint, Cint, Cint, Cint, Cint),
-            cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
-            field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
-            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, info_level)
-    end
+    jl_ld = Int32(length(jl_len))
+    nr_terms = length(jl_exp) ÷ nr_vars
 
     if nr_terms == 0
         I.gb[eliminate] = [R(0)]
         return I.gb[eliminate]
     end
 
-    # convert to julia array, also give memory management to julia
-    jl_ld   = gb_ld[]
-    jl_len  = Base.unsafe_wrap(Array, gb_len[], jl_ld)
-    jl_exp  = Base.unsafe_wrap(Array, gb_exp[], nr_terms*nr_vars)
-
-    #  coefficient handling depending on field characteristic
     if field_char == 0
-        ptr     = reinterpret(Ptr{BigInt}, gb_cf[])
-        jl_cf   = QQFieldElem[QQFieldElem(unsafe_load(ptr, i)) for i in 1:nr_terms]
-    else
-        ptr     = reinterpret(Ptr{Int32}, gb_cf[])
-        jl_cf   = Base.unsafe_wrap(Array, ptr, nr_terms)
+        jl_cf = QQ.(jl_cf)
     end
 
     #  shall eliminated variables be removed?
@@ -237,10 +305,6 @@ function _core_groebner_basis(
         basis = _convert_finite_field_array_to_abstract_algebra(
             jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
     end
-    ccall((:free_f4_julia_result_data, libneogb), Nothing ,
-          (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}},
-           Ptr{Ptr{Cvoid}}, Int, Int),
-          cglobal(:jl_free), gb_len, gb_exp, gb_cf, jl_ld, field_char)
 
     I.gb[eliminate] = basis
     return I.gb[eliminate]
