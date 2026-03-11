@@ -7,6 +7,7 @@ using StaticArrays
 import Random: MersenneTwister
 import Logging: ConsoleLogger, with_logger, Warn, Info
 import Printf: @sprintf, @printf
+import Distributed: AbstractWorkerPool, remotecall_fetch
 
 import Nemo:
     bell,

@@ -24,6 +24,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 - `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`.
 - `normalize::Bool=false`: normalize generators of Gröbner basis for `I`, only applicable when working over the rationals.
 - `truncate_lifting::Int=0`: truncates the lifting process to given number of elements, only applicable when working over the rationals.
+- `worker_pool::Union{Nothing,AbstractWorkerPool}=nothing`: run the Gröbner basis computation on a worker from the given pool, if not `nothing`.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 
 # Examples
@@ -52,6 +53,7 @@ function eliminate(
         complete_reduction::Bool=true,
         normalize::Bool=false,
         truncate_lifting::Int=0,
+        worker_pool::Union{Nothing,AbstractWorkerPool}=nothing,
         info_level::Int=0
         )
     if eliminate <= 0
@@ -63,6 +65,7 @@ function eliminate(
                               complete_reduction=complete_reduction,
                               normalize = normalize,
                               truncate_lifting = truncate_lifting,
+                              worker_pool = worker_pool,
                               info_level=info_level)
     end
 end
@@ -86,6 +89,7 @@ At the moment the underlying algorithm is based on variants of Faugère's F4 Alg
 - `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`.
 - `normalize::Bool=false`: normalize generators of Gröbner basis for `I`, only applicable when working over the rationals.
 - `truncate_lifting::Int=0`: truncates the lifting process to given number of elements, only applicable when working over the rationals.
+- `worker_pool::Union{Nothing,AbstractWorkerPool}=nothing`: if not `nothing`, run the core Gröbner-basis array computation on a worker from this pool.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 
 # Examples
@@ -121,6 +125,7 @@ function groebner_basis(
         complete_reduction::Bool=true,
         normalize::Bool=false,
         truncate_lifting::Int=0,
+        worker_pool::Union{Nothing,AbstractWorkerPool}=nothing,
         info_level::Int=0
         )
     return get!(I.gb, eliminate) do
@@ -130,6 +135,7 @@ function groebner_basis(
                              complete_reduction = complete_reduction,
                              normalize = normalize,
                              truncate_lifting = truncate_lifting,
+                             worker_pool = worker_pool,
                              info_level = info_level)
     end
 end
@@ -235,6 +241,7 @@ function _core_groebner_basis(
         complete_reduction::Bool=true,
         normalize::Bool=false,
         truncate_lifting::Int=0,
+        worker_pool::Union{Nothing,AbstractWorkerPool}=nothing,
         info_level::Int=0
         )
     F = I.gens
@@ -272,12 +279,18 @@ function _core_groebner_basis(
         return I.gb[eliminate]
     end
 
-    jl_len, jl_cf, jl_exp = _core_groebner_basis_array(
+    run_core_array = () -> _core_groebner_basis_array(
         lens, cfs, exps, field_char;
         initial_hts=initial_hts, nr_thrds=nr_thrds,
         max_nr_pairs=max_nr_pairs, la_option=la_option, eliminate=eliminate,
         complete_reduction=complete_reduction, truncate_lifting=truncate_lifting,
         info_level=info_level)
+
+    jl_len, jl_cf, jl_exp = if isnothing(worker_pool)
+        run_core_array()
+    else
+        remotecall_fetch(run_core_array, worker_pool)
+    end
 
     jl_ld = Int32(length(jl_len))
     nr_terms = length(jl_exp) ÷ nr_vars
