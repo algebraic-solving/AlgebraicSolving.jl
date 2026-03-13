@@ -1,6 +1,6 @@
 @testset "Algorithms -> Gröbner bases" begin
     R, (x,y,z) = polynomial_ring(GF(101),["x","y","z"], internal_ordering=:degrevlex)
-    I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
+    I = AlgebraicSolving.Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
     G = groebner_basis(I)
     H = MPolyRingElem[
          x + 2*y + 2*z + 100
@@ -17,7 +17,7 @@
         ]
     @test G == H
 
-    I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
+    I = AlgebraicSolving.Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
     G = groebner_basis(I, eliminate=2, intersect=false)
     H = MPolyRingElem[
         z^4 + 38*z^3 + 95*z^2 + 95*z
@@ -31,19 +31,19 @@
     @test L == H
     @test I.gb[2] == H
 
-    I = Ideal([R(0)])
+    I = AlgebraicSolving.Ideal([R(0)])
     G = groebner_basis(I)
     @test G == [R(0)]
 
     R, (x1, x2) = polynomial_ring(QQ, ["x1", "x2"])
-    I = Ideal([3*x1^2 + ZZRingElem(2)^100, 2*x1*x2 + 5*x1 + ZZRingElem(2)^100])
+    I = AlgebraicSolving.Ideal([3*x1^2 + ZZRingElem(2)^100, 2*x1*x2 + 5*x1 + ZZRingElem(2)^100])
     G = groebner_basis(I)
     H = MPolyRingElem[
         3*x1 - 2*x2 - 5
         4*x2^2 + 20*x2 + 3802951800684688204490109616153
         ]
     @test G == H
-    J = Ideal([3*x1^2 + ZZRingElem(2)^100, 2*x1*x2 + 5*x1 + ZZRingElem(2)^100])
+    J = AlgebraicSolving.Ideal([3*x1^2 + ZZRingElem(2)^100, 2*x1*x2 + 5*x1 + ZZRingElem(2)^100])
     G = groebner_basis(J, normalize=true)
     H = MPolyRingElem[
         x1 - 2//3*x2 - 5//3
@@ -51,14 +51,14 @@
         ]
     @test G == H
     R, (x,y,z) = polynomial_ring(QQ,["x","y","z"], internal_ordering=:degrevlex)
-    I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
+    I = AlgebraicSolving.Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
     G = eliminate(I, 2)
     H = MPolyRingElem[
         84*z^4 - 40*z^3 + z^2 + z
     ]
     @test G == H
     R, (a,b,c,d,x,y,z,w) = polynomial_ring(QQ, ["a", "b", "c", "d", "x", "y", "z", "w"])
-    I = Ideal([x - a*c, y - a*c*d, z - a*c^2 - b, w - a*c^2*d - b*d]);
+    I = AlgebraicSolving.Ideal([x - a*c, y - a*c*d, z - a*c^2 - b, w - a*c^2*d - b*d]);
     G = eliminate(I, 4)
     H = MPolyRingElem[
         -x*w + y*z

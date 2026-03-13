@@ -1,8 +1,9 @@
-
+# Function to hash a diagram.
 function Base.hash(diagram::Diagram, h::UInt)
     return hash(diagram.id, h)
 end
 
+# Function to test equality between two diagrams in O(1).
 function Base.:(==)(d1::Diagram, d2::Diagram)
     return d1.id == d2.id
 end
@@ -11,7 +12,7 @@ function Base.show(io::IO, diagram::Diagram)
     print(diagram.edges)
 end
 
-# Function to print the diagram
+# Function to print the diagram as an n-tree.
 function print_diagram(diagram::Diagram, space::Int=0)
     for edge in diagram.edges
         println(" " ^ space * " ", edge[1])
@@ -19,11 +20,12 @@ function print_diagram(diagram::Diagram, space::Int=0)
     end
 end
 
-# Define a function to create a new hash state
+# This function is to create a new hash state.
 function new_hashstate()
     return HashState(Dict{Vector{Edge}, Diagram}(), 0, 0, 0)
 end
 
+# Function to troncate a list of edges.
 function troncate!(children::Vector{Edge}, i::Int)
     if length(children) > i
         resize!(children,i)
@@ -33,6 +35,8 @@ end
 # Function to create a monomial divisibility diagram with hash consing
 function make_diagram(children::Vector{Edge}, hashstate::HashState)
     i = 0
+
+    # In order to keep strict inclusions we remove the edges that are the same keeping the leftmost one.
     last = empty_diagram
     for j in 1:length(children)
         current_edge = children[j][2]
