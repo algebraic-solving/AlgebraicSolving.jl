@@ -3,7 +3,7 @@ using Random
 using StaticArrays
 
 @testset "Algorithms -> Monomial Diagram" begin
-    R, (x1,x2,x3,x4,x5,x6) = polynomial_ring(QQ, ["x1", "x2", "x3", "x4", "x5", "x6"], internal_ordering=:degrevlex)
+    R, (x1,x2,x3,x4,x5,x6) = polynomial_ring(GF(101), ["x1", "x2", "x3", "x4", "x5", "x6"], internal_ordering=:degrevlex)
     list_of_polynomials1 = [x1+2*x2+2*x3+2*x4+2*x5+2*x6-1, 
     x1^2+2*x2^2+2*x3^2+2*x4^2+2*x5^2+2*x6^2-x1,
     2*x1*x2+2*x2*x3+2*x3*x4+2*x4*x5+2*x5*x6-x2,
