@@ -142,7 +142,7 @@ end
 
 
 # Function to create the monomial divisibility diagram of a list of monomials
-function create_diagram(monomial_list::Vector{<:Monomial}, hashstate::HashState)
+function create_diagram(monomial_list::Vector{<:Monomial}, hashstate::HashState = new_hashstate())
     diagram = empty_diagram
     for m in monomial_list
         diagram = insertion(diagram, m, hashstate)
@@ -265,8 +265,6 @@ function depth(diagram::Diagram)::Int
     return 1 + depth(diagram.edges[1][2])
 end
 
-
-
 function hilbert_series_mdd_aux(R, i::Int, diagram::Diagram)
     t = gens(R)[1]
 
@@ -290,39 +288,12 @@ function hilbert_series_mdd_aux(R, i::Int, diagram::Diagram)
     return hilbert_series
 end
 
-
-
-@doc Markdown.doc"""
-    hilbert_series_mdd(diagram::Diagram)
-
-Compute the Hilbert series of a given monomial divisibility diagram.
-
-**Notes**:
-* This requires a monomial divisibility diagram of an ideal.
-
-# Examples
-```jldoctest
-julia> using AlgebraicSolving
-
-julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
-
-# This represents the monomials [x*y, x*z, y*z].
-julia> list_of_monomials = [monomial(SVector{3}([0,1,1])), monomial(SVector{3}([1,0,1])), monomial(SVector{3}([1,1,0]))]
-
-julia> diagram = create_diagram(list_of_monomials)
-
-julia> hilbert_series_mdd(diagram)
-(-2*t - 1)//(t - 1)
-```
-"""
 function hilbert_series_mdd(diagram::Diagram)
     n = depth(diagram)
     R, t = polynomial_ring(ZZ, :t)
     K = fraction_field(R)
     return K(hilbert_series_mdd_aux(R, n, diagram)) / (K(1)-K(t))^n
 end
-
-
 
 function multi_hilbert_series_mdd_aux(R, i::Int, diagram::Diagram)
     vars = gens(R)
