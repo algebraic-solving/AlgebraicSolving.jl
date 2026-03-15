@@ -213,12 +213,6 @@ function siggb!(basis::Basis{N},
 
             if !iszero(p_idx)
                 basis.koszul_diagram = basis.lm_diagram
-                # for i in basis.basis_offset:basis.basis_load
-                #     if !basis.is_red[i] && index(basis.sigs[i]) == curr_ind
-                #         m = leading_monomial(basis, basis_ht, i)
-                #         basis.koszul_diagram = insertion(basis.koszul_diagram, m, basis.hashstate)
-                #     end
-                # end
             end
         end
     end
