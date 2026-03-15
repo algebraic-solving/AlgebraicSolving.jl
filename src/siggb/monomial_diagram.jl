@@ -256,7 +256,6 @@ function get_leaves(diagram::Diagram)
     return leaves
 end
 
-
 function depth(diagram::Diagram)::Int
     if isempty(diagram.edges)
         return 0

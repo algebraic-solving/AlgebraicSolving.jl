@@ -95,9 +95,11 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
                                 mod_ord)
         @info "$(arit_ops) total submul's"
         @info timer
-        @info "Size of the mdd: $(number_of_distinct_nodes(basis.lm_diagram))"
-        @info "Number of insertions: $(basis.hashstate.numberofinsertion)"
-        @info "Number of tests: $(basis.hashstate.numberofmembershiptests)"
+        if mod_ord == :POT
+            @info "Size of the mdd: $(number_of_distinct_nodes(basis.lm_diagram))"
+            @info "Number of insertions: $(basis.hashstate.numberofinsertion)"
+            @info "Number of tests: $(basis.hashstate.numberofmembershiptests)"
+        end
     end
 
     # output
