@@ -346,31 +346,6 @@ function multi_hilbert_series_mdd_aux(R, i::Int, diagram::Diagram)
     return hilbert_series
 end
 
-
-
-@doc Markdown.doc"""
-    hilbert_series_mdd(diagram::Diagram)
-
-Compute the multivariate Hilbert series of a given monomial divisibility diagram.
-
-**Notes**:
-* This requires a monomial divisibility diagram of an ideal.
-
-# Examples
-```jldoctest
-julia> using AlgebraicSolving
-
-julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
-
-# This represents the monomials [x*y, x*z, y*z].
-julia> list_of_monomials = [monomial(SVector{3}([0,1,1])), monomial(SVector{3}([1,0,1])), monomial(SVector{3}([1,1,0]))]
-
-julia> diagram = create_diagram(list_of_monomials)
-
-julia> multi_hilbert_series_mdd(diagram)
-(-2*x1*x2*x3 + x1*x2 + x1*x3 + x2*x3 - 1)//(x1*x2*x3 - x1*x2 - x1*x3 + x1 - x2*x3 + x2 + x3 - 1)
-```
-"""
 function multi_hilbert_series_mdd(diagram::Diagram)
     n = depth(diagram)
     R, vars = polynomial_ring(ZZ, ["x$i" for i in 1:n])
