@@ -37,7 +37,7 @@ function make_diagram(children::Vector{Edge}, hashstate::HashState)
     i = 0
 
     # In order to keep strict inclusions we remove the edges that are the same keeping the leftmost one.
-    last = empty_diagram
+    last = EMPTY_DIAGRAM
     for j in 1:length(children)
         current_edge = children[j][2]
         if current_edge != last
@@ -48,9 +48,9 @@ function make_diagram(children::Vector{Edge}, hashstate::HashState)
     end
 
     troncate!(children, i)
-    key = get(hashstate.hashtable, children, empty_diagram)
+    key = get(hashstate.hashtable, children, EMPTY_DIAGRAM)
 
-    if key != empty_diagram
+    if key != EMPTY_DIAGRAM
         return hashstate.hashtable[children]
     end
 
@@ -92,7 +92,7 @@ end
 
 # Function to insert a monomial in the diagram with memoization
 function insertion_aux(diagram::Diagram, m::Monomial, i::Int, memo::Dict{Tuple{Diagram,Int}, Diagram}, hashstate::HashState)
-    if diagram == empty_diagram
+    if diagram == EMPTY_DIAGRAM
         return insert_aux(make_diagram(Edge[], hashstate), m, i, hashstate)
     end
     if i == 1
@@ -101,15 +101,15 @@ function insertion_aux(diagram::Diagram, m::Monomial, i::Int, memo::Dict{Tuple{D
     if isempty(diagram.edges)
         return diagram
     end
-    key = get(memo, (diagram, i), empty_diagram)
-    if key != empty_diagram
+    key = get(memo, (diagram, i), EMPTY_DIAGRAM)
+    if key != EMPTY_DIAGRAM
         return key
     end
 
     i -= 1
     new_diagram = Edge[]
     is_sub_diagram = false
-    last_sub_diagram = empty_diagram
+    last_sub_diagram = EMPTY_DIAGRAM
     for edge in diagram.edges
         if edge[1] < m.exps[i]
             push!(new_diagram, edge)
@@ -143,7 +143,7 @@ end
 
 # Function to create the monomial divisibility diagram of a list of monomials
 function create_diagram(monomial_list::Vector{<:Monomial}, hashstate::HashState = new_hashstate())
-    diagram = empty_diagram
+    diagram = EMPTY_DIAGRAM
     for m in monomial_list
         diagram = insertion(diagram, m, hashstate)
     end
@@ -152,7 +152,7 @@ end
 
 # Function that determines the number of nodes in the monomial divisibility diagram
 function size_of_diagram(diagram::Diagram)
-    if isempty(diagram.edges) || diagram == empty_diagram
+    if isempty(diagram.edges) || diagram == EMPTY_DIAGRAM
         return 0
     end
     return 1 + sum(size_of_diagram(sub_diagram[2]) for sub_diagram in diagram.edges)
@@ -160,7 +160,7 @@ end
 
 # Function that determines the number of distinct nodes in the monomial divisibility diagram
 function number_of_distinct_nodes(diagram::Diagram, mem::Dict{Diagram, Diagram} = Dict{Diagram,Diagram}())
-    if isempty(diagram.edges) || diagram == empty_diagram
+    if isempty(diagram.edges) || diagram == EMPTY_DIAGRAM
         return 0
     end
     if haskey(mem, diagram)
