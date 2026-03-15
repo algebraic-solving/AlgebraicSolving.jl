@@ -233,6 +233,7 @@ function symbolic_pp!(timer::Timings,
         exp = symbol_ht.exponents[i]
         divm = symbol_ht.hashdata[i].divmask
 
+        basis.hashstate.numberofmembershiptests += 1
         if !is_in_diagram(exp, basis.lm_diagram)
             i += one(MonIdx)
             continue
