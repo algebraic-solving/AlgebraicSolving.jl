@@ -26,7 +26,7 @@ function new_hashstate()
 end
 
 # Function to troncate a list of edges.
-function troncate!(children::Vector{Edge}, i::Int)
+function truncate!(children::Vector{Edge}, i::Int)
     if length(children) > i
         resize!(children,i)
     end
@@ -47,7 +47,7 @@ function make_diagram(children::Vector{Edge}, hashstate::HashState)
         end
     end
 
-    troncate!(children, i)
+    truncate!(children, i)
     key = get(hashstate.hashtable, children, EMPTY_DIAGRAM)
 
     if key != EMPTY_DIAGRAM
