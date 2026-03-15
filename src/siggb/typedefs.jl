@@ -81,7 +81,7 @@ mutable struct HashState
 end
 
 # Define a constant for an empty diagram
-const empty_diagram = Diagram(-1, Tuple{Int,Diagram}[])
+const EMPTY_DIAGRAM = Diagram(-1, Tuple{Int,Diagram}[])
 
 mutable struct Basis{N}
     sigs::Vector{Sig{N}}
