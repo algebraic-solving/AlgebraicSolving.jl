@@ -10,6 +10,9 @@ function new_basis(basis_size, syz_size,
     sigratios = Vector{Monomial{N}}(undef, basis_size)
     rewrite_nodes = Vector{Vector{Int}}(undef, basis_size+1)
     lm_masks = Vector{DivMask}(undef, basis_size)
+    koszul_diagram = empty_diagram
+    lm_diagram = empty_diagram
+    hashstate = new_hashstate()
     monomials = Vector{Vector{MonIdx}}(undef, basis_size)
     coeffs = Vector{Vector{Coeff}}(undef, basis_size)
     is_red = Vector{Bool}(undef, basis_size)
@@ -18,7 +21,8 @@ function new_basis(basis_size, syz_size,
     syz_sigs = Vector{Monomial{N}}(undef, syz_size)
     syz_masks = Vector{MaskSig}(undef, syz_size)
     basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
-                  lm_masks, monomials, coeffs, is_red,
+                  lm_masks, lm_diagram, koszul_diagram, hashstate,
+                  monomials, coeffs, is_red,
                   mod_rep_known, mod_reps,
                   syz_sigs, syz_masks, Exp[],
                   input_length,
@@ -70,7 +74,7 @@ function make_room_new_input_el!(basis::Basis,
             basis.mod_rep_known[i] = basis.mod_rep_known[i-shift]
             basis.mod_reps[i] = basis.mod_reps[i-shift]
 
-            # adjust rewrite tree
+            # adjust rewrite diagram
             rnodes = basis.rewrite_nodes[i-shift+1]
             if rnodes[2] >= old_offset + 1
                 rnodes[2] += shift
@@ -373,7 +377,7 @@ function sort_pairset!(pairset::Pairset, from::Int, sz::Int,
 end
 
 function new_timer()
-    return Timings(0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0)
+    return Timings(0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0)
 end
 
 function Base.show(io::IO, timer::Timings)
@@ -382,6 +386,8 @@ function Base.show(io::IO, timer::Timings)
     @printf io "linear algebra:      %.2f\n" timer.lin_alg_time
     @printf io "select:              %.2f\n" timer.select_time
     @printf io "update:              %.2f\n" timer.update_time
+    @printf io "mdd creation:        %.2f\n" timer.time_for_mdd
+    @printf io "membership tests:    %.2f\n" timer.time_for_membership
     !iszero(timer.module_time) && @printf io "module construction: %.2f\n" timer.module_time
     !iszero(timer.comp_lc_time) && @printf io "splitting:           %.2f\n" timer.comp_lc_time
 end
