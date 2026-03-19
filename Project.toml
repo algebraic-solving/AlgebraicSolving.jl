@@ -4,6 +4,7 @@ authors = ["ederc <ederc@mathematik.uni-kl.de>", "Mohab Safey El Din <Mohab.Safe
 version = "0.10.4"
 
 [deps]
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
@@ -20,6 +21,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 test = ["Test"]
 
 [compat]
+Distributed = "1.6"
 LinearAlgebra = "1.6"
 Logging = "1.6"
 Markdown = "1.6"
