@@ -88,3 +88,37 @@
     rat_sols = Vector{QQFieldElem}[[1, 2, 3], [0, 2, 3]]
     @test issetequal(rat_sols, rational_solutions(I))
 end
+
+@testset "Algorithms -> Solvers (array interface)" begin
+    # we represent [x+2*y+2*z-1, x^2-x+2*y^2+2*z^2, 2*x*y+2*y*z-y] in msolve format
+    lens = Int32[4, 4, 3]
+    cfs = BigInt[
+        1, 1, 2, 1, 2, 1, -1, 1, # 1, 2, 2, -1
+        1, 1, -1, 1, 2, 1, 2, 1, # 1, -1, 2, 2
+        2, 1, 2, 1, -1, 1 # 2, 2, -1
+    ]
+    exps = Int32[
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, # x, y, z, 1
+        2, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 2, # x^2, x, y^2, z^2
+        1, 1, 0, 0, 1, 1, 0, 1, 0 # x * y, y * z, y
+    ]
+    variable_names = ["x", "y", "z"]
+    field_char = 0
+
+    # the expected parametrization is 84*x^4-40*x^3+x^2+x, 336*x^3-120*x^2+2*x+1, [184*x^3-80*x^2+4*x+1, 36*x^3-18*x^2+2*x]
+    # we also represent it in msolve format
+    res_len = Int32[5, 4, 5, 5]
+    res_vnames = ["x", "y", "z"]
+    res_cf_lf = BigInt[]
+    res_cf = BigInt[
+        0, 1, 1, -40, 84, # 84*x^4 - 40*x^3 + x^2 + x
+        1, 2, -120, 336, # 336*x^3 - 120*x^2 + 2*x + 1
+        -1, -4, 80, -184, 1, # (-184*x^3 + 80*x^2 - 4*x - 1) * (-1 // 1)
+        0, -2, 18, -36, 1 # (-36*x^3 + 18*x^2 - 2*x) * (-1 // 1)
+    ]
+    res_sols_num = BigInt[]
+    res_sols_den = Int32[]
+
+    @test (res_len, res_vnames, res_cf_lf, res_cf, res_sols_num, res_sols_den) == AlgebraicSolving._core_msolve_array(
+        lens, cfs, exps, variable_names, field_char; get_param=2)
+end
