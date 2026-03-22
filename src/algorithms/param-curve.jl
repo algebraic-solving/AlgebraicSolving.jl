@@ -103,12 +103,13 @@ function rational_curve_parametrization(
         # Compute parametrization of each evaluation
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
         for j in 1:length(free_ind)
-            info_level>0 && print("Evaluated parametrizations: $(j+DEG+2-length(free_ind))/$(DEG+2)", "\r")
+            info_level>0 && print("Evaluated parametrizations: $(j)/$(length(free_ind))", "\r")
             Lr[j] = rational_parametrization(LFeval[j], nr_thrds=nr_thrds)
         end
         info_level>0 && println()
         for j in 1:length(free_ind)
             # Specialization checks: same vars order, generic degree
+            @show Lr[j].vars
             if  Lr[j].vars == [symbols(R)[1:N-2]; symbols(R)[N]] && degree(Lr[j].elim) == DEG
                 if isnothing(lc)
                     lc = leading_coefficient(Lr[j].elim)
@@ -118,8 +119,8 @@ function rational_curve_parametrization(
                     fact = lc / leading_coefficient(Lr[j].elim)
                     rr = [ p*fact for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
                 end
-                PARAM[j] = rr
-                _values[j] = curr_values[j]
+                PARAM[free_ind[j]] = rr
+                _values[free_ind[j]] = curr_values[j]
                 used_ind[j] = true
             else
                 info_level>0 && println("bad specialization: ", i+j-1)

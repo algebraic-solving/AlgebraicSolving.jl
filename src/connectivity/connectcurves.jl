@@ -4,7 +4,7 @@
 #pythonplot()
 
 export compute_graph, connected_components, number_connected_components, group_by_component, merge_graphs,
- plot_graph, plot_graphs, plot_graph_comp, compute_param, Bresultant, param_crit_split
+ plot_graph, plot_graphs, plot_graph_comp, Bresultant, param_crit_split
 
  # DEBUG
  export interp_subresultants, mmod_subresultants, subresultants, diff, diff_list, trimat_rand, fact_gcd, isolate_eval, isolate,
@@ -19,6 +19,7 @@ include("graph.jl")
 include("plots.jl")
 include("arbtools.jl")
 include("src/resultant/bresultant.jl")
+include("buildpoly.jl")
 
 function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); generic=true, precx = 150, v=0, arb=true, int_coeff=true, outf=true)  where (P <: MPolyRingElem)
     R = parent(f)
@@ -49,7 +50,7 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
                 # TODO : check that no overlap between different isolations
                 v > 0 && println("\nIsolating critical values with precision ", precx,"..")
             @iftime (v > 0) begin
-                xcrit = Dict(p[1]=> reduce(vcat, [isolate(pp, prec=precx) for pp in p[2][1]]) for p in params)
+                xcrit = Dict(p[1]=> reduce(vcat, [isolate(pp, prec=precx, software="msolve") for pp in p[2][1]]) for p in params)
                 # Enlarge exact isolating root intervals
                 for i in eachindex(xcrit)
                     for j in eachindex(xcrit[i])
