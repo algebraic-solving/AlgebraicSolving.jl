@@ -1,14 +1,10 @@
-#println("\nLoading libraries and data..")
-#using Nemo
-#using Plots, Colors
-#pythonplot()
 
 export compute_graph, connected_components, number_connected_components, group_by_component, merge_graphs,
  plot_graph, plot_graphs, plot_graph_comp, Bresultant, param_crit_split
 
  # DEBUG
  export interp_subresultants, mmod_subresultants, subresultants, diff, diff_list, trimat_rand, fact_gcd, isolate_eval, isolate,
- rat_to_Arb, evaluate_Arb, evaluate_Arb_rat, int_coeffs, array_to_poly, parray_asvar, poly_to_array, homogenize, rem_var,
+ rat_to_arb, evaluate_arb, evaluate_arb_rat, int_coeffs, array_to_poly, parray_asvar, poly_to_array, homogenize, rem_var,
  intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit
 
 include("tools.jl")
@@ -32,8 +28,8 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
     v > 1 && println(f)
 
     v > 0 && println("Compute parametrization of critical pts...")
-    @iftime (v > 0) params = param_crit_split(f,g,v=v-1, detect_app=true)
-    #@iftime (v > 0) params = mmod_param_crit(f, g,v=v-1, detect_app=false)
+    @iftime (v > 0) params = param_crit_split(f,g,v=v-1, detect_app=false)
+    #@iftime (v > 0) params = mmod_param_crit(f, g,v=v-1, detect_app=true)
     #=params = Bresultant(f, derivative(f,2), bspath="AlgebraicSolving.jl/src/connectivity/src/resultant/bresultant",v=2);
     params = change_ringvar.(params, Ref([:x,:y]))
     params = [ [[p[1]], p[3], p[2]] for p in params]
@@ -62,11 +58,11 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
                 xcritpermut = order_permut2d(xcrit);
             end
 
-                v > 0 && println("\nComputing isolating critical boxes using Arb with precision ",max(precx,150),"..")
+                v > 0 && println("\nComputing isolating critical boxes using Arb with precision ",precx,"..")
             @iftime (v > 0) begin
-                precArb = precx
-                Pcrit = Dict( i => [[xc, evaluate_Arb(params[i][2], params[i][3], rat_to_Arb(xc, precArb))] for xc in xcrit[i]] for i in eachindex(xcrit))
-                LBcrit =Dict( i=> [[ map(QQ, pc[1]), map(QQ, Arb_to_rat(pc[2])) ]  for pc in pcrit] for (i, pcrit) in Pcrit)
+                arbField = ArbField(precx)
+                Pcrit = Dict( i => [[xc, evaluate_arb(params[i][2], params[i][3], rat_to_arb(xc, arbField))] for xc in xcrit[i]] for i in eachindex(xcrit))
+                LBcrit =Dict( i=> [[ map(QQ, pc[1]), map(QQ, arb_to_rat(pc[2])) ]  for pc in pcrit] for (i, pcrit) in Pcrit)
                 # Enlarge exact isolating box vertical side (horizontal lines)
                 for i in eachindex(LBcrit)
                     for j in eachindex(LBcrit[i])
@@ -84,6 +80,7 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
                 break
             end
         end
+        # TODO: compteur pertinent ?
         if compt >= 5
             error("Problem in isolating critical boxes")
         end
@@ -91,7 +88,7 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
         v > 0 && println("\nCompute critical boxes with msolve with precision ", precx,"..")
     @iftime (v > 0) begin
         # TODO: parameter -I
-        LBcrit = Dict(p[1]=>reduce(vcat,[ sort(real_solutions(AlgebraicSolving.Ideal([pp,  p[2][3]*y-p[2][2]]), precision=precx,interval=true),by=t->t[1])  for pp in p[2][1] ]) for p in params)
+        LBcrit = Dict(p[1]=>reduce(vcat,[ sort(real_solutions(Ideal([pp,  p[2][3]*y-p[2][2]]), precision=precx,interval=true),by=t->t[1])  for pp in p[2][1] ]) for p in params)
         # Enlarge each exact isolating box side
         for i in eachindex(LBcrit)
             for j in eachindex(LBcrit[i])
@@ -113,6 +110,7 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
     ########################################################
     # For each mult of sing pts (keys) give the corresponding factors of the resultant (values)
     #########################################################
+    arbField = ArbField(precx)
     Lfyk = diff_list(f, 2, max(maximum(eachindex(LBcrit)),2))
     for ind in eachindex(LBcrit)
         ind>1 || ind==0 ||  continue # extreme and control pts
@@ -120,7 +118,7 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
         while true
             flag = false
             for j in eachindex(LBcrit[ind])
-                pcrit = [ rat_to_Arb(c, precx) for c in LBcrit[ind][j] ]
+                pcrit = [ rat_to_arb(c, arbField) for c in LBcrit[ind][j] ]
                 # Check if the the mult(pcrit)-th derivative of f vanishes on pcrit
                 if contains_zero(evaluate(Lfyk[m+1], pcrit))
                     (v > 0) && println("Refine singular boxes of multiplicity ", m)
@@ -176,7 +174,7 @@ end
         end
     end
     LnPCside = Dict(i => [[length(indI) for (L, indI) in PB] for PB in LPCside[i]] for i in eachindex(LPCside))
-
+    #return LnPCside
     # Update extreme boxes
     if haskey(LBcrit, 1)
         for j in eachindex(LBcrit[1])

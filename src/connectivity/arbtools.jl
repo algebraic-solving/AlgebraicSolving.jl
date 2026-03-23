@@ -1,34 +1,75 @@
-function Arb_to_rat(x)
-	r = radius(x)
-	return map(simplest_rational_inside, [x-r, x+r])
+"""
+    arb_to_rat(x::ArbFieldElem) -> Tuple{Rational, Rational}
+
+Return a rational interval enclosing the Arb ball.
+"""
+function arb_to_rat(x::ArbFieldElem)
+    r = radius(x)
+    lo = x - 2r
+    hi = x + 2r
+    return (simplest_rational_inside(lo), simplest_rational_inside(hi))
 end
 
-function rat_to_Arb(x, prec)
-    x1,x2 = x
-    xm, xd = ArbField(prec)((x1+x2)/2), ArbField(prec)(x2-x1)
-    return ball(xm,xd)
+
+"""
+    rat_to_arb(interval::Tuple, field::ArbField) -> ArbFieldElem
+
+Convert rational interval (x1, x2) to Arb ball.
+"""
+function rat_to_arb(interval, field::ArbField)
+    x1, x2 = interval
+    @assert x1 <= x2 "Invalid interval: x1 > x2"
+
+    mid = field((x1 + x2) / 2)
+    rad = field((x2 - x1) / 2)
+
+    return ball(mid, rad)
 end
 
-function evaluate_Arb(f, x::ArbFieldElem)
-	if is_zero(f)
-		return zero(parent(x))
-	else
-		cf = coefficients_of_univariate(f)
-		return evalpoly(x, cf)
-	end
+
+"""
+    evaluate_arb(f, x::ArbFieldElem)
+
+Evaluate polynomial f at x using Arb arithmetic.
+"""
+function evaluate_arb(f, x::ArbFieldElem)
+    is_zero(f) && return zero(parent(x))
+    cf = coefficients_of_univariate(f)
+    return evalpoly(x, cf)
 end
 
-function evaluate_Arb(f, g, x::ArbFieldElem)
-	@assert !is_zero(g) "Denominator must be non-zero"
-	if is_zero(f)
-		return zero(parent(x))
-	else
-		cf, cg = coefficients_of_univariate.([f, g])
-		return evalpoly(x, cf) / evalpoly(x, cg)
-	end
+
+"""
+    evaluate_arb(f, g, x::ArbFieldElem)
+
+Evaluate rational function f/g at x.
+"""
+function evaluate_arb(f, g, x::ArbFieldElem)
+    @assert !is_zero(g) "Denominator must be non-zero"
+
+    is_zero(f) && return zero(parent(x))
+
+    cf = coefficients_of_univariate(f)
+    cg = coefficients_of_univariate(g)
+
+    num = evalpoly(x, cf)
+    den = evalpoly(x, cg)
+
+    return num / den
 end
 
-function Arb_eval(f, B, prec)
-	BA = [ rat_to_Arb(b, prec) for b in B ]
-	return evaluate(change_base_ring(ArbField(prec), f), BA)
+
+"""
+    arb_eval(f, B::Vector{Tuple}, prec::Int)
+
+Evaluate polynomial f over interval box B.
+"""
+function arb_eval(f, B::Vector{Tuple}, field::ArbField)
+    BA = Vector{ArbFieldElem}(undef, length(B))
+    for i in eachindex(B)
+        BA[i] = rat_to_arb(B[i], field)
+    end
+
+    f_arb = change_base_ring(field, f)
+    return evaluate(f_arb, BA)
 end

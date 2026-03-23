@@ -109,7 +109,6 @@ function rational_curve_parametrization(
         info_level>0 && println()
         for j in 1:length(free_ind)
             # Specialization checks: same vars order, generic degree
-            @show Lr[j].vars
             if  Lr[j].vars == [symbols(R)[1:N-2]; symbols(R)[N]] && degree(Lr[j].elim) == DEG
                 if isnothing(lc)
                     lc = leading_coefficient(Lr[j].elim)
