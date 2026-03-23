@@ -6,7 +6,7 @@ whose real trace XR is bounded, return a roadmap of XR
 
 The output is given as a Roadmap structure, encoding the recursive structure
 of roadmaps. It is encoded as a chained list, whose root is containing the equations defining X
-and each node representing a curve component, that is defined by additional polar equation and base point<
+and each node representing a curve component, that is defined by additional polar equation and base point.
 Moreover it is linked to fibers, that share the same base point.
 
 # Arguments
