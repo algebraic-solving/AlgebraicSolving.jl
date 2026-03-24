@@ -14,7 +14,6 @@ include("boxes.jl")
 include("graph.jl")
 include("plots.jl")
 include("arbtools.jl")
-include("src/resultant/bresultant.jl")
 include("buildpoly.jl")
 
 function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); generic=true, precx = 150, v=0, arb=true, int_coeff=true, outf=true)  where (P <: MPolyRingElem)
@@ -28,82 +27,58 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
     v > 1 && println(f)
 
     v > 0 && println("Compute parametrization of critical pts...")
-    @iftime (v > 0) params = param_crit_split(f,g,v=v-1, detect_app=false)
+    @iftime (v > 0) params = param_crit_split(f,g,v=v-1, detect_app=true)
     #@iftime (v > 0) params = mmod_param_crit(f, g,v=v-1, detect_app=true)
-    #=params = Bresultant(f, derivative(f,2), bspath="AlgebraicSolving.jl/src/connectivity/src/resultant/bresultant",v=2);
-    params = change_ringvar.(params, Ref([:x,:y]))
-    params = [ [[p[1]], p[3], p[2]] for p in params]
-    params = Dict(1=>params[1], -1=>params[2])=#
 
     for i in 1:length(C)
         params[-i] = [ [C[i][1] |> intC], C[i][2], C[i][3] ]
     end
-    #println(keys(params))
-    if arb
-        compt = 0
-        while compt < 5
-            try
-                # TODO : check that no overlap between different isolations
-                v > 0 && println("\nIsolating critical values with precision ", precx,"..")
-            @iftime (v > 0) begin
-                xcrit = Dict(p[1]=> reduce(vcat, [isolate(pp, prec=precx, software="msolve") for pp in p[2][1]]) for p in params)
-                # Enlarge exact isolating root intervals
-                for i in eachindex(xcrit)
-                    for j in eachindex(xcrit[i])
-                        if xcrit[i][j][1]==xcrit[i][j][2]
-                            xcrit[i][j] = [xcrit[i][j][1]-1//ZZ(1)<<precx, xcrit[i][j][1]+1//ZZ(1)<<precx]
-                        end
-                    end
-                end
-                xcritpermut = order_permut2d(xcrit);
-            end
 
-                v > 0 && println("\nComputing isolating critical boxes using Arb with precision ",precx,"..")
-            @iftime (v > 0) begin
-                arbField = ArbField(precx)
-                Pcrit = Dict( i => [[xc, evaluate_arb(params[i][2], params[i][3], rat_to_arb(xc, arbField))] for xc in xcrit[i]] for i in eachindex(xcrit))
-                LBcrit =Dict( i=> [[ map(QQ, pc[1]), map(QQ, arb_to_rat(pc[2])) ]  for pc in pcrit] for (i, pcrit) in Pcrit)
-                # Enlarge exact isolating box vertical side (horizontal lines)
-                for i in eachindex(LBcrit)
-                    for j in eachindex(LBcrit[i])
-                        if LBcrit[i][j][2][1]==LBcrit[i][j][2][2]
-                            LBcrit[i][j][2] = [LBcrit[i][j][2][1]-1//ZZ(2)<<precx, LBcrit[i][j][2][1]+1//ZZ(2)<<precx]
-                        end
+    compt = 0
+    xcrit, xcritpermut, LBcrit = Dict(), Dict(), Dict()
+    while compt < 5
+        try
+            # TODO : check that no overlap between different isolations
+            v > 0 && println("\nIsolating critical values with precision ", precx,"..")
+        @iftime (v > 0) begin
+            xcrit = Dict(p[1]=> reduce(vcat, [isolate(pp, prec=precx) for pp in p[2][1]]) for p in params)
+            # Enlarge exact isolating root intervals
+            for i in eachindex(xcrit)
+                for j in eachindex(xcrit[i])
+                    if xcrit[i][j][1]==xcrit[i][j][2]
+                        xcrit[i][j] = [xcrit[i][j][1]-1//ZZ(1)<<precx, xcrit[i][j][1]+1//ZZ(1)<<precx]
                     end
                 end
             end
-            catch
-                precx *= 2
-                v > 0 && println("\nRefine x-precision to $precx")
-                compt += 1
-            else
-                break
-            end
+            xcritpermut = order_permut2d(xcrit);
         end
-        # TODO: compteur pertinent ?
-        if compt >= 5
-            error("Problem in isolating critical boxes")
-        end
-    else
-        v > 0 && println("\nCompute critical boxes with msolve with precision ", precx,"..")
-    @iftime (v > 0) begin
-        # TODO: parameter -I
-        LBcrit = Dict(p[1]=>reduce(vcat,[ sort(real_solutions(Ideal([pp,  p[2][3]*y-p[2][2]]), precision=precx,interval=true),by=t->t[1])  for pp in p[2][1] ]) for p in params)
-        # Enlarge each exact isolating box side
-        for i in eachindex(LBcrit)
-            for j in eachindex(LBcrit[i])
-                for k in eachindex(LBcrit[i][j])
-                    if LBcrit[i][j][k][1]==LBcrit[i][j][k][2]
-                        LBcrit[i][j][k] = [LBcrit[i][j][k][1]-1//ZZ(2-k)<<precx, LBcrit[i][j][k][1]+1//ZZ(2-k)<<precx]
+
+            v > 0 && println("\nComputing isolating critical boxes using Arb with precision ",precx,"..")
+        @iftime (v > 0) begin
+            arbField = ArbField(precx)
+            Pcrit = Dict( i => [[xc, evaluate_arb(params[i][2], params[i][3], rat_to_arb(xc, arbField))] for xc in xcrit[i]] for i in eachindex(xcrit))
+            LBcrit = Dict( i=> [[ map(QQ, pc[1]), map(QQ, arb_to_rat(pc[2])) ]  for pc in pcrit] for (i, pcrit) in Pcrit)
+            # Enlarge exact isolating box vertical side (horizontal lines)
+            for i in eachindex(LBcrit)
+                for j in eachindex(LBcrit[i])
+                    if LBcrit[i][j][2][1]==LBcrit[i][j][2][2]
+                        LBcrit[i][j][2] = [LBcrit[i][j][2][1]-1//ZZ(2)<<precx, LBcrit[i][j][2][1]+1//ZZ(2)<<precx]
                     end
                 end
             end
         end
-        xcrit = Dict(lbcrit[1]=>[ B[1] for B in lbcrit[2] ] for lbcrit in LBcrit)
-        xcritpermut = order_permut2d(xcrit);
+        catch
+            precx *= 2
+            v > 0 && println("\nRefine x-precision to $precx")
+            compt += 1
+        else
+            break
+        end
     end
+    # TODO: limite du compteur pertinent ?
+    if compt >= 5
+        error("Problem in isolating critical boxes")
     end
-    #println(xcrit)
 
     v > 0 && println("\nTest for identifying singular boxes")
 @iftime (v > 0) begin
@@ -113,7 +88,7 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
     arbField = ArbField(precx)
     Lfyk = diff_list(f, 2, max(maximum(eachindex(LBcrit)),2))
     for ind in eachindex(LBcrit)
-        ind>1 || ind==0 ||  continue # extreme and control pts
+        (ind < 0 && ind == 1) &&  continue # extreme and control pts
         m = ind==0 ? 2 : ind # nodes have mult 2
         while true
             flag = false
@@ -134,11 +109,7 @@ end
 
     v > 0 && println("\nCompute intersections with critical boxes..")
 @iftime (v > 0) begin
-    # Could be improved by handling nodes (or even any ordinary sing) as extreme boxes:
-    # when npcside = [2,2,0,0] just take nearest below and above
-    # intersections b with the curves on the vertical sides
-    # and change into npcside = [0,0,2,2]
-    ## TODO : Refine only the intervals that need to be refined
+    ## TODO : Refine only the intervals that need to be refined?
     LPCside = Dict{Int,Any}()
     ndig = maximum([ndigits(length(LBcrit[i])) for i in eachindex(LBcrit)])
     for i in eachindex(LBcrit)
@@ -174,7 +145,7 @@ end
         end
     end
     LnPCside = Dict(i => [[length(indI) for (L, indI) in PB] for PB in LPCside[i]] for i in eachindex(LPCside))
-    #return LnPCside
+
     # Update extreme boxes
     if haskey(LBcrit, 1)
         for j in eachindex(LBcrit[1])
@@ -216,19 +187,17 @@ end
     end
 end
 
-    #return LnPCside
-
-    #println("\nGraph computation")
-    # Would be nice to have only one intermediate fiber (take the average of abscissa and ordinates) for plot
-    # And even remove this fiber for the graph
+    # Graph computation
     fct, typeout = outf ? (Float64, Float64) : (identity, QQFieldElem)
 
+    # List of vertex: at index i is the tuple of the coordinates of the i-th vertex
     Vert = Vector{Tuple{typeout, typeout}}()
+    # List of edges: a tuple (i,j) is an edge between the i-th and j-th vertices
     Edg = Vector{Tuple{Int, Int}}()
     Corr = Dict( m => [[[], [[], [], []], []] for j in xcrit[m] ] for m in eachindex(xcrit))
-    Viso = []
     Vcon = [ [] for _ in 1:length(C) ]
 
+    # Keep track of processed isolated & apparent singularities
     Lapp = [[],[]]
 
     for ind in eachindex(xcritpermut)
@@ -239,10 +208,10 @@ end
         end
         if ind < length(xcritpermut)
             i2, j2 = xcritpermut[ind + 1]
-            I2L, nI2L = LPCside[i2][j2][3]
+            I2L, = LPCside[i2][j2][3]
         end
 
-        PCside, nPCside = LPCside[i][j], LnPCside[i][j]
+        PCside = LPCside[i][j]
         I = [ l[1] for l in PCside[3:end] ]
         nI = [ l[2] for l in PCside[3:end] ]
 
@@ -278,9 +247,6 @@ end
         end
         ###########################
         # Below the critical point
-        #println()
-        #println(map(length,I))
-        #println(nI[1],", ", nI[2], ", ", [length(I[1])+1])
         for k in 1:ymincrit-1
             push!(Vert, (xcmid, sum(I[1][k] + I[2][k])// 4) .|> fct)
             push!(Corr[i][j][2][1], length(Vert))
@@ -293,12 +259,6 @@ end
         # If we are dealing with a isolated node
         if i in [0,2] && isempty(nI[1]) && isempty(nI[2])
                 push!(Lapp[1], (i,j))
-                #pass
-                # We can add the isolated  vertex
-                # push!(Vert, [xcmid, ycmid])
-                # push!(Corr[i][j][2][1], length(Vert))
-                # We will subsequently add the vertex in the graph
-                # push!(Viso, length(Vert))
         # If we are dealing with an apparent singularity
         elseif i == 0
             # We connect the pairwise opposite branches nI[1][1][i] and nI[1][2][i+1 mod 2], i=1,2
