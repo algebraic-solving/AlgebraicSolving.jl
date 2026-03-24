@@ -232,7 +232,8 @@ function _evalvar(
     return LFeval
 end
 
-# Generate N primes > start that do not divide any numerator/denominator
+# Generate N random primes between low and up
+# that do not divide any numerator/denominator
 # of any coefficient in polynomials from LP
 function _generate_lucky_primes(
     LF::Vector{P} where P<:MPolyRingElem,

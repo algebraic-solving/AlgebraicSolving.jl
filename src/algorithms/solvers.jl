@@ -272,7 +272,7 @@ end
     rational_solutions(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
 Given an ideal `I` with a finite solution set over the complex numbers, return
-the rational roots of the ideal. 
+the rational roots of the ideal.
 
 # Arguments
 - `I::Ideal{T} where T <: MPolyRingElem`: input generators.
