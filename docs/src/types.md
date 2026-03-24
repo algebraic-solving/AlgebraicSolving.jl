@@ -182,7 +182,7 @@ component for which their attribute `base_pt` contains a point $\mathbf{q}'$
 that shares the same first $e$ coordinates with $\mathbf{q}$.
 
 The reason of this tree arrangement is mainly because of the following property:
-*two roadmap components intersects if, and only if, one's node is a descendant
+*two roadmap components intersect if, and only if, one's node is a descendant
 of the other's*. In many cases, one can even replace "descendant" by "parent".
 
 
