@@ -7,7 +7,7 @@
     denom = 4//3*x + 2*y - 1//3
     p     = 4//3*x^2 - 4//3*x*y + 2//3*x + 4//3*y - 1//3
 
-    param = rational_curve_parametrization(I)
+    param = curve_rational_parametrization(I)
 
     @test param.vars == [:x1, :x2, :x3]
     @test param.cfs_lfs == Vector{ZZRingElem}[]
@@ -21,14 +21,14 @@
     R, (x1,x2,x3,x4) = polynomial_ring(QQ, ["x1","x2","x3","x4"])
 
     I = Ideal([x1^2-x2, x1*x3-x4, x2*x4-12, x4^3-x3^2])
-    rational_curve_parametrization(I)
+    curve_rational_parametrization(I)
     @test I.rat_param.vars == Symbol[]
     @test I.rat_param.elim == -one(C)
     @test I.dim == -1
 
     I = Ideal([x1^2-x2, x1*x3, x2-12])
-	@test_throws AssertionError rational_curve_parametrization(I)
-    @test_throws ErrorException rational_curve_parametrization(Ideal([x1^2-x2, x1*x3, x2-12]), check_gen=false)
+	@test_throws AssertionError curve_rational_parametrization(I)
+    @test_throws ErrorException curve_rational_parametrization(Ideal([x1^2-x2, x1*x3, x2-12]), check_gen=false)
 
     elim    = 5041//2500*x^2 - 71//25*x*y - 3834//625*x + y^2 + 108//25*y - 6492//625
     denom   = -71//25*x + 2*y + 108//25
@@ -37,7 +37,7 @@
     p3      = zero(C)
     p4      = -923//625*x^2 + 26//25*x*y - 18192//625*x + 552//25*y + 8304//625
 
-    param = rational_curve_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-8,2,2,-1,-8,6], [8,-7,-5,8,-7,2]]))
+    param = curve_rational_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-8,2,2,-1,-8,6], [8,-7,-5,8,-7,2]]))
 
     @test param.vars == [:x1, :x2, :x3, :x4, :_Z2, :_Z1]
     @test param.cfs_lfs == Vector{ZZRingElem}[[-8, 2, 2, -1, -8, 6], [8, -7, -5, 8, -7, 2]]
@@ -50,20 +50,20 @@
     @test I.dim == 1
 
     I = Ideal([x1^2-x2, x1*x3])
-	@test_throws AssertionError rational_curve_parametrization(I)
-    @test_throws AssertionError rational_curve_parametrization(I, use_lfs=true)
-    @test_throws AssertionError rational_curve_parametrization(I, check_gen=false)
+	@test_throws AssertionError curve_rational_parametrization(I)
+    @test_throws AssertionError curve_rational_parametrization(I, use_lfs=true)
+    @test_throws AssertionError curve_rational_parametrization(I, check_gen=false)
 
     I = Ideal([R(0)])
-    @test_throws AssertionError rational_curve_parametrization(I)
+    @test_throws AssertionError curve_rational_parametrization(I)
 
     I = Ideal([R(1)])
-    @test rational_curve_parametrization(I).vars == Symbol[]
+    @test curve_rational_parametrization(I).vars == Symbol[]
 
     # Non-generic variables
     A,(x,t,u) = polynomial_ring(QQ, [:x,:u,:t])
     I = Ideal([t^2+u, u-x])
-	@test_throws AssertionError rational_curve_parametrization(I)
+	@test_throws AssertionError curve_rational_parametrization(I)
     I = Ideal([u^2+t, t-x])
-    @test_throws AssertionError rational_curve_parametrization(I)
+    @test_throws AssertionError curve_rational_parametrization(I)
 end
