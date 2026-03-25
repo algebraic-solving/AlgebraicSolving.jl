@@ -118,13 +118,15 @@ function curve_rational_parametrization(
                 PARAM[free_ind[j]] = rr
                 _values[free_ind[j]] = curr_values[j]
                 used_ind[j] = true
-            else
-                info_level>0 && println("\nbad specialization: ", i+j-1)
             end
         end
+        # Update range, free indices and used indices
         i += length(free_ind)
         free_ind = [ free_ind[j] for j in eachindex(free_ind) if !used_ind[j] ]
         used_ind = zeros(Bool, length(free_ind))
+
+        info_level * length(free_ind) != 0 &&
+        println("bad specialization(s): ", curr_values[free_ind])
     end
 
     # Interpolate each coefficient of each poly in the param
@@ -138,7 +140,7 @@ function curve_rational_parametrization(
         for deg in 0:DEG
             _evals = [coeff(PARAM[i][count], deg) for i in eachindex(PARAM)]
             # Remove denominators for faster interpolation with FLINT
-            # TODO: leave dens when interface ready in Nemo
+            # TODO: remove dens mult when interface's ready in Nemo
             den = foldl(lcm, denominator.(_evals))
             scaled_evals = [ZZ(_evals[i] * den) for i in eachindex(_evals)]
             COEFFS[deg+1] = interpolate(A, _values, scaled_evals) / (lc*den)
