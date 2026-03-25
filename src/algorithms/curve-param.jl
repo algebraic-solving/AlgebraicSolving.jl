@@ -43,6 +43,8 @@ function curve_rational_parametrization(
         nr_thrds::Int=1,                                            # number of threads (msolve)
         check_gen::Bool = true                                      # perform genericity check
     )
+    @assert(nvars(parent(I))>=2, "I must be defined in a ring with at least 2 variables")
+
     info_level>0 && println("Compute ideal data" * (check_gen ? " and genericity check" : ""))
     lucky_prime = _generate_lucky_primes(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
     Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
@@ -55,12 +57,6 @@ function curve_rational_parametrization(
         return I.rat_param
     end
     @assert(Itest.dim==1, "I must define a curve or an empty set")
-    if nvars(parent(I)) == 1
-        T, (x,y) = polynomial_ring(QQ, [:x,:y])
-        I.dim = 1
-        I.rat_param = CurveRationalParametrization(Symbol[:x, :y], Vector{ZZRingElem}[[0,1]], y, T(1), QQMPolyRingElem[])
-        return I.rat_param
-    end
 
     DEG = hilbert_degree(Itest)
     # If generic variables must be added
