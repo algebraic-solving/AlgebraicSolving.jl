@@ -25,23 +25,6 @@ function _change_ring(p::MPolyRingElem, R::MPolyRing)::MPolyRingElem
     return _map_exponent_vectors(v -> [i == 0 ? 0 : v[i] for i in indices], p, R)
 end
 
-function _leading_coefficient(f::QQMPolyRingElem, i::Int)::QQMPolyRingElem
-    e_max = 0
-    coeff_max = zero(parent(f))
-    for j in 1:length(f)
-        e = exponent_vector(f, j)
-        if e[i] > e_max
-            e_max = e[i]
-            e[i] = 0
-            coeff_max = coeff(f, j) * prod(gens(parent(f)) .^ e)
-        elseif e[i] == e_max
-            e[i] = 0
-            coeff_max += coeff(f, j) * prod(gens(parent(f)) .^ e)
-        end
-    end
-    return coeff_max
-end
-
 # TODO: remove this once the next version of Nemo is released
 function _flint_discriminant(f::QQMPolyRingElem, i::Int)::QQMPolyRingElem
     R = parent(f)
@@ -76,7 +59,7 @@ function discriminant(
     deg_f = total_degree(f)
     # not tight, but should be good enough in practice
     d = fill(deg_f * deg_f, length(gens(R′)))
-    lc = _leading_coefficient(f, i)
+    lc = leading_coefficient(f, i)
     res = newton(R′, bb, d, non_vanishing_poly=lc, nr_thrds=nr_thrds, show_progress=show_progress, desc=desc)
     @assert total_degree(res) <= deg_f * deg_f - deg_f
     res = _change_ring(res, R)
@@ -105,7 +88,7 @@ function resultant(
     deg_g = total_degree(g)
     # not tight, but should be good enough in practice
     d = fill(deg_f * deg_g + 1, length(gens(R′)))
-    lc = _leading_coefficient(f, i) * _leading_coefficient(g, i)
+    lc = leading_coefficient(f, i) * leading_coefficient(g, i)
     res = newton(R′, bb, d, non_vanishing_poly=lc, nr_thrds=nr_thrds, show_progress=show_progress, desc=desc)
     @assert total_degree(res) <= deg_f * deg_g
     res = _change_ring(res, R)
