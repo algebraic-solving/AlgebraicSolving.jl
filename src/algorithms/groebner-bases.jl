@@ -210,16 +210,16 @@ function _core_groebner_basis_array(
 
     # convert to julia array, also give memory management to julia
     jl_ld = gb_ld[]
-    jl_len = Int32.(Base.unsafe_wrap(Array, gb_len[], jl_ld))
-    jl_exp = Int32.(Base.unsafe_wrap(Array, gb_exp[], nr_terms * nr_vars))
+    jl_len = Vector{Int32}(Base.unsafe_wrap(Array, gb_len[], jl_ld))
+    jl_exp = Vector{Int32}(Base.unsafe_wrap(Array, gb_exp[], nr_terms * nr_vars))
 
     # coefficient handling depending on field characteristic
     if field_char == 0
         ptr = reinterpret(Ptr{BigInt}, gb_cf[])
-        jl_cf = BigInt.([deepcopy(unsafe_load(ptr, i)) for i in 1:nr_terms])
+        jl_cf = BigInt[deepcopy(unsafe_load(ptr, i)) for i in 1:nr_terms]
     else
         ptr = reinterpret(Ptr{Int32}, gb_cf[])
-        jl_cf = Int32.(Base.unsafe_wrap(Array, ptr, nr_terms))
+        jl_cf = Vector{Int32}(Base.unsafe_wrap(Array, ptr, nr_terms))
     end
 
     ccall((:free_f4_julia_result_data, libneogb), Nothing,
