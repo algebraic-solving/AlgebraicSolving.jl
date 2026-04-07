@@ -261,3 +261,8 @@ function _generate_lucky_primes(
     end
     return Lprim
 end
+
+function rational_curve_parametrization(I::Ideal{P}; kwargs...) where P<:QQMPolyRingElem
+    @warn "rational_curve_parametrization is deprecated; use curve_rational_parametrization instead."
+    return curve_rational_parametrization(I; kwargs...)
+end
