@@ -6,4 +6,4 @@ export polynomial_ring, MPolyRing, GFElem, MPolyRingElem,
        equidimensional_decomposition, homogenize, dimension, FqMPolyRingElem,
        hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial,
        rational_curve_parametrization, roadmap, computepolar, all_eqs,
-       all_base_pts, nb_nodes
+       all_base_pts, nb_nodes, subresultants

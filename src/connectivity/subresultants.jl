@@ -69,59 +69,96 @@ function array_to_poly(LP, A)
     return finish(C)
 end
 
-# Univariate resultant
+"""
+    subresultants(P, Q)
+Compute the subresultant polynomial remainder sequence (PRS) of two univariate polynomials.
+
+Returns a vector `[S0, S1, ..., Sk]` where:
+- S0 = Q (after possible swap)
+- each Si is a subresultant
+- sequence ends when remainder becomes zero or constant
+"""
+
 function subresultants(P::PolyRingElem{T}, Q::PolyRingElem{T}) where T <: RingElement
+    return _subresultants(P, Q, false)
+end
+
+function subresultants(P::FqPolyRingElem, Q::FqPolyRingElem)
+    return _subresultants(P, Q, true)
+end
+
+function _subresultants(P::Union{PolyRingElem{T}, FqPolyRingElem}, Q::Union{PolyRingElem{T}, FqPolyRingElem}, Fq::Bool) where T <: RingElement
+
+    # Ensure deg(P) >= deg(Q)
     if degree(P) < degree(Q)
         P, Q = Q, P
     end
-    S = [Q]
-    s = leading_coefficient(Q)^(degree(P)-degree(Q))
+
+    S = Vector{typeof(Q)}()
+    push!(S, Q)
+
+    # Initial scaling factor (controls normalization of pseudo-remainders)
+    s = leading_coefficient(Q)^(degree(P) - degree(Q))
+
+    # rem is faster when working with finite fields (relies on FLINT)
     A = Q
-    B = pseudorem(P,-Q)
-    ring = parent(P)
+    B = Fq ? (-leading_coefficient(Q))^(degree(P) - degree(Q) + 1) * rem(P, Q) : pseudorem(P, -Q)
+
     while true
         d = degree(A)
         e = degree(B)
-        #println("($d,$e)")
+        # Termination: exact division reached
         if iszero(B)
             return S
         end
-        pushfirst!(S, copy(B))
-        delta = d - e
+        pushfirst!(S, B)  # prepend current remainder
+        delta = d - e  # degree drop
+        # --- Compute normalization factor C ---
         if delta > 1
             if length(S) > 1
+                # Use previous subresultants to stabilize scaling
                 n = degree(S[2]) - degree(S[1]) - 1
                 if n == 0
-                    C = copy(S[1])
+                    C = S[1]
                 else
                     x = leading_coefficient(S[1])
                     y = leading_coefficient(S[2])
+
+                    # fast exponentiation (binary powering)
                     a = 1 << (length(bits(ZZ(n))) - 1)
                     c = x
-                    n = n - a
+                    n -= a
                     while a > 1
-                        a /= 2
+                        a >>= 1
                         c = c^2 / y
                         if n >= a
                             c = c * x / y
-                            n = n - a
+                            n -= a
                         end
                     end
+
                     C = c * S[1] / y
                 end
             else
-                C = leading_coefficient(B)^(delta-1) * B / s^(delta-1)
+                # First step: fallback normalization
+                C = leading_coefficient(B)^(delta - 1) * B / s^(delta - 1)
             end
-            pushfirst!(S, copy(C))
+            pushfirst!(S, C)
         else
-            C = copy(B)
+            C = B
         end
+
+        # Termination: constant polynomial
         if e == 0
             return S
         end
-        #@time
-        B = pseudorem(A,-B) / (s^delta * leading_coefficient(A))
-        A = copy(C)
+
+        # --- Next pseudo-remainder ---
+        B = Fq ? (-leading_coefficient(B))^(d - e + 1)* rem(A, B) : pseudorem(A, -B)
+        B /= (s^delta * leading_coefficient(A))
+
+        # Shift sequence
+        A = C
         s = leading_coefficient(A)
     end
 end
@@ -569,3 +606,4 @@ end
 end
 
 param_crit_split(f; v=1) = param_crit_split(f, zero(parent(f)), v=v, detect_app=false)
+
