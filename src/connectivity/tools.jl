@@ -19,9 +19,10 @@ function diff(p, v, n)
 end
 
 function diff_list(p, v, n)
-    Ldp = [p]
+    Ldp = Vector{typeof(p)}(undef, n+1)
+    Ldp[1] = p
     for j in 1:n
-        push!(Ldp, derivative(Ldp[end], v))
+        Ldp[j+1] = derivative(Ldp[j], v)
     end
     return Ldp
 end

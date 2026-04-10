@@ -9,14 +9,13 @@ export compute_graph, connected_components, number_connected_components, group_b
 
 include("tools.jl")
 include("subresultants.jl")
-include("isolate.jl")
-include("boxes.jl")
+include("isolateboxes.jl")
 include("graph.jl")
 include("plots.jl")
 include("arbtools.jl")
 include("buildpoly.jl")
 
-function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); generic=true, precx = 150, v=0, arb=true, int_coeff=true, outf=true)  where (P <: MPolyRingElem)
+function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); generic=true, precx = 150, v=0, int_coeff=true, outf=true)  where (P <: MPolyRingElem)
     R = parent(f)
     x, y = gens(R)
     intC = int_coeff ? int_coeffs : identity
@@ -25,6 +24,7 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
     changemat = generic ? [1 0; 0 1] : trimat_rand(QQ, 2, range=-100:100)
     f = evaluate(f, collect(changemat*[x; y]));
     v > 1 && println(f)
+    precx = precx <= 1 ? 2 : precx
 
     v > 0 && println("Compute parametrization of critical pts...")
     @iftime (v > 0) params = param_crit_split(f,g,v=v-1, detect_app=true)
@@ -34,51 +34,12 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
         params[-i] = [ [C[i][1] |> intC], C[i][2], C[i][3] ]
     end
 
-    compt = 0
-    xcrit, xcritpermut, LBcrit = Dict(), Dict(), Dict()
-    while compt < 5
-        try
-            # TODO : check that no overlap between different isolations
-            v > 0 && println("\nIsolating critical values with precision ", precx,"..")
-        @iftime (v > 0) begin
-            xcrit = Dict(p[1]=> reduce(vcat, [isolate(pp, prec=precx) for pp in p[2][1]]) for p in params)
-            # Enlarge exact isolating root intervals
-            for i in eachindex(xcrit)
-                for j in eachindex(xcrit[i])
-                    if xcrit[i][j][1]==xcrit[i][j][2]
-                        xcrit[i][j] = [xcrit[i][j][1]-1//ZZ(1)<<precx, xcrit[i][j][1]+1//ZZ(1)<<precx]
-                    end
-                end
-            end
-            xcritpermut = order_permut2d(xcrit);
-        end
+    v > 0 && println("Computing isolating critical boxes")
+    LBcrit = Dict()
+    @iftime (v > 0) xcritpermut, precx = compute_crit_boxes(params, LBcrit, precx, v)
+    xcrit = Dict(i => [LBcrit[i][j][1] for j in eachindex(LBcrit[i])] for i in eachindex(LBcrit))
 
-            v > 0 && println("\nComputing isolating critical boxes using Arb with precision ",precx,"..")
-        @iftime (v > 0) begin
-            arbField = ArbField(precx)
-            Pcrit = Dict( i => [[xc, evaluate_arb(params[i][2], params[i][3], rat_to_arb(xc, arbField))] for xc in xcrit[i]] for i in eachindex(xcrit))
-            LBcrit = Dict( i=> [[ map(QQ, pc[1]), map(QQ, arb_to_rat(pc[2])) ]  for pc in pcrit] for (i, pcrit) in Pcrit)
-            # Enlarge exact isolating box vertical side (horizontal lines)
-            for i in eachindex(LBcrit)
-                for j in eachindex(LBcrit[i])
-                    if LBcrit[i][j][2][1]==LBcrit[i][j][2][2]
-                        LBcrit[i][j][2] = [LBcrit[i][j][2][1]-1//ZZ(2)<<precx, LBcrit[i][j][2][1]+1//ZZ(2)<<precx]
-                    end
-                end
-            end
-        end
-        catch
-            precx *= 2
-            v > 0 && println("\nRefine x-precision to $precx")
-            compt += 1
-        else
-            break
-        end
-    end
-    # TODO: limite du compteur pertinent ?
-    if compt >= 5
-        error("Problem in isolating critical boxes")
-    end
+    # println("LBcrit: ", LBcrit)
 
     v > 0 && println("\nTest for identifying singular boxes")
 @iftime (v > 0) begin
@@ -88,28 +49,35 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
     arbField = ArbField(precx)
     Lfyk = diff_list(f, 2, max(maximum(eachindex(LBcrit)),2))
     for ind in eachindex(LBcrit)
-        (ind < 0 && ind == 1) &&  continue # extreme and control pts
-        m = ind==0 ? 2 : ind # nodes have mult 2
-        while true
-            flag = false
+        ind < 0 &&  continue # control pts
+        m = ind <= 1 ? 2 : ind # nodes and extrems have mult 2
+        noisolate = false
+        for _ in 1:5
+            noisolate = false
             for j in eachindex(LBcrit[ind])
                 pcrit = [ rat_to_arb(c, arbField) for c in LBcrit[ind][j] ]
                 # Check if the the mult(pcrit)-th derivative of f vanishes on pcrit
                 if contains_zero(evaluate(Lfyk[m+1], pcrit))
-                    (v > 0) && println("Refine singular boxes of multiplicity ", m)
-                    # TODO refine_boxes(params[k], LBcrit[k])
-                    #flag = true
+                    # TODO refine only boxes associated to multiplicity m
+                    precx *= 2
+                    (v > 0) && println("Refine singular boxes of index $ind to $precx bits precision")
+                    xcritpermut, precx = compute_crit_boxes(params, LBcrit, precx, v-1)
+                    xcrit = Dict(i => [LBcrit[i][j][1] for j in eachindex(LBcrit[i])] for i in eachindex(LBcrit))
+                    noisolate = true
                     break
                 end
             end
-            flag || break
+            noisolate || break
+        end
+        if noisolate
+            error("Problem in singular boxes refinement")
         end
     end
 end
 
     v > 0 && println("\nCompute intersections with critical boxes..")
 @iftime (v > 0) begin
-    ## TODO : Refine only the intervals that need to be refined?
+    ## TODO : Refine only the intervals that need to be refined? only the factor that defines the intervals
     LPCside = Dict{Int,Any}()
     ndig = maximum([ndigits(length(LBcrit[i])) for i in eachindex(LBcrit)])
     for i in eachindex(LBcrit)
@@ -122,14 +90,15 @@ end
         compt = 0
         while compt < 5
             flag = false
+            # println(LBcrit[i])
             for j in eachindex(LBcrit[i])
                 v > 0 && print("$Ptype=$i ; $(j)/$(length(LBcrit[i]))$(repeat(" ", ndig-ndigi+1))pts","\r")
                 pcside = intersect_box(f, LBcrit[i][j], prec=precxtmp,v=v)
                 npcside = [length(n) for (I, n) in pcside]
-                #println("($i, $j): $npcside")
+                # println("($i, $j): $npcside")
                 if (i == 1 && sum(npcside) > 2) || (i != 1 && sum(npcside[1:2]) != 0)
                     precxtmp *= 2
-                    v > 0 && println("\nRefine boxes along x-axis to precision ", precxtmp)
+                    v > 0 && println("\nRefine boxes along x-axis to $precxtmp bits precision")
                     refine_xboxes(params[i][1], LBcrit[i], precxtmp)
                     flag = true
                     compt += 1

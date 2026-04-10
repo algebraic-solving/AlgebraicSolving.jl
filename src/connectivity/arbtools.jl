@@ -7,12 +7,12 @@ function arb_to_rat(x::ArbFieldElem)
     r = radius(x)
     lo = x - 2r
     hi = x + 2r
-    return (simplest_rational_inside(lo), simplest_rational_inside(hi))
+    return Vector{QQFieldElem}([simplest_rational_inside(lo), simplest_rational_inside(hi)])
 end
 
 
 """
-    rat_to_arb(interval::Tuple, field::ArbField) -> ArbFieldElem
+    rat_to_arb(interval::Vector{QQFieldElem}, field::ArbField) -> ArbFieldElem
 
 Convert rational interval (x1, x2) to Arb ball.
 """
@@ -28,23 +28,12 @@ end
 
 
 """
-    evaluate_arb(f, x::ArbFieldElem)
-
-Evaluate polynomial f at x using Arb arithmetic.
-"""
-function evaluate_arb(f, x::ArbFieldElem)
-    is_zero(f) && return zero(parent(x))
-    cf = coefficients_of_univariate(f)
-    return evalpoly(x, cf)
-end
-
-
-"""
-    evaluate_arb(f, g, x::ArbFieldElem)
+    evaluate_arb(f, g, x::Vector{QQFieldElem})
 
 Evaluate rational function f/g at x.
+Return a rational interval enclosing the result, computed using Arb.
 """
-function evaluate_arb(f, g, x::ArbFieldElem)
+function evaluate_arb(f, g, x::Vector{QQFieldElem}, field::ArbField)
     @assert !is_zero(g) "Denominator must be non-zero"
 
     is_zero(f) && return zero(parent(x))
@@ -52,10 +41,11 @@ function evaluate_arb(f, g, x::ArbFieldElem)
     cf = coefficients_of_univariate(f)
     cg = coefficients_of_univariate(g)
 
-    num = evalpoly(x, cf)
-    den = evalpoly(x, cg)
+    x_arb = rat_to_arb(x, field)
+    num = evalpoly(x_arb, cf)
+    den = evalpoly(x_arb, cg)
 
-    return num / den
+    return arb_to_rat(num / den)
 end
 
 
@@ -63,6 +53,7 @@ end
     arb_eval(f, B::Vector{Tuple}, prec::Int)
 
 Evaluate polynomial f over interval box B.
+Return an Arb ball containing the image of B by f.
 """
 function arb_eval(f, B::Vector{Tuple}, field::ArbField)
     BA = Vector{ArbFieldElem}(undef, length(B))
