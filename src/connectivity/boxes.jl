@@ -1,63 +1,49 @@
-function in_inter(I, J)
-    return J[1] <= I[1] && I[2] <= J[2]
-end
+in_inter(I, J) =  J[1] <= I[1] && I[2] <= J[2]
+overlap_inter(I,J) = max(I[1], J[1]) <= min(I[2], J[2])
 
-function overlap_inter(I,J)
-    return max(I[1], J[1]) <= min(I[2], J[2])
-end
+# Helper function to process a single edge of the box
+function _isolate_box_edge(f, fixed_dim, fixed_val, target_interval, initial_prec, v; max_retries=5)
+    prec = initial_prec
 
-# To try/do : isolate with usolve, call msolve with only one variable
-function intersect_box(f, B; prec=100, v=0)
-    L = Array{Any}(undef, 4)
-    for i in 1:2
-        # Lxi
-        L[i] = Array{Any}(undef,2)
-        compt = 0
-        while compt < 5
-            flag = false
-            L[i][1] = isolate_eval(f, 2, B[2][i], prec=prec)
-            L[i][2] = []
-            for (j, l) in pairs(L[i][1])
-                if in_inter(l, B[1])
-                    push!(L[i][2], j)
-                elseif overlap_inter(l, B[1])
-                    prec *= 2
-                    v > 0 && println("Increase precision to ", prec)
-                    flag = true
-                    compt += 1
-                    break
-                end
+    for _ in 1:max_retries
+        roots = isolate_eval(f, fixed_dim, fixed_val, prec=prec)
+        valid_indices = Int[]
+        overlap_found = false
+
+        for (j, l) in pairs(roots)
+            if in_inter(l, target_interval)
+                push!(valid_indices, j)
+            elseif overlap_inter(l, target_interval)
+                prec *= 2
+                v > 0 && println("Increase precision to ", prec)
+                overlap_found = true
+                break # Break inner for-loop to restart with higher precision
             end
-            flag || break
         end
-        if compt >= 5
-            error("Problem when isolating on one side of a box")
-        end
-        # Lyi
-        L[i+2] = Array{Any}(undef,2)
-        compt = 0
-        while compt < 5
-            flag = false
-            L[i+2][1] = isolate_eval(f, 1, B[1][i], prec=prec)
-            L[i+2][2] = []
-            for (j, l) in pairs(L[i+2][1])
-                if in_inter(l, B[2])
-                    push!(L[i+2][2], j)
-                elseif overlap_inter(l, B[2])
-                    prec *= 2
-                    v > 0 && println("Increase precision to ", prec)
-                    flag = true
-                    compt += 1
-                    break
-                end
-            end
-            flag || break
-        end
-        if compt >= 5
-            error("Problem when isolating on one side of a box")
+
+        # If we successfully processed all roots without overlap, return the results
+        if !overlap_found
+            return (roots, valid_indices)
         end
     end
-    return L
+
+    error("Problem when isolating on one side of a box after $max_retries attempts")
+end
+
+
+function intersect_box(f, B; prec=100, v=0)
+    # B[1] represents x-bounds, B[2] represents y-bounds
+
+    # Evaluate horizontal edges (fix y to B[2][1] and B[2][2], target x-interval B[1])
+    edge_y1 = _isolate_box_edge(f, 2, B[2][1], B[1], prec, v)
+    edge_y2 = _isolate_box_edge(f, 2, B[2][2], B[1], prec, v)
+
+    # Evaluate vertical edges (fix x to B[1][1] and B[1][2], target y-interval B[2])
+    edge_x1 = _isolate_box_edge(f, 1, B[1][1], B[2], prec, v)
+    edge_x2 = _isolate_box_edge(f, 1, B[1][2], B[2], prec, v)
+
+    # Return as a typed array of Tuples
+    return [edge_y1, edge_y2, edge_x1, edge_x2]
 end
 
 function refine_xboxes(f::T where T<:Union{PolyRingElem, MPolyRingElem}, LB, prec)

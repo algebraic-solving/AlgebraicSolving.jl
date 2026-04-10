@@ -16,7 +16,7 @@ end
 
 Convert rational interval (x1, x2) to Arb ball.
 """
-function rat_to_arb(interval, field::ArbField)
+function rat_to_arb(interval::Vector{QQFieldElem}, field::ArbField)
     x1, x2 = interval
     @assert x1 <= x2 "Invalid interval: x1 > x2"
 
