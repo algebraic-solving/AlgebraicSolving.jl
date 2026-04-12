@@ -25,14 +25,14 @@ mutable struct RationalParametrization
     end
 end
 
-mutable struct RationalCurveParametrization
+mutable struct CurveRationalParametrization
     vars::Vector{Symbol}
     cfs_lfs::Vector{Vector{ZZRingElem}}
     elim::QQMPolyRingElem
     denom::QQMPolyRingElem
     param::Vector{QQMPolyRingElem}
 
-    function RationalCurveParametrization(
+    function CurveRationalParametrization(
             vars::Vector{Symbol},
             cfs_lfs::Vector{Vector{ZZRingElem}},
             elim::QQMPolyRingElem,
@@ -58,7 +58,7 @@ mutable struct Ideal{T <: MPolyRingElem}
     inter_sols::Vector{Vector{Vector{QQFieldElem}}}
     real_sols::Vector{Vector{QQFieldElem}}
     rat_sols::Vector{Vector{QQFieldElem}}
-    rat_param::Union{RationalParametrization, RationalCurveParametrization}
+    rat_param::Union{RationalParametrization, CurveRationalParametrization}
 
     function Ideal(F::Vector{T}) where {T <: MPolyRingElem}
         I = new{T}()
