@@ -128,7 +128,12 @@ function groebner_basis(
         worker_pool::Union{Nothing,AbstractWorkerPool}=nothing,
         info_level::Int=0
         )
-    return get!(I.gb, eliminate) do
+    key = if intersect && complete_reduction && !normalize && truncate_lifting == 0
+        eliminate
+    else
+        reinterpret(Int64, hash((eliminate, intersect, complete_reduction, normalize, truncate_lifting)) | 0x8000000000000000)
+    end
+    return get!(I.gb, key) do
         _core_groebner_basis(I, initial_hts = initial_hts, nr_thrds = nr_thrds,
                              max_nr_pairs = max_nr_pairs, la_option = la_option,
                              eliminate = eliminate, intersect = intersect,

@@ -30,6 +30,9 @@ using Distributed
 
     @test_throws ErrorException eliminate(I,0)
     L = eliminate(I,2)
+    H = MPolyRingElem[
+        z^4 + 38*z^3 + 95*z^2 + 95*z
+    ]
     @test L == H
     @test I.gb[2] == H
 
