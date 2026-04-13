@@ -1,140 +1,116 @@
-# Return the polynomials in F, but injected in the polynomial ring with newvarias_S as new variables
-function change_ringvar(F::Vector{P}, newvarias_S::Vector{Symbol}) where {P <: MPolyRingElem}
+"""
+    change_ringvar(F, new_S::Vector{Symbol})
+
+Inject polynomial(s) into a new multivariate polynomial ring defined by `new_S`.
+Uses the direct ring constructor `R(coeffs, exps)` to automatically handle
+monomial ordering, coalescing, and zero-term removal.
+"""
+function change_ringvar(F::AbstractVector{<:Union{PolyRingElem, MPolyRingElem}}, new_S::Vector{Symbol})
+    isempty(F) && return typeof(first(F))[]
+
     R = parent(first(F))
-    # Locate variables of R in newvarias
-    to_varias = Vector{Int}(undef,0)
-    for v in newvarias_S
-        ind = findfirst(x->x==v, R.S)
-        push!(to_varias, typeof(ind)==Nothing ? length(R.S)+1 : ind)
-    end
+    old_S = symbols(R)
+    newR, _ = polynomial_ring(base_ring(R), new_S)
 
-    ind_novarias = setdiff(eachindex(R.S), to_varias)
-    newR, newvarias = polynomial_ring(base_ring(R), newvarias_S)
+    # Pre-calculate index mapping: old_index -> new_index (0 if removed)
+    idx_map = [isnothing(idx) ? 0 : idx for idx in (findfirst(==(v), new_S) for v in old_S)]
 
-    res = typeof(first(F))[]
-    ctx = MPolyBuildCtx(newR)
+    T = typeof(zero(base_ring(R)))
+    n_vars = length(new_S)
 
-    for f in F
-        for (e, c) in zip(exponent_vectors(f), coefficients(f))
-            @assert(all([ e[i]==0 for i in ind_novarias ]), "Occurence of old variable.s found!")
-            push!(e, 0)
-            push_term!(ctx, c, [e[i] for i in to_varias ])
+    return map(F) do f
+        coeffs = T[]
+        exps = Vector{Int}[]
+
+        if f isa MPolyRingElem
+            for (e, c) in zip(exponent_vectors(f), coefficients(f))
+                e_new = zeros(Int, n_vars)
+                for (i, power) in enumerate(e)
+                    if power > 0
+                        @assert idx_map[i] != 0 "Occurrence of removed variable '$(old_S[i])' found!"
+                        e_new[idx_map[i]] = power
+                    end
+                end
+                push!(coeffs, c)
+                push!(exps, e_new)
+            end
+        else # PolyRingElem
+            @assert idx_map[1] != 0 "Occurrence of removed variable '$(old_S[1])' found!"
+            for (deg_plus_1, c) in enumerate(coefficients(f))
+                if !iszero(c)
+                    e_new = zeros(Int, n_vars)
+                    if deg_plus_1 > 1
+                        e_new[idx_map[1]] = deg_plus_1
+                    end
+                    push!(coeffs, c)
+                    push!(exps, e_new)
+                end
+            end
         end
-        push!(res, finish(ctx))
+
+        # Create the new polynomial associated to f
+        return newR(coeffs, exps)
     end
-
-    return res
 end
 
-function change_ringvar(F::Vector{P}, newvarias_S::Vector{Symbol}) where {P <: PolyRingElem}
-    R = parent(first(F))
-    to_varias = [ v==R.S ? 1 : 2 for v in newvarias_S]
-    newR, = polynomial_ring(base_ring(R), newvarias_S)
+# Dispatch for a single polynomial
+change_ringvar(f::Union{PolyRingElem, MPolyRingElem}, new_S::Vector{Symbol}) = change_ringvar([f], new_S)[1]
 
-    res = typeof(zero(newR))[]
-    ctx = MPolyBuildCtx(newR)
+# Dispatch for variable indices instead of symbols
+# change_ringvar(F::AbstractVector{<:MPolyRingElem}, ind::Union{AbstractVector{<:Integer}, UnitRange{<:Integer}}) = 
+#     change_ringvar(F, [symbols(parent(first(F)))[i] for i in ind])
 
-    LcF = [ filter!(t->t[2]!=0, collect(enumerate(coefficients(f)))) for f in F ]
-    for f in LcF
-        for (ef, c) in f
-            e = [ef-1, 0]
-            push_term!(ctx, c, [e[i] for i in to_varias ])
-        end
-        push!(res, finish(ctx))
-    end
+# change_ringvar(f::MPolyRingElem, ind::Union{AbstractVector{<:Integer}, UnitRange{<:Integer}}) = 
+#     change_ringvar([f], ind)[1]
 
-    return res
-end
+# """
+#     change_ringvar(F)
 
-function change_ringvar(f::Union{MPolyRingElem, PolyRingElem}, newvarias_S::Vector{Symbol})
-    return first(change_ringvar([f], newvarias_S))
-end
+# Automatically detect all unique variables present in the polynomials and inject them 
+# into a ring containing only those variables.
+# """
+# function change_ringvar(F::AbstractVector{<:MPolyRingElem})
+#     used_vars = unique(reduce(vcat, [Symbol.(vars(f)) for f in F]))
+#     return change_ringvar(F, used_vars)
+# end
 
-function change_ringvar(F::Vector{P}, ind_newvarias::Union{Vector{I}, UnitRange{I}}) where {P <: MPolyRingElem, I <: Int64}
-    R = parent(first(F))
-    return change_ringvar(F, [R.S[i] for i in ind_newvarias])
-end
+# change_ringvar(f::MPolyRingElem) = change_ringvar([f])[1]
 
-function change_ringvar(f::MPolyRingElem, ind_newvarias::Union{Vector{I}, UnitRange{I}}) where {I <: Int64}
-    R = parent(f)
-    return first(change_ringvar([f], [R.S[i] for i in ind_newvarias]))
-end
 
-# Return the polynomials in F, but injected in the polynomial ring with the variables occuring in F
-function change_ringvar(F::Vector{P}) where {P <: MPolyRingElem}
-    union_varias = Set{Symbol}()
-    for f in F
-        union!(union_varias, map(Symbol, vars(f)) )
-    end
-    return change_ringvar(F, collect(union_varias))
-end
+"""
+    MPolyBuild(F::Vector{Vector{RingElem}}, new_S::Vector{Symbol}, idx::Int)
 
-function change_ringvar(f::MPolyRingElem)
-    return first(change_ringvar([f]))
-end
+Construct multivariate polynomials in a single variable.
+`F` is a list of coefficient lists in degree-increasing order.
+The polynomial will use the variable at index `idx` in `new_S`.
+"""
+function MPolyBuild(F::AbstractVector{<:AbstractVector{<:RingElement}}, new_S::Vector{Symbol}, idx::Int)
+    isempty(F) && return []
 
-# Return the polynomials in F, but injected in the polynomial ring with newvarias_S as new variables
-function change_ringvar_mod(F::Vector{P}, newvarias_S::Vector{Symbol}, oldvarias_S::Vector{Symbol}) where {P <: MPolyRingElem}
-    R = parent(first(F))
-    # Locate variables of R in newvarias
-    to_varias = Vector{Int}(undef,0)
-    for v in newvarias_S
-        ind = findfirst(x->x==v, oldvarias_S)
-        push!(to_varias, typeof(ind)==Nothing ? length(oldvarias_S)+1 : ind)
-    end
-
-    ind_novarias = setdiff(eachindex(oldvarias_S), to_varias)
-    newR, newvarias = polynomial_ring(base_ring(R), newvarias_S)
-
-    res = typeof(first(F))[]
-    ctx = MPolyBuildCtx(newR)
-
-    for f in F
-        for (e, c) in zip(exponent_vectors(f), coefficients(f))
-            @assert(all([ e[i]==0 for i in ind_novarias ]), "Occurence of old variable.s found!")
-            push!(e, 0)
-            push_term!(ctx, c, [e[i] for i in to_varias ])
-        end
-        push!(res, finish(ctx))
-    end
-
-    return res
-end
-
-function change_ringvar_mod(F::Vector{P}, newvarias_S::Vector{Symbol}, oldvarias_S::Vector{Symbol}) where {P <: PolyRingElem}
-    R = parent(first(F))
-    A, (x,) = polynomial_ring(base_ring(R), oldvarias_S)
-    return change_ringvar_mod([ evaluate(f, x) for f in F ], newvarias_S, oldvarias_S)
-end
-
-function change_ringvar_mod(f::Union{MPolyRingElem, PolyRingElem}, newvarias_S::Vector{Symbol}, oldvarias_S::Vector{Symbol})
-    return first(change_ringvar_mod([f], newvarias_S, oldvarias_S))
-end
-
-#function change_ringvar_mod(f::Union{MPolyRingElem, PolyRingElem}, newvarias_S::Vector{Symbol})
-#    return first(change_ringvar_mod([f], newvarias_S, oldvarias_S))
-#end
-
-function MPolyBuild(F::Vector{Vector{P}}, newvarias_S::Vector{Symbol}, idx::Int) where {P <: RingElem}
     A = parent(first(first(F)))
-    R, = polynomial_ring(A, newvarias_S)
-    to_varias = [ i==idx ? 1 : 2 for i in eachindex(newvarias_S) ]
+    R, _ = polynomial_ring(A, new_S)
 
-    res = typeof(zero(R))[]
-    ctx = MPolyBuildCtx(R)
+    T = typeof(zero(A))
+    n_vars = length(new_S)
 
-    LcF = [ filter!(t->t[2]!=0, collect(enumerate(f))) for f in F ]
-    for f in LcF
-        for (ef, c) in f
-            e = [ef-1, 0]
-            push_term!(ctx, c, [e[i] for i in to_varias ])
+    return map(F) do f_coeffs
+        coeffs = T[]
+        exps = Vector{Int}[]
+
+        # Construct coeff/exp lists
+        for (deg_plus_1, c) in enumerate(f_coeffs)
+            if !iszero(c)
+                e_new = zeros(Int, n_vars)
+                e_new[idx] = deg_plus_1 - 1
+                push!(coeffs, c)
+                push!(exps, e_new)
+            end
         end
-        push!(res, finish(ctx))
+
+        # Create the polynomial associated to f_coeffs
+        return R(coeffs, exps)
     end
-
-    return res
 end
 
-function MPolyBuild(f::Vector{P}, newvarias_S::Vector{Symbol}, idx::Int) where {P <: RingElem}
-    return first(MPolyBuild([f], newvarias_S, idx))
-end
+# Dispatch for a single coefficient vector
+MPolyBuild(f::AbstractVector{<:RingElement}, new_S::Vector{Symbol}, idx::Int) = MPolyBuild([f], new_S, idx)[1]

@@ -335,7 +335,7 @@ function mmod_subresultants(P::ZZMPolyRingElem, Q::ZZMPolyRingElem, idx; list=fa
 
     v>1 && println("Convert the coefficients into polynomials")
     L1Q = [ [QQ.(ss) for ss in s ] for s in L1 ]
-    @iftime v>0 sr = [ MPolyBuild(s, parent(P).S, (idx+1)%2) for s in L1Q ]
+    @iftime v>0 sr = [ MPolyBuild(s, symbols(parent(P)), (idx+1)%2) for s in L1Q ]
     return sr
 end
 
@@ -352,7 +352,7 @@ end
 
 function mmod_param_crit(P::ZZMPolyRingElem, Q::ZZMPolyRingElem; n_threads=Threads.nthreads(), v=0, detect_app=true)
     prim = ZZ(1)<<(61)
-    RS = parent(P).S
+    RS = P |> parent |> symbols
     L1, L1f, primprod = [], [], ZZ(1)
     Ltemp = Vector{Vector{Vector{Vector{ZZRingElem}}}}(undef,n_threads+1)
     dP = derivative(P, 2)
@@ -420,7 +420,10 @@ function mmod_param_crit(P::ZZMPolyRingElem, Q::ZZMPolyRingElem; n_threads=Threa
 
     v>1 && println("Convert the coefficients into polynomials")
     L1Q = [ [ QQ.(poly) for poly in param ] for param in L1f ]
-    @iftime v>0 param = Dict( m => vcat([[int_coeffs(MPolyBuild(param[1], parent(P).S, 1))]], [ int_coeffs(MPolyBuild(poly, parent(P).S, 1)) for poly in param[2:end] ]) for (m, param) in zip([-1,1], L1Q))
+    @iftime v>0 param = Dict( m => vcat(
+    [[int_coeffs(MPolyBuild(param[1], symbols(parent(P)), 1))]],
+    [ int_coeffs(MPolyBuild(poly, symbols(parent(P)), 1)) for poly in param[2:end] ])
+    for (m, param) in zip([-1,1], L1Q))
     return param
 end
 
@@ -465,7 +468,7 @@ function num_biv_rat_mod(A, P, RS)
     Ahmod = change_coefficient_ring(U, Ah1)
 
     Aeval = evaluate(Ahmod, [amod, bmod])
-    return change_ringvar_mod(lift(Aeval), RS, newv)
+    return change_ringvar(lift(Aeval), RS)
 end
 
 function intersect_biv_mod(P::Vector{T} where T<:Any, A::MPolyRingElem, RS::Vector{Symbol})
@@ -480,7 +483,7 @@ function intersect_biv(P::Vector{T} where T<:Any, A::MPolyRingElem)
         return P[1]
     end
     compt = 0
-    RS = parent(A).S
+    RS = A |> parent |> symbols
     dA, dAf = [], []
     pprod, p = 1, ZZ(1) << 60
     while compt<12
@@ -521,7 +524,7 @@ end
 function param_crit_split(f, g; v=0, detect_app=true, RS = nothing)
     @assert (f|>parent|>base_ring|>characteristic == 0 || !isnothing(RS)) "Variable names must be provided when char>0"
     if f|>parent|>base_ring|>characteristic == 0
-        RS = parent(f).S
+        RS = f |> parent |> symbols
     end
     # Compute subresultants and factor the first subresultant
     v>0 && println("Compute subresultant sequence")

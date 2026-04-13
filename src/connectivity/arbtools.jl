@@ -7,7 +7,7 @@ function arb_to_rat(x::ArbFieldElem)
     r = radius(x)
     lo = x - 2r
     hi = x + 2r
-    return Vector{QQFieldElem}([simplest_rational_inside(lo), simplest_rational_inside(hi)])
+    return [simplest_rational_inside(lo), simplest_rational_inside(hi)]
 end
 
 
