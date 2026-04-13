@@ -34,47 +34,15 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
         params[-i] = [ [C[i][1] |> intC], C[i][2], C[i][3] ]
     end
 
-    v > 0 && println("Computing isolating critical boxes")
-    LBcrit = Dict()
-    @iftime (v > 0) xcritpermut, precx = compute_crit_boxes(params, LBcrit, precx, v)
-    xcrit = Dict(i => [LBcrit[i][j][1] for j in eachindex(LBcrit[i])] for i in eachindex(LBcrit))
-
-    # println("LBcrit: ", LBcrit)
-
-    v > 0 && println("\nTest for identifying singular boxes")
-@iftime (v > 0) begin
-    ########################################################
-    # For each mult of sing pts (keys) give the corresponding factors of the resultant (values)
-    #########################################################
-    arbField = ArbField(precx)
-    Lfyk = diff_list(f, 2, max(maximum(eachindex(LBcrit)),2))
-    for ind in eachindex(LBcrit)
-        ind < 0 &&  continue # control pts
-        m = ind <= 1 ? 2 : ind # nodes and extrems have mult 2
-        noisolate = false
-        for _ in 1:5
-            noisolate = false
-            for j in eachindex(LBcrit[ind])
-                pcrit = [ rat_to_arb(c, arbField) for c in LBcrit[ind][j] ]
-                # Check if the the mult(pcrit)-th derivative of f vanishes on pcrit
-                if contains_zero(evaluate(Lfyk[m+1], pcrit))
-                    # TODO refine only boxes associated to multiplicity m
-                    precx *= 2
-                    (v > 0) && println("Refine singular boxes of index $ind to $precx bits precision")
-                    xcritpermut, precx = compute_crit_boxes(params, LBcrit, precx, v-1)
-                    xcrit = Dict(i => [LBcrit[i][j][1] for j in eachindex(LBcrit[i])] for i in eachindex(LBcrit))
-                    noisolate = true
-                    break
-                end
-            end
-            noisolate || break
-        end
-        if noisolate
-            error("Problem in singular boxes refinement")
-        end
+    v > 0 && println("Computing insulating critical boxes")
+    @iftime (v > 0)
+        LBcrit, Lprecx = insulate_crit_boxes(f, params, precx)
     end
-end
+    #println("LBcrit: ", LBcrit)
 
+    #############################
+    # Compute boxes that intersect curve only on vertical sides
+    ##############################
     v > 0 && println("\nCompute intersections with critical boxes..")
 @iftime (v > 0) begin
     ## TODO : Refine only the intervals that need to be refined? only the factor that defines the intervals
@@ -158,7 +126,9 @@ end
 
     # Graph computation
     fct, typeout = outf ? (Float64, Float64) : (identity, QQFieldElem)
-
+    # Critical values and their order
+    xcrit = Dict(i => [LBcrit[i][j][1] for j in eachindex(LBcrit[i])] for i in eachindex(LBcrit))
+    xcritpermut = order_permut2d(xcrit)
     # List of vertex: at index i is the tuple of the coordinates of the i-th vertex
     Vert = Vector{Tuple{typeout, typeout}}()
     # List of edges: a tuple (i,j) is an edge between the i-th and j-th vertices

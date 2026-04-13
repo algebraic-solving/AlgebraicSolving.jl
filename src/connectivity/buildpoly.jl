@@ -56,25 +56,17 @@ end
 # Dispatch for a single polynomial
 change_ringvar(f::Union{PolyRingElem, MPolyRingElem}, new_S::Vector{Symbol}) = change_ringvar([f], new_S)[1]
 
-# Dispatch for variable indices instead of symbols
-# change_ringvar(F::AbstractVector{<:MPolyRingElem}, ind::Union{AbstractVector{<:Integer}, UnitRange{<:Integer}}) = 
-#     change_ringvar(F, [symbols(parent(first(F)))[i] for i in ind])
+ """
+     change_ringvar(F)
 
-# change_ringvar(f::MPolyRingElem, ind::Union{AbstractVector{<:Integer}, UnitRange{<:Integer}}) = 
-#     change_ringvar([f], ind)[1]
+Automatically detect all unique variables present in the polynomials and inject them into a ring containing only those variables.
+"""
+function change_ringvar(F::AbstractVector{<:MPolyRingElem})
+    used_vars = unique(reduce(vcat, [Symbol.(vars(f)) for f in F]))
+    return change_ringvar(F, used_vars)
+end
 
-# """
-#     change_ringvar(F)
-
-# Automatically detect all unique variables present in the polynomials and inject them 
-# into a ring containing only those variables.
-# """
-# function change_ringvar(F::AbstractVector{<:MPolyRingElem})
-#     used_vars = unique(reduce(vcat, [Symbol.(vars(f)) for f in F]))
-#     return change_ringvar(F, used_vars)
-# end
-
-# change_ringvar(f::MPolyRingElem) = change_ringvar([f])[1]
+change_ringvar(f::MPolyRingElem) = change_ringvar([f])[1]
 
 
 """

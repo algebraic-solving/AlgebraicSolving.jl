@@ -74,8 +74,126 @@ function  compute_crit_boxes(params, LBcrit, precx, v, max_attempts=5)
         error("Problem in isolating critical boxes")
     end
 
-    return (order_permut2d(xcrit), precx)
+    return precx
 end
+
+function compute_singular_boxes(f, LBcrit, params, precx)
+    arbField = ArbField(precx)
+    Lfyk = diff_list(f, 2, max(maximum(eachindex(LBcrit)),2))
+    for ind in eachindex(LBcrit)
+        ind < 0 &&  continue # control pts
+        m = ind <= 1 ? 2 : ind # nodes and extrems have mult 2
+        noisolate = false
+        for _ in 1:5
+            noisolate = false
+            for j in eachindex(LBcrit[ind])
+                pcrit = [ rat_to_arb(c, arbField) for c in LBcrit[ind][j] ]
+                # Check if the the mult(pcrit)-th derivative of f vanishes on pcrit
+                if contains_zero(evaluate(Lfyk[m+1], pcrit))
+                    # TODO refine only boxes associated to multiplicity m
+                    precx *= 2
+                    (v > 0) && println("Refine singular boxes of index $ind to $precx bits precision")
+                    precx = compute_crit_boxes(params, LBcrit, precx, v-1)
+                    noisolate = true
+                    break
+                end
+            end
+            noisolate || break
+        end
+        if noisolate
+            error("Problem in singular boxes refinement")
+        end
+    end
+    return precx
+end
+
+###################################3
+# File: critical_boxes.jl
+
+"""
+    _compute_boxes_for_index!(i, params, LBcrit, precx)
+
+Compute isolating boxes for a single index i.
+"""
+function _compute_boxes_for_index!(i, params, LBcrit, precx)
+    xvals = reduce(vcat, (isolate(pp, prec=precx) for pp in params[i][1]))
+    _expand_degenerate_intervals!(xvals, precx)
+
+    arbField = ArbField(precx)
+
+    yvals = [
+        evaluate_arb(params[i][2], params[i][3], xc, arbField)
+        for xc in xvals
+    ]
+    _expand_degenerate_intervals!(yvals, precx)
+
+    @inbounds LBcrit[i] = [[xvals[j], yvals[j]] for j in eachindex(xvals)]
+end
+
+
+"""
+    _needs_refinement(i, f, LBcrit, precx)
+
+Check if boxes at index i require refinement.
+"""
+function _needs_refinement(i, f, LBcrit, precx)
+    arbField = ArbField(precx)
+    m = i <= 1 ? 2 : i
+    # TODO: input, compute once for all i
+    Lfyk = diff_list(f, 2, max(i, 2))
+
+    for box in LBcrit[i]
+        pcrit = [rat_to_arb(c, arbField) for c in box]
+
+        if contains_zero(evaluate(Lfyk[m+1], pcrit))
+            return true
+        end
+    end
+    return false
+end
+
+
+"""
+    compute_crit_and_singular_boxes!(f, params, LBcrit, precx; max_attempts=5, v=0)
+
+Compute and refine critical boxes per index independently.
+"""
+function insulate_crit_boxes(f, params, precx; max_attempts=5, v=0)
+    LBcrit, Lprecx = Dict(), Dict()
+
+    for i in keys(params)
+        attempts, precxi = 0, precx
+        while attempts <= max_attempts
+            try
+                attempts > 0 && v > 0 &&
+                    println("Refining index $i -> prec = $precxi")
+
+                _compute_boxes_for_index!(i, params, LBcrit, precxi)
+
+                # singularity check
+                if ! needs_refinement(i, f, LBcrit, precxi, params)
+                    break
+                end
+
+                # refine ONLY this index
+                precxi *= 2
+                attempts += 1
+
+            catch e
+                precxi *= 2
+                attempts += 1
+                v > 1 && println("Error at index $i: ", e)
+            end
+        end
+        attempts > max_attempts &&
+            error("Failed to isolate boxes for index $i")
+
+        Lprecx[i] = precxi
+    end
+
+    return LBcrit, Lprecx
+end
+#######################################################
 
 # Helper function to process a single edge of the box
 function _isolate_box_edge(f, fixed_dim, fixed_val, target_interval, initial_prec, v; max_retries=5)
