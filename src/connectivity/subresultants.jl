@@ -477,6 +477,7 @@ function intersect_biv_mod(P::Vector{T} where T<:Any, A::MPolyRingElem, RS::Vect
 end
 
 function intersect_biv(P::Vector{T} where T<:Any, A::MPolyRingElem)
+    # TODO: test the reconstruction
     # P = [Lq, a, b] encodes sets (x,a(x)/b(x)) where Lq[i](x)=0
     # Compute divisor dA of q that encodes intersection with A(x,y)=0
     if iszero(A)
