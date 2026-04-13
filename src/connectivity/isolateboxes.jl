@@ -4,7 +4,7 @@ const Boxes = Vector{Sides}
 
 
 in_inter(I, J) =  J[1] <= I[1] && I[2] <= J[2]
-overlap_inter(I,J) = max(I[1], J[1]) <= min(I[2], J[2])
+overlap_inter(I, J) = max(I[1], J[1]) <= min(I[2], J[2])
 
  # Function that isolate roots of a multivariate polynomial with a
  # single variable

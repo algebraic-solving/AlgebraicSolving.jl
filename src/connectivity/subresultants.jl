@@ -564,6 +564,7 @@ function param_crit_split(f, g; v=0, detect_app=true, RS = nothing)
     end
 
     # Nodes : multiplicity 2 in res
+    # TODO: first test with interval arithmetics? Most of the time this will suffice
     v>0 && println("Compute apparent singularities")
     if 2 in sqrmult
         if detect_app
