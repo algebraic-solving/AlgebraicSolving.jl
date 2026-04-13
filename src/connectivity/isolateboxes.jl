@@ -1,6 +1,6 @@
-const Side = Tuple{Vector{QQFieldElem}, Vector{Int}}
-const Sides = NTuple{4, Side}
-const Boxes = Vector{Side}
+const side = Tuple{Vector{Vector{QQFieldElem}}, Vector{Int}}
+const Sides = NTuple{4, side}
+const Boxes = Vector{Sides}
 
 
 in_inter(I, J) =  J[1] <= I[1] && I[2] <= J[2]
@@ -39,81 +39,6 @@ function _expand_degenerate_intervals!(xnew, prec)
     end
     return xnew
 end
-
-# TODO: add the singularity check here, probably just by calling a function
-# make sure we refine only the boxes that need to be refined
-function  compute_crit_boxes(params, LBcrit, precx, v, max_attempts=5)
-    compt = 0
-    xcrit = Dict()
-    while compt <= max_attempts
-        try
-            v > 0 && compt > 0 && println("ComputeBoxes: refine x-precision to $precx bits")
-            # TODO : check that no overlap between different isolations
-            xcrit = Dict(i=> reduce(vcat, [isolate(pp, prec=precx) for pp in p[1]]) for (i, p) in params)
-            # Enlarge exact isolating root intervals
-            for xvals in values(xcrit)
-                _expand_degenerate_intervals!(xvals, precx)
-            end
-            arbField = ArbField(precx)
-            for i in keys(xcrit)
-                xvals = xcrit[i]
-                ycrit = [
-                    evaluate_arb(params[i][2], params[i][3], xc, arbField)
-                    for xc in xvals
-                ]
-                _expand_degenerate_intervals!(ycrit, precx)
-                @inbounds LBcrit[i] = [
-                    [xvals[j], ycrit[j]] for j in eachindex(ycrit)
-                ]
-            end
-        catch e
-            precx *= 2
-            v > 1 && println("Error in isolating critical boxes: ", e)
-            compt += 1
-        else
-            break
-        end
-    end
-    # TODO: is that a relevant upper bound?
-    if compt > max_attempts
-        error("Problem in isolating critical boxes")
-    end
-
-    return precx
-end
-
-function compute_singular_boxes(f, LBcrit, params, precx)
-    arbField = ArbField(precx)
-    Lfyk = diff_list(f, 2, max(maximum(eachindex(LBcrit)),2))
-    for ind in eachindex(LBcrit)
-        ind < 0 &&  continue # control pts
-        m = ind <= 1 ? 2 : ind # nodes and extrems have mult 2
-        noisolate = false
-        for _ in 1:5
-            noisolate = false
-            for j in eachindex(LBcrit[ind])
-                pcrit = [ rat_to_arb(c, arbField) for c in LBcrit[ind][j] ]
-                # Check if the the mult(pcrit)-th derivative of f vanishes on pcrit
-                if contains_zero(evaluate(Lfyk[m+1], pcrit))
-                    # TODO refine only boxes associated to multiplicity m
-                    precx *= 2
-                    (v > 0) && println("Refine singular boxes of index $ind to $precx bits precision")
-                    precx = compute_crit_boxes(params, LBcrit, precx, v-1)
-                    noisolate = true
-                    break
-                end
-            end
-            noisolate || break
-        end
-        if noisolate
-            error("Problem in singular boxes refinement")
-        end
-    end
-    return precx
-end
-
-###################################3
-# File: critical_boxes.jl
 
 """
     _compute_boxes_for_index!(i, params, LBcrit, precx)
@@ -159,9 +84,12 @@ end
 
 
 """
-    compute_crit_and_singular_boxes!(f, params, LBcrit, precx; max_attempts=5, v=0)
+    compute_crit_and_singular_boxes(f, params, precx; max_attempts=5, v=0)
 
-Compute and refine critical boxes per index independently.
+Compute insulating boxes for critical points, refining precision if necessary.
+Insulating means that each box contains a single critical point and
+all branches of the curve intersecting the box are incident to this
+critical point.
 """
 function insulate_crit_boxes(f, params, precx; max_attempts=5, v=0)
     LBcrit, Lprecx = Dict(), Dict()
@@ -176,7 +104,7 @@ function insulate_crit_boxes(f, params, precx; max_attempts=5, v=0)
                 _compute_boxes_for_index!(i, params, LBcrit, precxi)
 
                 # singularity check
-                if ! needs_refinement(i, f, LBcrit, precxi, params)
+                if !_needs_refinement(i, f, LBcrit, precxi)
                     break
                 end
 
@@ -234,12 +162,12 @@ function intersect_box(f, B; prec=100, v=0)
     # B[1] represents x-bounds, B[2] represents y-bounds
 
     # Evaluate horizontal edges (fix y to B[2][1] and B[2][2], target x-interval B[1])
-    edge_y1 = _isolate_box_edge(f, 2, B[2][1], B[1], prec, v)::Side
-    edge_y2 = _isolate_box_edge(f, 2, B[2][2], B[1], prec, v)::Side
+    edge_y1 = _isolate_box_edge(f, 2, B[2][1], B[1], prec, v)::side
+    edge_y2 = _isolate_box_edge(f, 2, B[2][2], B[1], prec, v)::side
 
     # Evaluate vertical edges (fix x to B[1][1] and B[1][2], target y-interval B[2])
-    edge_x1 = _isolate_box_edge(f, 1, B[1][1], B[2], prec, v)::Side
-    edge_x2 = _isolate_box_edge(f, 1, B[1][2], B[2], prec, v)::Side
+    edge_x1 = _isolate_box_edge(f, 1, B[1][1], B[2], prec, v)::side
+    edge_x2 = _isolate_box_edge(f, 1, B[1][2], B[2], prec, v)::side
 
     # Return as a 4-Tuple of 2-Tuples
     return (edge_y1, edge_y2, edge_x1, edge_x2)
@@ -272,96 +200,7 @@ function refine_xboxes(F::Vector{T} where T<:Union{PolyRingElem, MPolyRingElem},
     return _update_LB_first_axis!(LB, xnew)
 end
 
-## TODO : Refine only the intervals that need to be refined? only the factor that defines the intervals
-
-
-function intersect_vertical_boxes(LBcrit, params, Lprecx)
-    LPCside = Dict{Int,Any}()
-    ndig = maximum([ndigits(length(LBcrit[i])) for i in eachindex(LBcrit)])
-    for i in eachindex(LBcrit)
-        LPCside[i] = Array{Any}(undef, length(LBcrit[i]))
-        # Data printing part
-        ndigi = ndigits(length(LBcrit[i]))
-        Ptype = (i > length(LBcrit)-length(C)) ? "Pcon" : "mult"
-        ###
-        precxtmp = Lprecx[i]
-        compt = 0
-        while compt < 5
-            flag = false
-            # println(LBcrit[i])
-            for j in eachindex(LBcrit[i])
-                v > 0 && print("$Ptype=$i ; $(j)/$(length(LBcrit[i]))$(repeat(" ", ndig-ndigi+1))pts","\r")
-                pcside = intersect_box(f, LBcrit[i][j], prec=precxtmp,v=v)
-                npcside = [length(n) for (I, n) in pcside]
-                # println("($i, $j): $npcside")
-                if (i == 1 && sum(npcside) > 2) || (i != 1 && sum(npcside[1:2]) != 0)
-                    precxtmp *= 2
-                    v > 0 && println("\nRefine boxes along x-axis to $precxtmp bits precision")
-                    refine_xboxes(params[i][1], LBcrit[i], precxtmp)
-                    flag = true
-                    compt += 1
-                    break
-                end
-                LPCside[i][j] = pcside
-            end
-            flag || break
-        end
-        v > 0 && println("")
-        if compt >= 5
-            error("Problem in computing intersections with boxes")
-        end
-        Lprecx[i] = precxtmp
-    end
-    LnPCside = Dict(i => [[length(indI) for (L, indI) in PB] for PB in LPCside[i]] for i in eachindex(LPCside))
-
-    # Update extreme boxes
-    if haskey(LBcrit, 1)
-        for j in eachindex(LBcrit[1])
-            # If the curve does not intersect the box only on vertical sides
-            if !(LnPCside[1][j][1:2] == [0, 0])
-                PCside, nPCside = LPCside[1][j], LnPCside[1][j]
-                # Get the left and right sides
-                I = [ l[1] for l in PCside[3:end] ]
-                nI = [ l[2] for l in PCside[3:end] ]
-                # Locate the orientation of the extreme point
-                # s is the index on the side where there are more branches
-                # s=1: left; s=2: right
-                s = argmax([length(I[1]), length(I[2])])
-                # Ordinate range of the extreme point
-                ycrit = LBcrit[1][j][2]
-                # If it intersects on the bottom side
-                if nPCside[1] == 1
-                    # yinf: the intersection with the vertical side just below the extreme point
-                    yinf = maximum([i for (i, yy) in pairs(I[s]) if yy[1] < ycrit[1]])
-                    # We vertically enlarge the box until it intersects on the horizontal side
-                    push!(LPCside[1][j][s + 2][2], yinf)
-                    LPCside[1][j][1][2] = []
-                    # We update the intersection numbers
-                    LnPCside[1][j][s + 2] += 1
-                    LnPCside[1][j][1] = 0
-                end
-                # If it intersects on the top side
-                if nPCside[2] == 1
-                    # ymax: the intersection with the vertical side just above the extreme point
-                    ymax = minimum([i for (i, yy) in pairs(I[s]) if yy[2] > ycrit[2]])
-                    # We vertically enlarge the box until it intersects on the horizontal side
-                    push!(LPCside[1][j][s + 2][2], ymax)
-                    LPCside[1][j][2][2] = []
-                    # We update the intersection numbers
-                    LnPCside[1][j][s + 2] += 1
-                    LnPCside[1][j][2] = 0
-                end
-            end
-        end
-    end
-    return LPCside, LnPCside
-end
-
-###############################
-
-
-
-function intersect_vertical_boxes_bis(LBcrit, params, Lprecx; max_attempts=5, v=0)
+function intersect_vertical_boxes(f, params, LBcrit, Lprecx; max_attempts=5, v=0)
 
     LPCside = Dict{Int, Boxes}()
 
@@ -375,7 +214,7 @@ function intersect_vertical_boxes_bis(LBcrit, params, Lprecx; max_attempts=5, v=
             refined = false
 
             @inbounds for j in 1:n
-                v > 0 && print("i=$i ($j/$n)\r")
+                v >= 0 && print("i=$i ($j/$n)\r")
 
                 pc = intersect_box(f, boxes[j], prec=prec, v=v)::Sides
 
@@ -407,7 +246,7 @@ function intersect_vertical_boxes_bis(LBcrit, params, Lprecx; max_attempts=5, v=
         LPCside[i] = sides_vec
         Lprecx[i] = prec
 
-        v > 0 && println()
+        v >= 0 && println()
     end
 
     # ---- Counts (type-stable) ----

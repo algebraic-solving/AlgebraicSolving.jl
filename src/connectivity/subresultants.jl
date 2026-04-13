@@ -528,6 +528,7 @@ function param_crit_split(f, g; v=0, detect_app=true, RS = nothing)
         RS = f |> parent |> symbols
     end
     # Compute subresultants and factor the first subresultant
+    # TODO: factor f before computing subresultants or at least divide by content
     v>0 && println("Compute subresultant sequence")
     if  total_degree(f) > 30 && f|>parent|>base_ring|>characteristic == 0
         @iftime v>0 sr = mmod_subresultants(f, derivative(f, 2), 2, list=true, n_ssr=2, v=v-1)
@@ -539,6 +540,8 @@ function param_crit_split(f, g; v=0, detect_app=true, RS = nothing)
         return Dict()
     end
 
+    # TODO: sr is univariate? check what's called
+    # TODO: try full factorization?
     v>1 && println("Square-free factorization")
     @iftime v>1 sqr = collect(factor_squarefree(sr[1][1]))
 

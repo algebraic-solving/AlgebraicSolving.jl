@@ -29,16 +29,15 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
     v > 0 && println("Compute parametrization of critical pts...")
     @iftime (v > 0) params = param_crit_split(f,g,v=v-1, detect_app=true)
     #@iftime (v > 0) params = mmod_param_crit(f, g,v=v-1, detect_app=true)
-
     for i in 1:length(C)
         params[-i] = [ [C[i][1] |> intC], C[i][2], C[i][3] ]
     end
 
     v > 0 && println("Computing insulating critical boxes")
-    @iftime (v > 0) LBcrit, Lprecx = insulate_crit_boxes(f, params, precx)
+    @iftime (v > 0) LBcrit, Lprecx = insulate_crit_boxes(f, params, precx, v=v-1)
 
-    v > 0 && println("\nCompute intersections with critical boxes..")
-    @iftime (v > 0) LPCside, LnPCside = intersect_vertical_boxes(LBcrit, params, Lprecx)
+    v > 0 && println("Compute intersections with critical boxes..")
+    @iftime (v > 0) LPCside, LnPCside = intersect_vertical_boxes(f, params, LBcrit, Lprecx, v=v-1)
 
     # Graph computation
     fct, typeout = outf ? (Float64, Float64) : (identity, QQFieldElem)
