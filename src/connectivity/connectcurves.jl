@@ -35,94 +35,10 @@ function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); gen
     end
 
     v > 0 && println("Computing insulating critical boxes")
-    @iftime (v > 0)
-        LBcrit, Lprecx = insulate_crit_boxes(f, params, precx)
-    end
-    #println("LBcrit: ", LBcrit)
+    @iftime (v > 0) LBcrit, Lprecx = insulate_crit_boxes(f, params, precx)
 
-    #############################
-    # Compute boxes that intersect curve only on vertical sides
-    ##############################
     v > 0 && println("\nCompute intersections with critical boxes..")
-@iftime (v > 0) begin
-    ## TODO : Refine only the intervals that need to be refined? only the factor that defines the intervals
-    LPCside = Dict{Int,Any}()
-    ndig = maximum([ndigits(length(LBcrit[i])) for i in eachindex(LBcrit)])
-    for i in eachindex(LBcrit)
-        LPCside[i] = Array{Any}(undef, length(LBcrit[i]))
-        # Data printing part
-        ndigi = ndigits(length(LBcrit[i]))
-        Ptype = (i > length(LBcrit)-length(C)) ? "Pcon" : "mult"
-        ###
-        precxtmp = precx
-        compt = 0
-        while compt < 5
-            flag = false
-            # println(LBcrit[i])
-            for j in eachindex(LBcrit[i])
-                v > 0 && print("$Ptype=$i ; $(j)/$(length(LBcrit[i]))$(repeat(" ", ndig-ndigi+1))pts","\r")
-                pcside = intersect_box(f, LBcrit[i][j], prec=precxtmp,v=v)
-                npcside = [length(n) for (I, n) in pcside]
-                # println("($i, $j): $npcside")
-                if (i == 1 && sum(npcside) > 2) || (i != 1 && sum(npcside[1:2]) != 0)
-                    precxtmp *= 2
-                    v > 0 && println("\nRefine boxes along x-axis to $precxtmp bits precision")
-                    refine_xboxes(params[i][1], LBcrit[i], precxtmp)
-                    flag = true
-                    compt += 1
-                    break
-                end
-                LPCside[i][j] = pcside
-            end
-            flag || break
-        end
-        v > 0 && println("")
-        if compt >= 5
-            error("Problem in computing intersections with boxes")
-        end
-    end
-    LnPCside = Dict(i => [[length(indI) for (L, indI) in PB] for PB in LPCside[i]] for i in eachindex(LPCside))
-
-    # Update extreme boxes
-    if haskey(LBcrit, 1)
-        for j in eachindex(LBcrit[1])
-            # If the curve does not intersect the box only on vertical sides
-            if !(LnPCside[1][j][1:2] == [0, 0])
-                PCside, nPCside = LPCside[1][j], LnPCside[1][j]
-                I = [ l[1] for l in PCside[3:end] ]
-                nI = [ l[2] for l in PCside[3:end] ]
-                # Locate the orientation of the extreme point
-                # s is the index on the side where there are more branches
-                # s=1: left; s=2: right
-                s = argmax([length(I[1]), length(I[2])])
-                # Ordinate range of the extreme point
-                ycrit = LBcrit[1][j][2]
-                # If it intersects on the bottom side
-                if nPCside[1] == 1
-                    # yinf: the intersection with the vertical side just below the extreme point
-                    yinf = maximum([i for (i, yy) in pairs(I[s]) if yy[1] < ycrit[1]])
-                    # We vertically enlarge the box until it intersects on the horizontal side
-                    push!(LPCside[1][j][s + 2][2], yinf)
-                    LPCside[1][j][1][2] = []
-                    # We update the intersection numbers
-                    LnPCside[1][j][s + 2] += 1
-                    LnPCside[1][j][1] = 0
-                end
-                # If it intersects on the top side
-                if nPCside[2] == 1
-                    # ymax: the intersection with the vertical side just above the extreme point
-                    ymax = minimum([i for (i, yy) in pairs(I[s]) if yy[2] > ycrit[2]])
-                    # We vertically enlarge the box until it intersects on the horizontal side
-                    push!(LPCside[1][j][s + 2][2], ymax)
-                    LPCside[1][j][2][2] = []
-                    # We update the intersection numbers
-                    LnPCside[1][j][s + 2] += 1
-                    LnPCside[1][j][2] = 0
-                end
-            end
-        end
-    end
-end
+    @iftime (v > 0) LPCside, LnPCside = intersect_vertical_boxes(LBcrit, params, Lprecx)
 
     # Graph computation
     fct, typeout = outf ? (Float64, Float64) : (identity, QQFieldElem)
