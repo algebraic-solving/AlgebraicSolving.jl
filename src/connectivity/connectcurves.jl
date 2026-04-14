@@ -116,7 +116,7 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
             end
         else
             for k in 1:length(PCside.left.points)
-                xval = xcrit[i][j][1] - 1
+                xval = xcrit[i][j][1]
                 yval = sum(PCside.left.points[k]) / 2
                 push!(Vert, (xval, yval))
                 push!(Corr[i][j].left, length(Vert))
