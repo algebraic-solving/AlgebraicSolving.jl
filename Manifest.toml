@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.12.5"
+julia_version = "1.12.6"
 manifest_format = "2.0"
 project_hash = "df55572e31ee2a4a5a0c44bb96cd0c13ec9af668"
 
@@ -15,7 +15,7 @@ weakdeps = ["Test"]
     TestExt = "Test"
 
 [[deps.AlgebraicSolving]]
-deps = ["Colors", "LinearAlgebra", "Logging", "Markdown", "Nemo", "Plots", "Primes", "Printf", "Random", "StaticArrays", "msolve_jll"]
+deps = ["BenchmarkTools", "Colors", "LinearAlgebra", "Logging", "Markdown", "Nemo", "Plots", "Primes", "Printf", "Random", "StaticArrays", "msolve_jll"]
 path = "."
 uuid = "66b61cbe-0446-4d5d-9090-1ff510639f9d"
 version = "0.10.4"

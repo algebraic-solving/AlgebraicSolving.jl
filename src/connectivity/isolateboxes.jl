@@ -318,6 +318,6 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx; max_attempts=5, v=0
             end
         end
     end
-
+    #TODO: by design bottom/top sides in LnPCside are [0,0] -> remove
     return LPCside, LnPCside
 end

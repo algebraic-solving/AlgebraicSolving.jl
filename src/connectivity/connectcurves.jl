@@ -15,6 +15,13 @@ include("plots.jl")
 include("arbtools.jl")
 include("buildpoly.jl")
 
+# Input:
+# The space curve is given by f(x,y) = 0 and (df/dy)(x,y)*z = g(x,y)
+# it is assumed in generic position of put it using generic parameter
+# for now f is assumed to be square-free (future feature)
+# C is a list of parametrization [p,a,b] of plane pts i.e. such that p(x)=0,y=a(x)/b(x)
+# these points must be on the curve
+# Output: Computes a graph homeomorphic to the curve, identitying point in C
 function compute_graph(f::P, g::P, C::Vector{Vector{P}}=Vector{Vector{P}}(); generic=true, precx = 150, v=0, int_coeff=true, outf=true)  where (P <: MPolyRingElem)
     R = parent(f)
     x, y = gens(R)

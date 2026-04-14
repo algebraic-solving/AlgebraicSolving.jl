@@ -96,11 +96,11 @@ struct PointGroup
 end
 
 struct GraphPlotData
-    edge_groups::Vector{EdgeGroup}
+    edge_groups::EdgeGroup
     point_groups::Vector{PointGroup}
 end
 
-# ---------- HELPERS ----------
+# ---------- HELPER ----------
 
 function normalize_vemph(Vemph)
     if Vemph isa Vector{Vector}
@@ -115,9 +115,7 @@ function normalize_vemph(Vemph)
 end
 
 # ---------- CORE BUILDERS ----------
-# TODO: remove the sequence in edge_groups as there should be only one, right? (same for point_groups in build_graph_data)
-
-function build_graph_data(G, Vemph=Vector{Vector{Int}}(); width=3.0, vert=true)
+function build_graph_data(G, Vemph=Vector{Vector{Int}}(); width=3.0, vert=true, color=rand(1:666))
     Vemph = normalize_vemph(Vemph)
     V, E = G
 
@@ -129,25 +127,24 @@ function build_graph_data(G, Vemph=Vector{Vector{Int}}(); width=3.0, vert=true)
         end
         for e in E
     ]
+    edge_group = EdgeGroup(edges, color, width)
 
-    edge_groups = [EdgeGroup(edges, rand(1:666), width)]
-
-    #point groups
+    #points
     point_groups = PointGroup[]
 
     if vert
         vx = map(v -> Float64(v[1]), V)
         vy = map(v -> Float64(v[2]), V)
-        push!(point_groups, PointGroup((vx, vy), rand(1:666), :diamond))
+        push!(point_groups, PointGroup((vx, vy), 17, :diamond))
     end
 
     for group in Vemph
         hx = map(j -> Float64(V[j][1]), group)
         hy = map(j -> Float64(V[j][2]), group)
-        push!(point_groups, PointGroup((hx, hy), rand(1:666), :diamond))
+        push!(point_groups, PointGroup((hx, hy), color, :diamond))
     end
 
-    return GraphPlotData(edge_groups, point_groups)
+    return GraphPlotData(edge_group, point_groups)
 end
 
 # ---------- MULTI GRAPHS ----------
@@ -156,24 +153,10 @@ function build_graphs_data(CG; width=3.0, vert=true)
     results = GraphPlotData[]
 
     for item in CG
-
         G, Vemph = length(item) == 2 ? item : item, Vector{Int}()
-        data = build_graph_data(G, Vemph; width=width, vert=vert)
-
-        # override edge color per graph
-        for eg in data.edge_groups
-            eg = EdgeGroup(eg.edges, rand(1:666), eg.width)
-        end
+        data = build_graph_data(G, Vemph; width=width, vert=vert, color=rand(1:666))
 
         push!(results, data)
     end
-
     return results
-end
-
-# ---------- CONNECTED COMPONENTS ----------
-
-function build_graph_components_data(G, Vemph=Vector{Int}(); width=3.0, vert=true)
-    CG = connected_components(G, Vemph)
-    return build_graphs_data(CG; width=width, vert=vert)
 end
