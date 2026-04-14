@@ -4,7 +4,7 @@ function plot_graph(G, Vemph::Vector{Vector{T}} where T<:Any; color="red", width
     if !subplt
         plot(legend=false)
     end
-    V, E = G
+    V, E = G.vertices, G.edges
     #col = distinguishable_colors(length(Vemph)+2)
     for e in E
         v1, v2 = [ map(Float64, V[ee]) for ee in e ]
