@@ -16,6 +16,34 @@ include("plots.jl")
 include("arbtools.jl")
 include("buildpoly.jl")
 
+# =========================================================================
+# MULTIPLE DISPATCH WRAPPERS (Clean, concise, and DRY)
+# =========================================================================
+
+# Base case: No 'C' provided
+compute_graph(f::P, g::P; kwargs...) where {P <: MPolyRingElem} =
+    _compute_graph_core(f, g, Vector{Vector{P}}(); kwargs...)
+
+# Case 1: C is a Vector of Vectors
+compute_graph(f::P, g::P, C::Vector{Vector{P}}; kwargs...) where {P <: MPolyRingElem} =
+    _compute_graph_core(f, g, C; kwargs...)
+
+# Case 2: C is a Dictionary
+function compute_graph(f::P, g::P, C::Dict{Int, Vector{P}}; kwargs...) where {P <: MPolyRingElem}
+    graph = _compute_graph_core(f, g, collect(values(C)); kwargs...)
+    # Remap Vcon dictionary keys to match original dict keys
+    mapped_vcon = Dict{Int, Vector{Int}}(k => graph.control_nodes[i] for (i, k) in enumerate(keys(C)))
+    return CurveGraph(graph.vertices, graph.edges, mapped_vcon)
+end
+
+# Case 3: C is a single Vector
+compute_graph(f::P, g::P, C::Vector{P}; kwargs...) where {P <: MPolyRingElem} =
+    _compute_graph_core(f, g, [C]; kwargs...)
+
+# =========================================================================
+# CORE IMPLEMENTATION
+# =========================================================================
+
 # Input:
 # The space curve is given by f(x,y) = 0 and (df/dy)(x,y)*z = g(x,y)
 # it is assumed in generic position of put it using generic parameter
@@ -168,20 +196,3 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
     # Return the unified data structure
     return CurveGraph{QQFieldElem}(Vert, Edg, Vcon)
 end
-
-# Multi-dispatch wrappers returning the Graph Struct
-compute_graph(f::P, g::P; kwargs...) where {P <: MPolyRingElem} =
-    _compute_graph_core(f, g, Vector{Vector{P}}(); kwargs...)
-
-compute_graph(f::P, g::P, C::Vector{Vector{P}}; kwargs...) where {P <: MPolyRingElem} =
-    _compute_graph_core(f, g, C; kwargs...)
-
-function compute_graph(f::P, g::P, C::Dict{Int, Vector{P}}; kwargs...) where {P <: MPolyRingElem}
-    graph = _compute_graph_core(f, g, collect(values(C)); kwargs...)
-    # Remap Vcon dictionary keys to match original dict keys
-    mapped_vcon = Dict{Int, Vector{Int}}(k => graph.control_nodes[i] for (i, k) in enumerate(keys(C)))
-    return CurveGraph(graph.vertices, graph.edges, mapped_vcon)
-end
-
-compute_graph(f::P, g::P, C::Vector{P}; kwargs...) where {P <: MPolyRingElem} = 
-    _compute_graph_core(f, g, [C]; kwargs...)

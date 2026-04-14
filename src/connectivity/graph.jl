@@ -11,7 +11,7 @@ Decomposes a graph into its connected components.
 - `G::CurveGraph{T}`: The unified curve graph.
 
 # Outputs
-- `Vector{CurveGraph{T}}`: A list of disjoint subgraphs. Each subgraph retains 
+- `Vector{CurveGraph{T}}`: A list of disjoint subgraphs. Each subgraph retains
   the mapped coordinates, edges, and control nodes belonging to its component.
 """
 function connected_components(G::CurveGraph{T}) where T
