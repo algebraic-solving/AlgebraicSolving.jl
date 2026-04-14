@@ -4,12 +4,10 @@ function order_permut2d(L)
     # Sort the enumerated list based on the values
     sorted_LL = sort(LL, by = x -> x[1])
     # Extract the sorted values and their corresponding indices
-    #sorted_L = [pair[1] for pair in sorted_LL]
     sorted_ind = [pair[2] for pair in sorted_LL]
 
     return sorted_ind
 end
-
 
 function trimat_rand(A, n; up=true, range=-100:100)
     if up

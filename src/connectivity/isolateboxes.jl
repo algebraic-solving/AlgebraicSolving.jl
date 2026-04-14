@@ -1,8 +1,6 @@
 in_inter(I, J) =  J[1] <= I[1] && I[2] <= J[2]
 overlap_inter(I, J) = max(I[1], J[1]) <= min(I[2], J[2])
 
-# TODO: output vector of tuple for the intervals (inside real_solutions?)
-
  # Function that isolate roots of a multivariate polynomial with a
  # single variable
 function isolate(f; prec = 32)
@@ -250,7 +248,7 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf; max_attempts=
     end
 
     # ---- Extremal case (i == 1) we vertically enlarge boxes manually -----
-    # TODO: here we modify only LPCside and LnPCside, not LBcrit
+    # TODO: should we also modify LBcrit?
     if haskey(LBcrit, 1)
         boxes, pcs, npcs = LBcrit[1], LPCside[1], LnPCside[1]
 
