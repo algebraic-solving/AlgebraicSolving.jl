@@ -20,7 +20,7 @@ include("buildpoly.jl")
 # MULTIPLE DISPATCH WRAPPERS
 # =========================================================================
 
-# Base case: No 'C' provided
+# Base case: No 'C' (control points) provided
 compute_graph(f::P, g::P; kwargs...) where {P <: MPolyRingElem} =
     _compute_graph_core(f, g, Vector{Vector{P}}(); kwargs...)
 
