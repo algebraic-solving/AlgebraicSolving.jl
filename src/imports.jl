@@ -7,7 +7,7 @@ using Plots, Colors
 #pythonplot()
 
 import Plots: plot
-import Random: MersenneTwister
+import Random: MersenneTwister, randperm
 import Logging: ConsoleLogger, with_logger, Warn, Info
 import Printf: @sprintf, @printf
 

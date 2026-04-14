@@ -10,22 +10,6 @@ function order_permut2d(L)
     return sorted_ind
 end
 
-function diff(p, v, n)
-    dp = p
-    for j in 1:n
-        dp = derivative(dp, v)
-    end
-    return dp
-end
-
-function diff_list(p, v, n)
-    Ldp = Vector{typeof(p)}(undef, n+1)
-    Ldp[1] = p
-    for j in 1:n
-        Ldp[j+1] = derivative(Ldp[j], v)
-    end
-    return Ldp
-end
 
 function trimat_rand(A, n; up=true, range=-100:100)
     if up
@@ -51,20 +35,3 @@ macro iftime(v, ex)
         end
     end
 end
-
-"""
-    extract_point(I, outf::Bool)
-
-Convert an isolation interval `I = [a, b]` into a single representative point.
-"""
-function extract_point(I, outf::Bool; interval::Bool=false)
-    a, b = I[1], I[2]
-    if outf
-        return interval ? (Float64(a),Float64(b)) : Float64(a + b) / 2.0
-    else
-        return interval ? (a,b) : simplest_between(a, b) # Nemo's native simplest rational function
-    end
-end
-
-# Helper for averaging two extracted points
-average_points(a, b, outf::Bool) = outf ? (a + b) / 2.0 : (a + b) // 2

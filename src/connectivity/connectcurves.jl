@@ -17,7 +17,7 @@ include("arbtools.jl")
 include("buildpoly.jl")
 
 # =========================================================================
-# MULTIPLE DISPATCH WRAPPERS (Clean, concise, and DRY)
+# MULTIPLE DISPATCH WRAPPERS
 # =========================================================================
 
 # Base case: No 'C' provided
@@ -73,10 +73,10 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
 
     v > 0 && println("Computing insulating critical boxes")
     @iftime (v > 0) LBcrit, Lprecx = insulate_crit_boxes(f, params, precx, v=v-1)
-    println(LBcrit)
+
     v > 0 && println("Compute intersections with critical boxes..")
     @iftime (v > 0) LPCside, LnPCside = intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf, v=v-1)
-    println(LPCside)
+
     # Critical values and their order
     xcrit = Dict(i => [LBcrit[i][j][1] for j in eachindex(LBcrit[i])] for i in keys(LBcrit))
     xcritpermut = order_permut2d(xcrit)
@@ -110,7 +110,6 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
 
         # 1. Left side vertices
         # one-to-one connection with previous right side
-        # TODO: could be improved memory-wise
         if ind > 1
             for k in 1:length(PCside.left.points)
                 push!(Corr[i][j].left, Corr[i1][j1].right[k])

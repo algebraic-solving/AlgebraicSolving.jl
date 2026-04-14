@@ -16,8 +16,9 @@ end
 # univariate isolation of roots of a bivariate polynomial f whose
 # ivar-th variable is evaluated at val
 function isolate_eval(f, ivar, val; prec=64)
-    fev = change_ringvar(evaluate(f, [ivar], [val]))
+    fev = evaluate(f, [ivar], [val])
     # fev *= fev |> coefficients .|> denominator |> lcm
+    fev = fev / content(fev)
     return isolate(fev, prec=prec)
 end
 
@@ -47,7 +48,6 @@ function _compute_boxes_for_index!(i, params, LBcrit, precx)
     _expand_degenerate_intervals!(xvals, precx)
 
     arbField = ArbField(precx)
-
     yvals = [
         evaluate_arb(params[i][2], params[i][3], xc, arbField)
         for xc in xvals
@@ -63,12 +63,9 @@ end
 
 Check if boxes at index i require refinement.
 """
-function _needs_refinement(i, f, LBcrit, precx)
+function _needs_refinement(i, Lfyk, LBcrit, precx)
     arbField = ArbField(precx)
     m = i <= 1 ? 2 : i
-    # TODO: input, compute once for all i
-    Lfyk = diff_list(f, 2, max(i, 2))
-
     for box in LBcrit[i]
         pcrit = [rat_to_arb(c, arbField) for c in box]
 
@@ -79,6 +76,15 @@ function _needs_refinement(i, f, LBcrit, precx)
     return false
 end
 
+# Compute the list of the n-th first derivative of p w.r.t v
+function diff_list(p, v, n)
+    L = Vector{typeof(p)}(undef, n + 1)
+    L[1] = p
+    @inbounds for j in 2:n+1
+        L[j] = derivative(L[j-1], v)
+    end
+    return L
+end
 
 """
     compute_crit_and_singular_boxes(f, params, precx; max_attempts=5, v=0)
@@ -90,6 +96,7 @@ critical point.
 """
 function insulate_crit_boxes(f, params, precx; max_attempts=5, v=0)
     LBcrit, Lprecx = Dict(), Dict()
+    Lfyk = diff_list(f, 2, max(maximum(keys(params)), 2))
 
     for i in keys(params)
         attempts, precxi = 0, precx
@@ -101,7 +108,7 @@ function insulate_crit_boxes(f, params, precx; max_attempts=5, v=0)
                 _compute_boxes_for_index!(i, params, LBcrit, precxi)
 
                 # singularity check
-                if !_needs_refinement(i, f, LBcrit, precxi)
+                if !_needs_refinement(i, Lfyk, LBcrit, precxi)
                     break
                 end
 
