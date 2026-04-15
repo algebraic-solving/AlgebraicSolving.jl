@@ -9,7 +9,7 @@ export compute_graph, connected_components, number_connected_components, group_b
 
 include("datastruct.jl")
 include("tools.jl")
-include("subresultants.jl")
+include("subresultants-bis.jl")
 include("isolateboxes.jl")
 include("graph.jl")
 include("plots.jl")
