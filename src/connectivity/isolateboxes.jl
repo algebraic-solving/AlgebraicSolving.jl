@@ -130,7 +130,7 @@ function insulate_crit_boxes(f, params, precx; max_attempts=5, v=0)
 end
 
 # Helper function to process a single edge of the box
-function _isolate_box_edge(f, fixed_dim, fixed_val, target_interval, initial_prec, v, outf; max_retries=5)
+function _isolate_box_edge(f, fixed_dim, fixed_val, target_interval, initial_prec, v; max_retries=5)
     prec = initial_prec
 
     for _ in 1:max_retries
@@ -158,13 +158,13 @@ function _isolate_box_edge(f, fixed_dim, fixed_val, target_interval, initial_pre
 end
 
 # Function that computes the intersection of a curve with a box by isolating roots on the edges
-function intersect_box(f, B, outf; prec=100, v=0)
+function intersect_box(f, B; prec=100, v=0)
     # Evaluate horizontal edges (fix y to B[2][1] and B[2][2], target x-interval B[1])
-    edge_y1 = _isolate_box_edge(f, 2, B[2][1], B[1], prec, v, outf)
-    edge_y2 = _isolate_box_edge(f, 2, B[2][2], B[1], prec, v, outf)
+    edge_y1 = _isolate_box_edge(f, 2, B[2][1], B[1], prec, v)
+    edge_y2 = _isolate_box_edge(f, 2, B[2][2], B[1], prec, v)
     # Evaluate vertical edges (fix x to B[1][1] and B[1][2], target y-interval B[2])
-    edge_x1 = _isolate_box_edge(f, 1, B[1][1], B[2], prec, v, outf)
-    edge_x2 = _isolate_box_edge(f, 1, B[1][2], B[2], prec, v, outf)
+    edge_x1 = _isolate_box_edge(f, 1, B[1][1], B[2], prec, v)
+    edge_x2 = _isolate_box_edge(f, 1, B[1][2], B[2], prec, v)
 
     # Return clean struct
     T = QQFieldElem
@@ -199,8 +199,7 @@ end
 
 # Function computing the intersection of the vertical sides of the critical boxes with the curve defined by f.
 # If an intersection on top/bottom side is detected, refine the width until this does not happen or max_attemps is reached.
-function intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf; max_attempts=5, v=0)
-    # Automatically infer the point type based on outf
+function intersect_vertical_boxes(f, params, LBcrit, Lprecx; max_attempts=5, v=0)
     T = QQFieldElem
     LPCside = Dict{Int, Vector{BoxIntersections{T}}}()
     LnPCside = Dict{Int, Vector{NTuple{4, Int}}}()
@@ -216,7 +215,7 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf; max_attempts=
 
             @inbounds for j in 1:n
                 v >= 0 && print("i=$i ($j/$n)\r")
-                pc = intersect_box(f, boxes[j], outf, prec=prec, v=v)
+                pc = intersect_box(f, boxes[j], prec=prec, v=v)
 
                 c1 = length(pc.bottom.indices_inside)
                 c2 = length(pc.top.indices_inside)
@@ -271,6 +270,8 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf; max_attempts=
                 push!(side_indices, ind_yinf)
                 empty!(pc.bottom.indices_inside)
                 npcs[j] = (0, c2, s == 1 ? c3 + 1 : c3, s == 2 ? c4 + 1 : c4)
+                # Update also LBcrit for consistency purpose only
+                boxes[j][2] = (side_pts[ind_yinf][1], boxes[j][2][2])
             end
 
             c1, c2, c3, c4 = npcs[j] # In case this has changed
@@ -281,6 +282,8 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf; max_attempts=
                 push!(side_indices, ind_ymax)
                 empty!(pc.top.indices_inside)
                 npcs[j] = (c1, 0, s == 1 ? c3 + 1 : c3, s == 2 ? c4 + 1 : c4)
+                # Update also LBcrit for consistency purpose only
+                boxes[j][2] = (boxes[j][2][1], side_pts[ind_ymax][2])
             end
         end
     end

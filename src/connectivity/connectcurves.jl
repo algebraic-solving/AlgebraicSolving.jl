@@ -75,7 +75,7 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
     @iftime (v > 0) LBcrit, Lprecx = insulate_crit_boxes(f, params, precx, v=v-1)
 
     v > 0 && println("Compute intersections with critical boxes..")
-    @iftime (v > 0) LPCside, LnPCside = intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf, v=v-1)
+    @iftime (v > 0) LPCside, LnPCside = intersect_vertical_boxes(f, params, LBcrit, Lprecx, v=v-1)
 
     # Critical values and their order
     xcrit = Dict(i => [LBcrit[i][j][1] for j in eachindex(LBcrit[i])] for i in keys(LBcrit))
@@ -85,6 +85,15 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
     Vert = Tuple{QQFieldElem, QQFieldElem}[] # List of points (x,y)
     Edg = Tuple{Int, Int}[] # List of tuples (idx, idy)
     Vcon = Dict{Int, Vector{Int}}(k => Int[] for k in keys(C)) # Index of control vertices
+    typeout = outf ? Float64 : QQFieldElem
+
+    # Empty or unbounded real curves
+    if isempty(xcrit)
+        Vert = reduce(vcat, [ (typeout(e), typeout(yy[1])) for e=0:1 for yy in isolate_eval(f,1,1-2*e)])
+        nV = length(Vert) / 2
+        Edg = [ (i, i + nV) for i=1:nV ]
+        return CurveGraph{typeout}(Vert, Edg, Vcon)
+    end
 
     Lapp_isolated = Tuple{Int, Int}[]
     Lapp_nodes = Tuple{Int, Int}[]
@@ -189,9 +198,8 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
 
     if outf
         Vert = [ (Float64(x), Float64(y)) for (x,y) in Vert ]
-        return CurveGraph{Float64}(Vert, Edg, Vcon)
     end
 
     # Return the unified data structure
-    return CurveGraph{QQFieldElem}(Vert, Edg, Vcon)
+    return CurveGraph{typeout}(Vert, Edg, Vcon)
 end
