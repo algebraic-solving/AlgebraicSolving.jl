@@ -10,7 +10,7 @@ export compute_graph, connected_components, number_connected_components, group_b
 include("tools.jl")
 include("datastruct.jl")
 include("buildpoly.jl")
-include("subresultants.jl")
+include("paramcrit.jl")
 include("arbtools.jl")
 include("isolateboxes.jl")
 include("graph.jl")
