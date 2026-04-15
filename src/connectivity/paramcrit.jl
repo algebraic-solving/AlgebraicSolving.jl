@@ -125,6 +125,9 @@ function intersect_biv(P::Vector, A::MPolyRingElem)
     while compt < 12
         p = next_prime(p)
         Fp = GF(p)
+        # Prime check
+        lcA, lcP = ZZ(leading_coefficient(A)), ZZ(leading_coefficient(P[1]))
+        divides(p, gcd(lcA, lcP))[1] && continue
 
         # Map polynomials natively to Fp
         Pp = [map_coefficients(Fp, poly) for poly in P]
@@ -147,7 +150,10 @@ function intersect_biv(P::Vector, A::MPolyRingElem)
         pprod *= p
         try
             dA_final = [reconstruct(c, pprod) for c in dA_current]
-            (compt > 0 && dA_final == dA_prev) && break
+            if (compt > 0 && dA_final == dA_prev)
+                fact = MPolyBuild(dA_final, RSA, 1)
+                divides(fact, P[1])[1] && return fact
+            end
         catch
             # Rational reconstruction failed, try next prime
         end
@@ -156,7 +162,7 @@ function intersect_biv(P::Vector, A::MPolyRingElem)
         compt += 1
     end
 
-    return MPolyBuild(dA_final, RSA, 1)
+    error("Failed multi-modular computation of apparent sing: $compt primes used")
 end
 
 # =========================================================================
