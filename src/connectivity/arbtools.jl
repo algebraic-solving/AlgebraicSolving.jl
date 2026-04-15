@@ -38,8 +38,8 @@ function evaluate_arb(f, g, x::Vector{QQFieldElem}, field::ArbField)
 
     is_zero(f) && return zero(parent(x))
 
-    cf = coefficients_of_univariate(f)
-    cg = coefficients_of_univariate(g)
+    cf = field.(coefficients_of_univariate(f))
+    cg = field.(coefficients_of_univariate(g))
 
     x_arb = rat_to_arb(x, field)
     num = evalpoly(x_arb, cf)

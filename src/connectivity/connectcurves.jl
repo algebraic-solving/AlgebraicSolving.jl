@@ -90,21 +90,37 @@ compute_graph(f::P, g::P, C::Vector{P}; kwargs...) where {P <: MPolyRingElem} =
 # =========================================================================
 
 function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
-                             generic=true, precx=150, v=0, int_coeff=true, outf=true) where {P <: MPolyRingElem}
+                             generic=true, precx=150, v=0, detect_app=true, outf=true) where {P <: MPolyRingElem}
+
+    @assert !iszero(f) "Input does not define a curve"
 
     R = parent(f)
     x, y = gens(R)
-    intC = int_coeff ? int_coeffs : identity
+    typeout = outf ? Float64 : QQFieldElem
+
+    # Empty set
+    total_degree(f) == 0 &&
+    return CurveGraph(
+    Tuple{typeout, typeout}[],
+    Tuple{Int, Int}[],
+    Dict{Int, Vector{Int}}()
+    )
 
     # Pre-processing the input
-    f, g = intC([f, g])
-    changemat = generic ? [1 0; 0 1] : trimat_rand(QQ, 2, range=-100:100)
+    f, g = int_coeffs([f, g])
+    changemat = generic ? [1 0; 0 1] : [ QQ(rand(-100:100)) for i=1:2, j=1:2 ]
+
     f = evaluate(f, collect(changemat * [x; y]))
     precx = max(2, precx)
     v > 1 && println(f)
 
+    # Zero-dim param conditions
+    d = total_degree(f)
+    @assert degree(f, 2) == d && degree(f, 1) == d && degree(g, 2) < d &&
+    is_squarefree(f) "Curve not in generic position. Try with generic=false."
+
     v > 0 && println("Compute parametrization of critical pts...")
-    @iftime (v > 0) params = param_crit_split(f, g, v=v-1, detect_app=true)
+    @iftime (v > 0) params = param_crit_split(f, g, v=v-1, detect_app=detect_app)
     for i in 1:length(C)
         params[-i] = [ [intC(C[i][1])], C[i][2], C[i][3] ]
     end
@@ -123,7 +139,6 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
     Vert = Tuple{QQFieldElem, QQFieldElem}[] # List of points (x,y)
     Edg = Tuple{Int, Int}[] # List of tuples (idx, idy)
     Vcon = Dict{Int, Vector{Int}}(k => Int[] for k in keys(C)) # Index of control vertices
-    typeout = outf ? Float64 : QQFieldElem
 
     # Empty or unbounded real curves
     if isempty(xcrit)

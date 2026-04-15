@@ -213,7 +213,6 @@ function param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, detect_app=tr
     v > 0 && println("Compute subresultant sequence")
     f_y = derivative(f, 2)
     @iftime v>0 sr = subresultants(f, f_y, 2, list=true)
-
     (isempty(sr) || total_degree(sr[1][1]) == 0) && return Dict{Int, Vector}()
 
     v > 1 && println("Factorization")
@@ -226,25 +225,28 @@ function param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, detect_app=tr
     sqrmult = unique([s[2] for s in sqr])
     group_sqr = Dict(m => [s[1] for s in sqr if s[2] == m] for m in sqrmult)
 
-    v > 0 && println("Compute crit partition w.r.t to multiplicity")
     param_crit = Dict{Int, Vector}()
 
     # Helper function to prevent out-of-bounds access on subresultant lists
-    get_sr = (p, idx) -> (length(sr) >= p && length(sr[p]) >= abs(idx)) ? sr[p][end+idx] : zero(parent(f))
-
-    singmult = filter(p -> p*(p-1) <= sqrmult[end], 2:sqrmult[end])
-    for p in singmult
-        param_crit[p] = [MPolyRingElem[], -get_sr(p, -1), (p-1)*get_sr(p, 0)]
-    end
+    get_sr = (p, idx)-> (length(sr) >= p && length(sr[p]) >= abs(idx) + 1) ? sr[p][end+idx] : zero(parent(f))
 
     # Critical points : multiplicity 1 in res
     (1 in sqrmult) && (param_crit[1] = [group_sqr[1], -get_sr(2, -1), get_sr(2, 0)])
+
+    # Singular points
+    singmult = filter(p -> p*(p-1) <= sqrmult[end], 2:sqrmult[end])
     isempty(singmult) && return filter(p -> length(p.second[1]) > 0, param_crit)
 
+    @assert length(sr) >= singmult[end] "Curve not in generic position. Try with generic=false."
+    for p in singmult
+        @assert length(sr[p]) >= 2 "Curve not in generic position. Try with generic=false."
+        param_crit[p] = [MPolyRingElem[], -get_sr(p, -1), (p-1)*get_sr(p, 0)]
+    end
+
     # Nodes : multiplicity 2 in res
-    v > 0 && println("Compute apparent singularities")
     if 2 in sqrmult
         if detect_app
+            v > 0 && println("Compute apparent singularities")
             f_x = derivative(f, 1)
             A = derivative(f_y, 2) * derivative(g, 1) - derivative(f_x, 2) * derivative(g, 2)
 
@@ -265,13 +267,10 @@ function param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, detect_app=tr
     for m in sqrmult
         for q in group_sqr[m]
             for (i, dji) in fact_gcd(q, lsr)
-                haskey(param_crit, i+1) ? push!(param_crit[i+1][1], dji) : error("Curve not generic")
+                @assert haskey(param_crit, i+1) "Curve not in generic position. Try with generic=false."
+                push!(param_crit[i+1][1], dji)
             end
         end
-    end
-
-    for v in values(param_crit)
-        filter!(p -> total_degree(p) > 0, v[1])
     end
 
     return filter(p -> length(p.second[1]) > 0, param_crit)
