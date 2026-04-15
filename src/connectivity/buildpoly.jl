@@ -69,40 +69,77 @@ end
 change_ringvar(f::MPolyRingElem) = change_ringvar([f])[1]
 
 
-# """
-#     MPolyBuild(F::Vector{Vector{RingElem}}, new_S::Vector{Symbol}, idx::Int)
+"""
+    MPolyBuild(F::Vector{Vector{RingElem}}, new_S::Vector{Symbol}, idx::Int)
 
-# Construct multivariate polynomials in a single variable.
-# `F` is a list of coefficient lists in degree-increasing order.
-# The polynomial will use the variable at index `idx` in `new_S`.
-# """
-# function MPolyBuild(F::AbstractVector{<:AbstractVector{<:RingElement}}, new_S::Vector{Symbol}, idx::Int)
-#     isempty(F) && return []
+Construct multivariate polynomials in a single variable.
+`F` is a list of coefficient lists in degree-increasing order.
+The polynomial will use the variable at index `idx` in `new_S`.
+"""
+function MPolyBuild(F::AbstractVector{<:AbstractVector{<:RingElement}}, new_S::Vector{Symbol}, idx::Int)
+    isempty(F) && return []
 
-#     A = parent(first(first(F)))
-#     R, _ = polynomial_ring(A, new_S)
+    A = parent(first(first(F)))
+    R, _ = polynomial_ring(A, new_S)
 
-#     T = typeof(zero(A))
-#     n_vars = length(new_S)
+    T = typeof(zero(A))
+    n_vars = length(new_S)
 
-#     return map(F) do f_coeffs
-#         coeffs = T[]
-#         exps = Vector{Int}[]
+    return map(F) do f_coeffs
+        coeffs = T[]
+        exps = Vector{Int}[]
 
-#         # Construct coeff/exp lists
-#         for (deg_plus_1, c) in enumerate(f_coeffs)
-#             if !iszero(c)
-#                 e_new = zeros(Int, n_vars)
-#                 e_new[idx] = deg_plus_1 - 1
-#                 push!(coeffs, c)
-#                 push!(exps, e_new)
-#             end
-#         end
+        # Construct coeff/exp lists
+        for (deg_plus_1, c) in enumerate(f_coeffs)
+            if !iszero(c)
+                e_new = zeros(Int, n_vars)
+                e_new[idx] = deg_plus_1 - 1
+                push!(coeffs, c)
+                push!(exps, e_new)
+            end
+        end
 
-#         # Create the polynomial associated to f_coeffs
-#         return R(coeffs, exps)
-#     end
-# end
+        # Create the polynomial associated to f_coeffs
+        return R(coeffs, exps)
+    end
+end
 
-# # Dispatch for a single coefficient vector
-# MPolyBuild(f::AbstractVector{<:RingElement}, new_S::Vector{Symbol}, idx::Int) = MPolyBuild([f], new_S, idx)[1]
+# Dispatch for a single coefficient vector
+MPolyBuild(f::AbstractVector{<:RingElement}, new_S::Vector{Symbol}, idx::Int) = MPolyBuild([f], new_S, idx)[1]
+
+"""
+    to_univariate(P::MPolyRingElem, var_idx::Int)
+
+Converts a bivariate polynomial in `K[x, y]` into a univariate polynomial in `(K[x])[y]`.
+"""
+function to_univariate(P::MPolyRingElem, var_idx::Int)
+    R = parent(P)
+    K = base_ring(R)
+    coeff_idx = 3 - var_idx # The variable to be pushed to the coefficients
+
+    Rx, x = polynomial_ring(K, symbols(R)[coeff_idx])
+    Rxy, y = polynomial_ring(Rx, symbols(R)[var_idx])
+
+    res = zero(Rxy)
+    for (c, exp) in zip(coefficients(P), exponent_vectors(P))
+        # Build the coefficient in Rx, then attach to y in Rxy
+        res += (c * x^exp[coeff_idx]) * y^exp[var_idx]
+    end
+    return res
+end
+
+
+"""
+    to_bivariate(P::PolyRingElem, R_orig::MPolyRing)
+
+Maps a univariate polynomial in `(K[x])[y]` back to the original bivariate ring `K[x, y]`.
+"""
+function to_bivariate(P::PolyRingElem, R_orig::MPolyRing)
+    ctx = MPolyBuildCtx(R_orig)
+    for (deg_y, c_y) in enumerate(coefficients(P))
+        for (deg_x, c_x) in enumerate(coefficients(c_y))
+            push_term!(ctx, c_x, [deg_x - 1, deg_y - 1])
+        end
+    end
+    return finish(ctx)
+end

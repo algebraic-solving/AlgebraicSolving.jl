@@ -1,45 +1,79 @@
 # =========================================================================
-# RING COERCION TOOLS (Replaces array wrangling and homogenize)
+# SUBRESULTANTS
 # =========================================================================
 
-# TODO: use MPolyBuildCtx?
+# Univariate resultant
+function subresultants(P::Union{PolyRingElem{T}, FqPolyRingElem}, Q::Union{PolyRingElem{T}, FqPolyRingElem}, is_Fq::Bool=false) where T <: RingElem
+    degree(P) < degree(Q) && ((P, Q) = (Q, P))
 
-"""
-    to_univariate(P::MPolyRingElem, var_idx::Int)
+    S = typeof(P)[Q]
+    s = leading_coefficient(Q)^(degree(P) - degree(Q)) # Initial scaling factor
+    # rem is faster when working with finite fields (relies on FLINT)
+    A = Q
+    B = is_Fq ? (-leading_coefficient(Q))^(degree(P) - degree(Q) + 1) * rem(P, Q) : pseudorem(P, -Q)
 
-Converts a bivariate polynomial in `K[x, y]` into a univariate polynomial in `(K[x])[y]`.
-"""
-function to_univariate(P::MPolyRingElem, var_idx::Int)
-    R = parent(P)
-    K = base_ring(R)
-    coeff_idx = 3 - var_idx # The variable to be pushed to the coefficients
+    while !iszero(B)
+        d, e = degree(A), degree(B)
+        push!(S, B) # current remainder
+        delta = d - e # degree drop
 
-    Rx, x = polynomial_ring(K, symbols(R)[coeff_idx])
-    Rxy, y = polynomial_ring(Rx, symbols(R)[var_idx])
-
-    res = zero(Rxy)
-    for (c, exp) in zip(coefficients(P), exponent_vectors(P))
-        # Build the coefficient in Rx, then attach to y in Rxy
-        res += (c * x^exp[coeff_idx]) * y^exp[var_idx]
-    end
-    return res
-end
-
-"""
-    to_bivariate(P::PolyRingElem, R_orig::MPolyRing)
-
-Maps a univariate polynomial in `(K[x])[y]` back to the original bivariate ring `K[x, y]`.
-"""
-function to_bivariate(P::PolyRingElem, R_orig::MPolyRing)
-    ctx = MPolyBuildCtx(R_orig)
-    for (deg_y, c_y) in enumerate(coefficients(P))
-        for (deg_x, c_x) in enumerate(coefficients(c_y))
-            push_term!(ctx, c_x, [deg_x - 1, deg_y - 1])
+        if delta > 1
+            if length(S) > 2
+                last_add, prev_add = S[end], S[end-1]
+                n = degree(prev_add) - degree(last_add) - 1 # stabilize scaling
+                if n == 0
+                    C = last_add
+                else
+                    x, y = leading_coefficient(last_add), leading_coefficient(prev_add)
+                    a = 1 << (length(bits(ZZ(n))) - 1)
+                    c, n = x, n - a
+                    while a > 1
+                        a >>= 1
+                        c = divexact(c^2, y)
+                        if n >= a
+                            c = c * divexact(x, y)
+                            n -= a
+                        end
+                    end
+                    C = c * divexact(last_add, y)
+                end
+            else
+                # First step: fallback normalization
+                C = divexact(leading_coefficient(B)^(delta - 1) * B, s^(delta - 1))
+            end
+            push!(S, C)
+        else
+            C = B # no degree drop
         end
+
+        # Termination: constant polynomial
+        e == 0 && return reverse!(S)
+
+        # --- Next pseudo-remainder ---
+        B = is_Fq ? (-leading_coefficient(B))^(d - e + 1) * rem(A, B) : pseudorem(A, -B)
+        B = divexact(B, s^delta * leading_coefficient(A))
+
+        A = C
+        s = leading_coefficient(A)
     end
-    return finish(ctx)
+    return reverse!(S)
 end
 
+# Bivariate resultant
+function subresultants(P::MPolyRingElem, Q::MPolyRingElem, var_idx::Int; list=false)
+    UP, UQ = to_univariate(P, var_idx), to_univariate(Q, var_idx)
+    sr_uni = subresultants(UP, UQ)
+
+    R_orig = parent(P)
+    v_orig = symbols(R_orig)
+
+    if list
+        # Extract coefficients as bivariate polynomials
+        return [change_ringvar(collect(coefficients(sr)), v_orig) for sr in sr_uni]
+    else
+        return [to_bivariate(sr, R_orig) for sr in sr_uni]
+    end
+end
 
 # =========================================================================
 # MODULAR ARITHMETIC & INTERSECTION
@@ -55,18 +89,21 @@ function num_biv_rat_mod(A::MPolyRingElem, P::Vector)
     q, a, b = P[1], P[2], P[3]
     Rx = parent(q)
 
-    # Do math natively inside the quotient ring Rx / <q>
+    # Work modulo q and compute y = a/b in the quotient ring
     U, mod_q = residue_ring(Rx, q)
-    a_u, b_u, x_u = mod_q(a), mod_q(b), mod_q(gens(Rx)[1])
+    y_u = mod_q(a) / mod_q(b)
 
-    deg_y = maximum(e[2] for e in exponent_vectors(A); init=0)
-    res_u = zero(U)
-
-    # Avoids homogenization entirely. b^(deg_y - j) clears the denominator.
+    # Build coefficients of A as polynomials in y with coefficients in U
+    degA_y = maximum(e[2] for e in exponent_vectors(A))
+    coeff_A_u = [ MPolyBuildCtx(Rx) for _ in 0:degA_y ]
     for (c, exp) in zip(coefficients(A), exponent_vectors(A))
-        i, j = exp[1], exp[2]
-        res_u += c * (x_u^i) * (a_u^j) * (b_u^(deg_y - j))
+        push_term!(coeff_A_u[exp[2] + 1], c, [exp[1], 0])
     end
+    coeff_A_u = [ mod_q(finish(a)) for a in coeff_A_u ]
+
+    # Evaluate the univariate polynomial at y_u in the quotient ring
+    U_y,_ = polynomial_ring(U)
+    res_u = evaluate(U_y(coeff_A_u), y_u)
 
     return lift(res_u)
 end
@@ -80,9 +117,6 @@ Uses a modular CRT loop.
 """
 function intersect_biv(P::Vector, A::MPolyRingElem)
     iszero(A) && return P[1]
-
-    RS = symbols(parent(A))
-    B, x = polynomial_ring(QQ, RS[1])
 
     dA_prev, dA_final = Int[], Int[]
     pprod, p = ZZ(1), ZZ(1) << 60
@@ -106,7 +140,9 @@ function intersect_biv(P::Vector, A::MPolyRingElem)
             dA_current = [crt([d1, d2], [pprod, p]) for (d1, d2) in zip(dA_prev, dA_current)]
         end
 
-        count(!iszero, dA_current) <= 1 && return one(B) # Trivial GCD
+        # Trivial GCD : reduced gcd has larger degree
+        # Then, A(x,y) does not vanish on the points defined by q(x)=0
+        all(iszero(c) for c in dA_current[2:end]) && return one(parent(A))
 
         pprod *= p
         try
@@ -120,94 +156,12 @@ function intersect_biv(P::Vector, A::MPolyRingElem)
         compt += 1
     end
 
-    return B(dA_final)
+    return MPolyBuild(dA_final, RSA, 1)
 end
 
-
-# =========================================================================
-# SUBRESULTANTS
 # =========================================================================
 
-# Univariate resultant
-function subresultants(P::Union{PolyRingElem{T}, FqPolyRingElem}, Q::Union{PolyRingElem{T}, FqPolyRingElem}, is_Fq::Bool=false) where T <: RingElem
-    degree(P) < degree(Q) && ((P, Q) = (Q, P))
-
-    S = typeof(P)[Q]
-    s = leading_coefficient(Q)^(degree(P) - degree(Q)) # Initial scaling factor
-    # rem is faster when working with finite fields (relies on FLINT)
-    A = Q
-    B = is_Fq ? (-leading_coefficient(Q))^(degree(P) - degree(Q) + 1) * rem(P, Q) : pseudorem(P, -Q)
-
-    while !iszero(B)
-        d, e = degree(A), degree(B)
-        pushfirst!(S, B) # current remainder
-        delta = d - e # degree drop
-
-        if delta > 1
-            if length(S) > 2
-                n = degree(S[3]) - degree(S[2]) - 1 # stabilize scaling
-                if n == 0
-                    C = S[1]
-                else
-                    x, y = leading_coefficient(S[2]), leading_coefficient(S[3])
-                    a = 1 << (length(bits(ZZ(n))) - 1)
-                    c, n = x, n - a
-                    while a > 1
-                        a >>= 1
-                        c = divexact(c^2, y)
-                        if n >= a
-                            c = c * divexact(x, y)
-                            n -= a
-                        end
-                    end
-                    C = c * divexact(S[2], y)
-                end
-            else
-                # First step: fallback normalization
-                C = divexact(leading_coefficient(B)^(delta - 1) * B, s^(delta - 1))
-            end
-            pushfirst!(S, C)
-        else
-            C = B # no degree drop
-        end
-
-        # Termination: constant polynomial
-        e == 0 && return S
-
-        # --- Next pseudo-remainder ---
-        B = is_Fq ? (-leading_coefficient(B))^(d - e + 1) * rem(A, B) : pseudorem(A, -B)
-        B = divexact(B, s^delta * leading_coefficient(A))
-
-        A = C
-        s = leading_coefficient(A)
-    end
-    return S
-end
-
-# Bivariate resultant
-function subresultants(P::MPolyRingElem, Q::MPolyRingElem, var_idx::Int; list=false)
-    UP, UQ = to_univariate(P, var_idx), to_univariate(Q, var_idx)
-    sr_uni = subresultants(UP, UQ)
-
-    R_orig = parent(P)
-    #x_orig = symbols(R_orig)[3 - var_idx]
-    v_orig = symbols(R_orig)
-
-    if list
-        # TODO: avoid evaluate, use change_ringvar?
-        # Extract coefficients as bivariate polynomials evaluated at y=0
-        return [change_ringvar(collect(coefficients(sr)), v_orig) for sr in sr_uni]
-    else
-        return [to_bivariate(sr, R_orig) for sr in sr_uni]
-    end
-end
-
-
-# =========================================================================
-# CORE ALGEBRAIC ENGINE
-# =========================================================================
-
-# delta : poly to factor w.r.t the polynomials in LP
+# delta : poly to factor w.r.t the factor of the polynomials in LP
 function fact_gcd(delta::T, LP::Vector{T}) where T <: PolyRingElem
     Ldelta = Dict{Int, T}()
     curr_phi = gcd(delta, LP[1])
@@ -235,6 +189,9 @@ function fact_gcd(delta::T, LP::Vector{T}) where (T <:MPolyRingElem)
 
     return Dict([ (i, change_ringvar(f, [first(RS)]) ) for (i,f) in out ])
 end
+
+
+# =========================================================================
 
 """
     param_crit_split(f::MPolyRingElem; v=0, detect_app=true)

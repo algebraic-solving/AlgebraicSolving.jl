@@ -94,7 +94,7 @@ critical point.
 """
 function insulate_crit_boxes(f, params, precx; max_attempts=5, v=0)
     LBcrit, Lprecx = Dict(), Dict()
-    Lfyk = diff_list(f, 2, max(maximum(keys(params)), 2))
+    Lfyk = diff_list(f, 2, maximum(keys(params), init=2))
 
     for i in keys(params)
         attempts, precxi = 0, precx
@@ -248,7 +248,6 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf; max_attempts=
     end
 
     # ---- Extremal case (i == 1) we vertically enlarge boxes manually -----
-    # TODO: should we also modify LBcrit?
     if haskey(LBcrit, 1)
         boxes, pcs, npcs = LBcrit[1], LPCside[1], LnPCside[1]
 
@@ -268,7 +267,7 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf; max_attempts=
             # ---- intersection on bottom ----
             if c1 == 1
                 # Attach to the max intersection below the box on the correct side
-                ind_yinf = maximum(i for (i, yy) in pairs(side_pts) if yy < ycrit[1])
+                ind_yinf = maximum(i for (i, yy) in pairs(side_pts) if yy[1] < ycrit[1])
                 push!(side_indices, ind_yinf)
                 empty!(pc.bottom.indices_inside)
                 npcs[j] = (0, c2, s == 1 ? c3 + 1 : c3, s == 2 ? c4 + 1 : c4)
@@ -278,7 +277,7 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx, outf; max_attempts=
             # ---- intersection on top ----
             if c2 == 1
                 # Attach to the min intersection above the bow on the correct side
-                ind_ymax = minimum(i for (i, yy) in pairs(side_pts) if yy > ycrit[2])
+                ind_ymax = minimum(i for (i, yy) in pairs(side_pts) if yy[2] > ycrit[2])
                 push!(side_indices, ind_ymax)
                 empty!(pc.top.indices_inside)
                 npcs[j] = (c1, 0, s == 1 ? c3 + 1 : c3, s == 2 ? c4 + 1 : c4)

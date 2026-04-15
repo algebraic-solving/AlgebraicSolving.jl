@@ -5,7 +5,7 @@ export compute_graph, connected_components, number_connected_components, group_b
  # DEBUG
  export interp_subresultants, mmod_subresultants, subresultants, diff, diff_list, trimat_rand, fact_gcd, isolate_eval, isolate,
  rat_to_arb, evaluate_arb, evaluate_arb_rat, int_coeffs, array_to_poly, parray_asvar, poly_to_array, homogenize, rem_var,
- intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit
+ intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit, MPolyBuild, change_ringvar
 
 include("datastruct.jl")
 include("tools.jl")
