@@ -32,13 +32,13 @@ end
 
 struct EdgeGroup
     edges::Vector{Tuple{Vector{Float64}, Vector{Float64}}}
-    color::Int64
+    color::String
     width::Float64
 end
 
 struct PointGroup
     vertices::Tuple{Vector{Float64}, Vector{Float64}}  # (x, y)
-    color::Int64
+    color::String
     marker::Symbol
 end
 

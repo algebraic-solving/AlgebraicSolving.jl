@@ -1,6 +1,6 @@
 
 export compute_graph, connected_components, number_connected_components, group_by_component, merge_graphs,
- plot_graph, plot_graphs, plot_graph_comp, Bresultant, param_crit_split, build_graph_components_data, build_graphs_data, build_graph_data
+ plot_graph, plot_graphs, plot_graph_comp, Bresultant, param_crit_split, build_graphs_data, build_graph_data
 
  # DEBUG
  export interp_subresultants, mmod_subresultants, subresultants, diff, diff_list, trimat_rand, fact_gcd, isolate_eval, isolate,

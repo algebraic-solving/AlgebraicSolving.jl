@@ -40,7 +40,7 @@ function change_ringvar(F::AbstractVector{<:Union{PolyRingElem, MPolyRingElem}},
                 if !iszero(c)
                     e_new = zeros(Int, n_vars)
                     if deg_plus_1 > 1
-                        e_new[idx_map[1]] = deg_plus_1
+                        e_new[idx_map[1]] = deg_plus_1 - 1
                     end
                     push!(coeffs, c)
                     push!(exps, e_new)
@@ -69,40 +69,40 @@ end
 change_ringvar(f::MPolyRingElem) = change_ringvar([f])[1]
 
 
-"""
-    MPolyBuild(F::Vector{Vector{RingElem}}, new_S::Vector{Symbol}, idx::Int)
+# """
+#     MPolyBuild(F::Vector{Vector{RingElem}}, new_S::Vector{Symbol}, idx::Int)
 
-Construct multivariate polynomials in a single variable.
-`F` is a list of coefficient lists in degree-increasing order.
-The polynomial will use the variable at index `idx` in `new_S`.
-"""
-function MPolyBuild(F::AbstractVector{<:AbstractVector{<:RingElement}}, new_S::Vector{Symbol}, idx::Int)
-    isempty(F) && return []
+# Construct multivariate polynomials in a single variable.
+# `F` is a list of coefficient lists in degree-increasing order.
+# The polynomial will use the variable at index `idx` in `new_S`.
+# """
+# function MPolyBuild(F::AbstractVector{<:AbstractVector{<:RingElement}}, new_S::Vector{Symbol}, idx::Int)
+#     isempty(F) && return []
 
-    A = parent(first(first(F)))
-    R, _ = polynomial_ring(A, new_S)
+#     A = parent(first(first(F)))
+#     R, _ = polynomial_ring(A, new_S)
 
-    T = typeof(zero(A))
-    n_vars = length(new_S)
+#     T = typeof(zero(A))
+#     n_vars = length(new_S)
 
-    return map(F) do f_coeffs
-        coeffs = T[]
-        exps = Vector{Int}[]
+#     return map(F) do f_coeffs
+#         coeffs = T[]
+#         exps = Vector{Int}[]
 
-        # Construct coeff/exp lists
-        for (deg_plus_1, c) in enumerate(f_coeffs)
-            if !iszero(c)
-                e_new = zeros(Int, n_vars)
-                e_new[idx] = deg_plus_1 - 1
-                push!(coeffs, c)
-                push!(exps, e_new)
-            end
-        end
+#         # Construct coeff/exp lists
+#         for (deg_plus_1, c) in enumerate(f_coeffs)
+#             if !iszero(c)
+#                 e_new = zeros(Int, n_vars)
+#                 e_new[idx] = deg_plus_1 - 1
+#                 push!(coeffs, c)
+#                 push!(exps, e_new)
+#             end
+#         end
 
-        # Create the polynomial associated to f_coeffs
-        return R(coeffs, exps)
-    end
-end
+#         # Create the polynomial associated to f_coeffs
+#         return R(coeffs, exps)
+#     end
+# end
 
-# Dispatch for a single coefficient vector
-MPolyBuild(f::AbstractVector{<:RingElement}, new_S::Vector{Symbol}, idx::Int) = MPolyBuild([f], new_S, idx)[1]
+# # Dispatch for a single coefficient vector
+# MPolyBuild(f::AbstractVector{<:RingElement}, new_S::Vector{Symbol}, idx::Int) = MPolyBuild([f], new_S, idx)[1]

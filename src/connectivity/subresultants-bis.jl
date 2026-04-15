@@ -34,7 +34,7 @@ function to_bivariate(P::PolyRingElem, R_orig::MPolyRing)
     ctx = MPolyBuildCtx(R_orig)
     for (deg_y, c_y) in enumerate(coefficients(P))
         for (deg_x, c_x) in enumerate(coefficients(c_y))
-            push_term!(ctx, c_x, [deg_x,deg_y])
+            push_term!(ctx, c_x, [deg_x - 1, deg_y - 1])
         end
     end
     return finish(ctx)
@@ -144,23 +144,23 @@ function subresultants(P::Union{PolyRingElem{T}, FqPolyRingElem}, Q::Union{PolyR
         delta = d - e # degree drop
 
         if delta > 1
-            if length(S) > 1
-                n = degree(S[2]) - degree(S[1]) - 1 # stabilize scaling
+            if length(S) > 2
+                n = degree(S[3]) - degree(S[2]) - 1 # stabilize scaling
                 if n == 0
                     C = S[1]
                 else
-                    x, y = leading_coefficient(S[1]), leading_coefficient(S[2])
+                    x, y = leading_coefficient(S[2]), leading_coefficient(S[3])
                     a = 1 << (length(bits(ZZ(n))) - 1)
                     c, n = x, n - a
                     while a > 1
                         a >>= 1
                         c = divexact(c^2, y)
                         if n >= a
-                            c = divexact(c * x, y)
+                            c = c * divexact(x, y)
                             n -= a
                         end
                     end
-                    C = divexact(c * S[1], y)
+                    C = c * divexact(S[2], y)
                 end
             else
                 # First step: fallback normalization
