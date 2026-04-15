@@ -200,9 +200,14 @@ end
 # =========================================================================
 
 """
-    param_crit_split(f::MPolyRingElem; v=0, detect_app=true)
+    param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, detect_app=true)
 
-Computes the critical points of a curve `f(x, y) = 0` grouped by multiplicity.
+Computes the critical points (grouped by multiplicity) and apparent singularities
+of the space curve defined by:
+    `f(x, y) = 0`   and    `(df/dy)(x,y) * z = g(x,y)`
+
+This relies on subresultant computations and apparent singularity criterion from:
+A.Poteaux, N.Islam, R.Prébet - Algorithm for Connectivity Queries on Real Algebraic Curves - ISSAC'23
 """
 function param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, detect_app=true)
     v > 0 && println("Compute subresultant sequence")

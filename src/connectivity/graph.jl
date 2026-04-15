@@ -102,12 +102,12 @@ function group_by_component(G::CurveGraph)
 end
 
 """
-    number_connected_components(G::CurveGraph)
+    number_of_connected_components(G::CurveGraph)
 
 # Outputs
 - `Int`: The count of isolated subgraphs in the parent structure.
 """
-number_connected_components(G::CurveGraph) = length(connected_components(G))
+number_of_connected_components(G::CurveGraph) = length(connected_components(G))
 
 
 # =========================================================================

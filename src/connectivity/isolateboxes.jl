@@ -271,7 +271,7 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx; max_attempts=5, v=0
                 empty!(pc.bottom.indices_inside)
                 npcs[j] = (0, c2, s == 1 ? c3 + 1 : c3, s == 2 ? c4 + 1 : c4)
                 # Update also LBcrit for consistency purpose only
-                boxes[j][2] = (side_pts[ind_yinf][1], boxes[j][2][2])
+                boxes[j][2][1] = side_pts[ind_yinf][1]
             end
 
             c1, c2, c3, c4 = npcs[j] # In case this has changed
@@ -283,7 +283,7 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx; max_attempts=5, v=0
                 empty!(pc.top.indices_inside)
                 npcs[j] = (c1, 0, s == 1 ? c3 + 1 : c3, s == 2 ? c4 + 1 : c4)
                 # Update also LBcrit for consistency purpose only
-                boxes[j][2] = (boxes[j][2][1], side_pts[ind_ymax][2])
+                boxes[j][2][2] = side_pts[ind_ymax][2]
             end
         end
     end

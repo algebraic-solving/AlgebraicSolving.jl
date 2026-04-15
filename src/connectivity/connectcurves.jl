@@ -1,5 +1,5 @@
 
-export compute_graph, connected_components, number_connected_components, group_by_component, merge_graphs,
+export compute_graph, connected_components, number_of_connected_components, group_by_component, merge_graphs,
  plot_graph, plot_graphs, plot_graph_comp, Bresultant, param_crit_split, build_graphs_data, build_graph_data
 
  # DEBUG
@@ -20,6 +20,51 @@ include("plots.jl")
 # MULTIPLE DISPATCH WRAPPERS
 # =========================================================================
 
+@doc Markdown.doc"""
+    compute_graph(f::P, g::P; generic=true, precx=150, v=0, int_coeff=true, outf=true) where {P <: MPolyRingElem}
+    compute_graph(f::P, g::P, C::Vector{P}; kwargs...)
+    compute_graph(f::P, g::P, C::Vector{Vector{P}}; kwargs...)
+    compute_graph(f::P, g::P, C::Dict{Int, Vector{P}}; kwargs...)
+
+Computes a planar straight-line graph that is homeomorphic to a 3D space curve.
+
+The input space curve is defined by a 1D parameterization consisting of its planar projection `f(x,y) = 0` and its vertical lift `z = g(x,y) / df/dy(x,y)`. A key feature of this function is its ability to identify and resolve "apparent singularities" in the planar projection—points where two non-singular branches of the 3D curve cross in the 2D projection but do not intersect in 3D space. This is describe in the paper:
+
+    A.Poteaux, N.Islam, R.Prébet - Algorithm for Connectivity Queries on Real Algebraic Curves - ISSAC'23
+
+### Output Data Structure
+Returns a `CurveGraph{T}` object (where `T` is determined by the `outf` flag), containing:
+* `Vert::Vector{Tuple{T, T}}`: A list of 2D coordinates representing the vertices of the graph (critical points, structural routing nodes, and injected control points).
+* `Edg::Vector{Tuple{Int, Int}}`: A list of index pairs defining the undirected edges between vertices in `Vert`.
+* `Vcon::Dict{Int, Vector{Int}}`: A mapping from the original 1-based index of a control point in the input array `C` to its resulting vertex index in the `Vert` array.
+
+### Arguments
+* **`f`** (`MPolyRingElem`): The bivariate polynomial defining the planar projection `f(x,y) = 0`
+* **`g`** (`MPolyRingElem`): The auxiliary polynomial defining the z-coordinate via `z = g / f_y`.
+* **`C`** (`Vector{P}`, Vector{Vector{MPolyRingElem}}`, or `Dict{Int, Vector{P}}`, optionnal): A single/list/dictionnary of user-defined plane points on the curve (control points). Each point is given as a parameterization `[p, a, b]` such that `p(x) = 0` and `y = a(x)/b(x)`.
+* **`generic`** (`Bool`, default `true`): If `false`, applies a random shear transformation to put the curve into generic position (preventing vertical alignments of critical points) and inverses it at the end.
+* **`precx`** (`Int`, default `150`): Base numerical precision used for the real root isolation of critical x-coordinates.
+* **`v`** (`Int`, default `0`): Verbosity level for tracking computational progress.
+* **`int_coeff`** (`Bool`, default `true`): If `true`, coerces the polynomials to integer coefficients for optimized exact arithmetic.
+* **`outf`** (`Bool`, default `true`): If `true`, outputs the vertex coordinates as machine `Float64`. If `false`, preserves exact rational coordinates (`QQFieldElem`).
+
+### Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x,y) = polynomial_ring(QQ, ["x","y"])
+(Multivariate polynomial ring in 2 variables over QQ, QQMPolyRingElem[x, y])
+
+
+julia> # Define a space curve projection and its z-lift
+       f = -49303382*x^4 + 9395599*x^3*y + 67366686*x^3 - 27407214*x^2*y^2 - 71298014*x^2*y - 24150320*x^2 - 12067817*x*y^3 + 6797370*x*y^2 + 20838420*x*y - 18118613*x + 2357706*y^4 - 13736522*y^3 - 37604516*y^2 - 13868221*y + 6980802;
+       g = 32091920*x^4 - 97772598*x^3*y - 245256584*x^3 + 99093410*x^2*y^2 + 162335273*x^2*y + 239310556*x^2 + 28995368*x*y^3 - 59544597*x*y^2 - 20499914*x*y + 98243402*x + 22738226*y^3 + 111105506*y^2 + 86287748*y - 62439535;
+
+julia> graph = compute_graph(f, g);
+
+julia> number_of_connected_components(graph)
+3
+"""
 # Base case: No 'C' (control points) provided
 compute_graph(f::P, g::P; kwargs...) where {P <: MPolyRingElem} =
     _compute_graph_core(f, g, Vector{Vector{P}}(); kwargs...)
@@ -44,13 +89,6 @@ compute_graph(f::P, g::P, C::Vector{P}; kwargs...) where {P <: MPolyRingElem} =
 # CORE IMPLEMENTATION
 # =========================================================================
 
-# Input:
-# The space curve is given by f(x,y) = 0 and (df/dy)(x,y)*z = g(x,y)
-# it is assumed in generic position of put it using generic parameter
-# for now f is assumed to be square-free (future feature)
-# C is a list of parametrization [p,a,b] of plane pts i.e. such that p(x)=0,y=a(x)/b(x)
-# these points must be on the curve
-# Output: Computes a graph homeomorphic to the curve, identitying point in C
 function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
                              generic=true, precx=150, v=0, int_coeff=true, outf=true) where {P <: MPolyRingElem}
 
