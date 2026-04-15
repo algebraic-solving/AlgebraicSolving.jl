@@ -154,7 +154,7 @@ function _isolate_box_edge(f, fixed_dim, fixed_val, target_interval, initial_pre
             return BoxEdge{T}(roots, indices_inside)
         end
     end
-    error("Problem when isolating on one side of a box after $max_retries attempts")
+    error("Problem when isolating on one side of a box after $max_retries attempts\n Consider increasing the initial precision or genericity position.")
 end
 
 # Function that computes the intersection of a curve with a box by isolating roots on the edges
