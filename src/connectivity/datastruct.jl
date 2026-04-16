@@ -20,29 +20,3 @@ Base.@kwdef struct CriticalNodeConnections
     top::Vector{Int} = Int[]
     right::Vector{Int} = Int[]
 end
-
-# Connectivity graph + control nodes
-struct CurveGraph{T}
-    vertices::Vector{Tuple{T, T}}
-    edges::Vector{Tuple{Int, Int}}
-    control_nodes::Dict{Int, Vector{Int}}
-end
-
-# ---------- PLOT ----------
-
-struct EdgeGroup
-    edges::Vector{Tuple{Vector{Float64}, Vector{Float64}}}
-    color::String
-    width::Float64
-end
-
-struct PointGroup
-    vertices::Tuple{Vector{Float64}, Vector{Float64}}  # (x, y)
-    color::String
-    marker::Symbol
-end
-
-struct GraphPlotData
-    edge_group::EdgeGroup
-    point_groups::Vector{PointGroup}
-end

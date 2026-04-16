@@ -78,6 +78,8 @@ Base.getindex(I::Ideal, idx::Union{Int, UnitRange}) = I.gens[idx]
 
 Base.lastindex(I::Ideal) = lastindex(I.gens)
 
+# ---------- ROADMAPS ----------
+
 mutable struct RMnode
     base_pt::Vector{QQFieldElem}
     polar_eqs::Vector{QQMPolyRingElem}
@@ -120,3 +122,30 @@ Base.show(io::IO, RM::Roadmap) = print(io, all_base_pts(RM))
 Base.getindex(RM::Roadmap, idx::Union{Int, UnitRange}) = all_eqs(RM)[idx]
 Base.lastindex(RM::Roadmap) = nb_nodes(RM)
 Base.length(RM::Roadmap) = nb_nodes(RM)
+
+# ---------- CURVE CONNECTIVITY ----------
+
+struct CurveGraph{T}
+    vertices::Vector{Tuple{T, T}}
+    edges::Vector{Tuple{Int, Int}}
+    control_nodes::Dict{Int, Vector{Int}}
+end
+
+# ----- PLOT ----
+
+struct EdgeGroup
+    edges::Vector{Tuple{Vector{Float64}, Vector{Float64}}}
+    color::String
+    width::Float64
+end
+
+struct PointGroup
+    vertices::Tuple{Vector{Float64}, Vector{Float64}}
+    color::String
+    marker::Symbol
+end
+
+struct GraphPlotData
+    edge_group::EdgeGroup
+    point_groups::Vector{PointGroup}
+end

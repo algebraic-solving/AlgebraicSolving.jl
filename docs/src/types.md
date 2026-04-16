@@ -187,3 +187,106 @@ of the other's*. In many cases, one can even replace "descendant" by "parent".
 
 
 See the documentation of the [roadmap](@ref) function for further details.
+
+# Graph Data Structures & Visualization
+
+## Curve Graphs
+
+The `CurveGraph{T}` structure represents a planar straight-line graph
+that is homeomorphic to a real algebraic curve. It is the output of
+algorithms [compute_graph](@ref), which compute the planar projection
+of curves while resolving apparent singularities.
+
+These real algebraic curves are typically output of roadmap algorithms
+presented above. Hence `CurveGraph{T}` object can provide a
+discretized skeleton of real algebraic sets that preserves
+connectivity properties. In particular they share the same number of
+connected components (respectively as graphs and as semi-algebraic
+sets)
+
+
+The type `CurveGraph{T}` (where `T` is typically `Float64` or `QQFieldElem`) caches the following attributes:
+
+  * `vertices::Vector{Tuple{T, T}}`: a list of 2D coordinates representing the nodes of the graph (critical points, regular routing points, and user-defined control points).
+
+  * `edges::Vector{Tuple{Int, Int}}`: a list of index pairs defining the undirected edges connecting the vertices in `vertices`.
+
+  * `control_nodes::Dict{Int, Vector{Int}}`: a dictionary mapping user-defined control point IDs to their corresponding local vertex indices in the `vertices` array. These IDs typically refer to other `CurveGraph{T}` and the associated vertices: their mutual intersection. This is useful when computing arrangement of curves using [merge_graphs](@ref).
+
+```julia
+struct CurveGraph{T}
+    vertices::Vector{Tuple{T, T}}
+    edges::Vector{Tuple{Int, Int}}
+    control_nodes::Dict{Int, Vector{Int}}
+end
+```
+
+## Graph Plotting Data
+
+To seamlessly visualize `CurveGraph` objects using standard plotting libraries (such as `Plots.jl`), AlgebraicSolving provides an intermediate geometric representation.
+
+The primary structure is `GraphPlotData`, which decomposes a mathematical graph into purely visual components:
+
+* `edges::EdgeGroup`: contains the geometric line segments representing the graph's connections, alongside styling data (color and width).
+
+* `points::Vector{PointGroup}`: separates standard vertices and special control nodes into distinct scatter groups with specific markers (e.g., `:x` for standard vertices, `:+` for control nodes).
+
+```julia
+struct EdgeGroup
+    edges::Vector{Tuple{Vector{Float64}, Vector{Float64}}}
+    color::String
+    width::Float64
+end
+
+struct PointGroup
+    vertices::Tuple{Vector{Float64}, Vector{Float64}}
+    color::String
+    marker::Symbol
+end
+
+struct GraphPlotData
+    edge_group::EdgeGroup
+    point_groups::Vector{PointGroup}
+end
+```
+
+### Core Builders
+
+The functions [build_graph_data](@ref) allow to compute such `GraphPlotData` from `CurveGraph{T}` objects. These former objects can be plotted with `Plot.jl` as follows. Below, `G` is a `CurveGraph{T}`.
+
+```julia
+using Plots
+
+function plot_graph(P)
+  plot(legend=false)
+  E = P.edge_group
+  plot!(E.edges, color=E.color, width = E.width)
+  [scatter!(V.vertices, color=V.color, marker = V.marker) for V in P.point_groups]
+  gui()
+end
+
+plot_graph(build_graphs_data(G))
+```
+
+If one has `CG` a list of `CurveGraph{T}` (typically the connected
+components of `G` obtained with [connected_components](@ref)).
+
+```julia
+# How to plot:
+using Plots
+
+function plot_graphs(CP)
+  plot(legend=false)
+  for P in CP
+      E = P.edge_group
+      plot!(E.edges, color=E.color, width = E.width)
+      [ scatter!(V.vertices, color=V.color, marker = V.marker) for V in P.point_groups ]
+  end
+  gui()
+end
+
+plot_graphs(build_graph_data(CG))
+```
+
+This will plot graphs in CG with distinct and distinguishable colors.
+See the documentation of the [build_graph_data](@ref) function for further details.

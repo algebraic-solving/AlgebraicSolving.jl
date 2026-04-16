@@ -1,10 +1,10 @@
 """
     distinguishable_colors(n; s=0.8, v=0.9)
 
-Return `n` visually distinct HEX colors using manual HSV→RGB conversion.
+Return `n` visually distinct HEX colors using manual HSV->RGB conversion.
 No external libraries used.
 """
-function distinguishable_colors(n::Int; s::Float64=0.8, v::Float64=0.9)
+function distinguishable_colors(n::Int; s::Float64=0.6, v::Float64=0.9)
     n <= 0 && return String[]
 
     colors = Vector{String}(undef, n)
@@ -45,18 +45,35 @@ end
 
 
 # ---------- CORE BUILDERS ----------
-"""
-# How to plot:
-using Plots
-function plot_graph(P)
-  plot(legend=false)
-  E = P.edge_group
-  plot!(E.edges, color=E.color, width = E.width)
-  [scatter!(V.vertices, color=V.color, marker = V.marker) for V in P.point_groups]
-  gui()
-end
 
-plot_graph(build_graphs_data(G))
+@doc Markdown.doc"""
+    build_graph_data(G::CurveGraph{T}; width=3.0, vert=true, color="#FF0000") where T <: Union{Float64,QQFieldElem}
+
+Construct plotting data from a `CurveGraph`.
+
+This function converts the piecewise linear structure encoded in `G` into a
+`GraphPlotData` object, separating edges and point groups (vertices and control points),
+ready for visualization with plotting libraries such as `Plots.jl` (see documentation
+of `GraphPlotData`)
+
+# Arguments
+- `G::CurveGraph{T}`: Input graph containing vertices, control nodes, and edges.
+- `width::Real=3.0`: Line width used for rendering edges.
+- `vert::Bool=true`: If `true`, include vertices in the graph.
+- `color::AbstractString="#FF0000"`: Color used for both edges and points.
+
+# Behavior
+- Edges are converted into line segments between vertex coordinates.
+- Vertices (if enabled) are displayed with marker `:x`.
+- Control nodes are grouped and displayed with marker `:+`.
+
+# Returns
+- `GraphPlotData`: A structure containing:
+  - one `EdgeGroup` for all edges
+  - multiple `PointGroup`s for vertices and control nodes
+
+# Notes
+- All coordinates are converted to `Float64` for compatibility with plotting backends.
 """
 
 function build_graph_data(G::CurveGraph{T}; width=3.0, vert=true, color="#FF0000")  where T <: Union{Float64,QQFieldElem}
@@ -90,24 +107,26 @@ function build_graph_data(G::CurveGraph{T}; width=3.0, vert=true, color="#FF0000
     return GraphPlotData(edge_group, point_groups)
 end
 
-# ---------- MULTI GRAPHS ----------
-
 """
-# How to plot:
-using Plots
-function plot_graphs(CP)
-  plot(legend=false)
-  for P in CP
-      E = P.edge_group
-      plot!(E.edges, color=E.color, width = E.width)
-      [ scatter!(V.vertices, color=V.color, marker = V.marker) for V in P.point_groups ]
-  end
-  gui()
-end
+    build_graph_data(CG::Vector{CurveGraph{T}}; width=3.0, vert=true) where T <: Union{Float64,QQFieldElem}
 
-plot_graphs(build_graph_data(CG))
+Construct plotting data for multiple `CurveGraph`s with automatically assigned colors.
+
+# Arguments
+- `CG::Vector{CurveGraph{T}}`: Collection of curve graphs to visualize.
+- `width::Real=3.0`: Line width used for rendering edges.
+- `vert::Bool=true`: If `true`, include vertices in each graph.
+
+# Behavior
+- Colors are generated using `distinguishable_colors` to ensure visual contrast.
+- Each graph is assigned a unique color consistently across its edges and points.
+
+# Returns
+- `Vector{GraphPlotData}`: One plotting data object per input graph.
+
+# Notes
+- The number of colors scales with `length(CG)`.
 """
-
 function build_graph_data(CG::Vector{CurveGraph{T}}; width=3.0, vert=true) where T <: Union{Float64,QQFieldElem}
     c = distinguishable_colors(length(CG))
     return [build_graph_data(G; width=width, vert=vert, color=c[i])
