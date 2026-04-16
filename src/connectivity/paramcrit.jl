@@ -2,7 +2,7 @@
 # SUBRESULTANTS
 # =========================================================================
 
-# Univariate resultant
+# Univariate subresultants
 function subresultants(P::Union{PolyRingElem{T}, FqPolyRingElem}, Q::Union{PolyRingElem{T}, FqPolyRingElem}, is_Fq::Bool=false) where T <: RingElem
     degree(P) < degree(Q) && ((P, Q) = (Q, P))
 
@@ -59,7 +59,7 @@ function subresultants(P::Union{PolyRingElem{T}, FqPolyRingElem}, Q::Union{PolyR
     return reverse!(S)
 end
 
-# Bivariate resultant
+# Bivariate subresultants seen in (K[x])[y]
 function subresultants(P::MPolyRingElem, Q::MPolyRingElem, var_idx::Int; list=false)
     UP, UQ = to_univariate(P, var_idx), to_univariate(Q, var_idx)
     sr_uni = subresultants(UP, UQ)
@@ -167,19 +167,30 @@ end
 
 # =========================================================================
 
-# delta : poly to factor w.r.t the factor of the polynomials in LP
-function fact_gcd(delta::T, LP::Vector{T}) where T <: PolyRingElem
-    Ldelta = Dict{Int, T}()
-    curr_phi = gcd(delta, LP[1])
-    Ldelta[1] = divexact(delta, curr_phi)
+@doc Markdown.doc"""
+    fact_gcd(delta::T, LP::Vector{T}) where T <: Union{PolyRingElem, MPolyRingElem}
 
-    for i in 2:length(LP)
+Decomposes the polynomial `delta` by separating it into factors based on its greatest common divisors with the sequence of polynomials in `LP`.
+The $i$-th entry corresponds to the exact factor of `delta` that divides $LP[1], \dots, LP[i-1]$, but is coprime to $LP[i]$. Factors of degree $0$ are discarded.
+"""
+function fact_gcd(delta::T, LP::Vector{T}) where {T <: PolyRingElem}
+    Ldelta = Dict{Int, T}()
+    curr_phi = delta
+
+    for (i, p) in pairs(LP)
         degree(curr_phi) == 0 && break
-        next_phi = gcd(curr_phi, LP[i])
-        Ldelta[i] = divexact(curr_phi, next_phi)
+
+        next_phi = gcd(curr_phi, p)
+        q = divexact(curr_phi, next_phi)
+
+        if degree(q) > 0
+            Ldelta[i] = q
+        end
+
         curr_phi = next_phi
     end
-    return filter(kv -> degree(kv.second) > 0, Ldelta)
+
+    return Ldelta
 end
 
 # wrapper for the above function
@@ -189,18 +200,19 @@ function fact_gcd(delta::T, LP::Vector{T}) where (T <:MPolyRingElem)
     K, RS = coefficient_ring(R), symbols(R)
     A, = polynomial_ring(K, RS[1])
 
+    # Convert to standard univariate ring
     d_uni = A(coefficients_of_univariate(delta))
     LP_uni = [A(coefficients_of_univariate(p)) for p in LP]
-    out = fact_gcd(d_uni, LP_uni)
 
-    return Dict([ (i, change_ringvar(f, [first(RS)]) ) for (i,f) in out ])
+    out = fact_gcd(d_uni, LP_uni)
+    return Dict(i => change_ringvar(f, [first(RS)]) for (i,f) in out)
 end
 
 
 # =========================================================================
 
 """
-    param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, detect_app=true)
+    param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, force_app=false)
 
 Computes the critical points (grouped by multiplicity) and apparent singularities
 of the space curve defined by:
@@ -208,8 +220,10 @@ of the space curve defined by:
 
 This relies on subresultant computations and apparent singularity criterion from:
 A.Poteaux, N.Islam, R.Prébet - Algorithm for Connectivity Queries on Real Algebraic Curves - ISSAC'23
+
+If force_app, it assumes that all nodes are apparent singularities.
 """
-function param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, detect_app=true)
+function param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, force_app=false)
     v > 0 && println("Compute subresultant sequence")
     f_y = derivative(f, 2)
     @iftime v>0 sr = subresultants(f, f_y, 2, list=true)
@@ -245,7 +259,7 @@ function param_crit_split(f::MPolyRingElem, g::MPolyRingElem; v=0, detect_app=tr
 
     # Nodes : multiplicity 2 in res
     if 2 in sqrmult
-        if detect_app
+        if !(force_app)
             v > 0 && println("Compute apparent singularities")
             f_x = derivative(f, 1)
             A = derivative(f_y, 2) * derivative(g, 1) - derivative(f_x, 2) * derivative(g, 2)

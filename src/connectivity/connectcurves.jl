@@ -45,7 +45,7 @@ Returns a `CurveGraph{T}` object (where `T` is determined by the `outf` flag), c
 * **`generic`** (`Bool`, default `true`): If `false`, applies a random shear transformation to put the curve into generic position (preventing vertical alignments of critical points) and inverses it at the end.
 * **`precx`** (`Int`, default `150`): Base numerical precision used for the real root isolation of critical x-coordinates.
 * **`v`** (`Int`, default `0`): Verbosity level for tracking computational progress.
-* **`int_coeff`** (`Bool`, default `true`): If `true`, coerces the polynomials to integer coefficients for optimized exact arithmetic.
+* **`force_app`** (`Bool`, default `false`): If `true`, all nodes are considered apparent singularities and the detection step is skipped. This is useful when the original curve is known to have no nodes.
 * **`outf`** (`Bool`, default `true`): If `true`, outputs the vertex coordinates as machine `Float64`. If `false`, preserves exact rational coordinates (`QQFieldElem`).
 
 ### Examples
@@ -90,7 +90,7 @@ compute_graph(f::P, g::P, C::Vector{P}; kwargs...) where {P <: MPolyRingElem} =
 # =========================================================================
 
 function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
-                             generic=true, precx=150, v=0, detect_app=true, outf=true) where {P <: MPolyRingElem}
+                             generic=true, precx=150, v=0, force_app=false, outf=true) where {P <: MPolyRingElem}
 
     @assert !iszero(f) "Input does not define a curve"
 
@@ -120,7 +120,7 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
     is_squarefree(f) "Curve not in generic position. Try with generic=false."
 
     v > 0 && println("Compute parametrization of critical pts...")
-    @iftime (v > 0) params = param_crit_split(f, g, v=v-1, detect_app=detect_app)
+    @iftime (v > 0) params = param_crit_split(f, g, v=v-1, force_app=force_app)
     for i in 1:length(C)
         params[-i] = [ [intC(C[i][1])], C[i][2], C[i][3] ]
     end
