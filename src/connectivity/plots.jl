@@ -1,7 +1,3 @@
-# Distinguishable Colors
-
-# file: utils/colors.jl
-
 """
     distinguishable_colors(n; s=0.8, v=0.9)
 
@@ -62,7 +58,7 @@ end
 plot_graph(build_graphs_data(G))
 """
 
-function build_graph_data(G; width=3.0, vert=true, color="#FF0000")
+function build_graph_data(G::CurveGraph{T}; width=3.0, vert=true, color="#FF0000")  where T <: Union{Float64,QQFieldElem}
     V, Vcon, E = G.vertices, G.control_nodes, G.edges
 
     # edges
@@ -107,10 +103,10 @@ function plot_graphs(CP)
   gui()
 end
 
-plot_graphs(build_graphs_data(CG))
+plot_graphs(build_graph_data(CG))
 """
 
-function build_graphs_data(CG; width=3.0, vert=true)
+function build_graph_data(CG::Vector{CurveGraph{T}}; width=3.0, vert=true) where T <: Union{Float64,QQFieldElem}
     c = distinguishable_colors(length(CG))
     return [build_graph_data(G; width=width, vert=vert, color=c[i])
             for (i, G) in enumerate(CG)]
