@@ -65,6 +65,11 @@ julia> graph = compute_graph(f, g);
 julia> number_of_connected_components(graph)
 3
 """
+function compute_graph(I::Ideal{P} where P <: QQMPolyRingElem; generic=true, kwargs...)
+    p = rational_curve_parametrization(I, use_lfs = !generic)
+    return compute_graph(p.elim, p.param[1], kwargs...)
+end
+
 # Base case: No 'C' (control points) provided
 compute_graph(f::P, g::P; kwargs...) where {P <: MPolyRingElem} =
     _compute_graph_core(f, g, Vector{Vector{P}}(); kwargs...)
@@ -90,7 +95,7 @@ compute_graph(f::P, g::P, C::Vector{P}; kwargs...) where {P <: MPolyRingElem} =
 # =========================================================================
 
 function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
-                             generic=true, precx=150, v=0, force_app=false, outf=true) where {P <: MPolyRingElem}
+                             plane_generic=true, precx=150, v=0, force_app=false, outf=true) where {P <: MPolyRingElem}
 
     @assert !iszero(f) "Input does not define a curve"
 
@@ -108,7 +113,7 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
 
     # Pre-processing the input
     f, g = int_coeffs([f, g])
-    changemat = generic ? [1 0; 0 1] : [ QQ(rand(-100:100)) for i=1:2, j=1:2 ]
+    changemat = plane_generic ? [1 0; 0 1] : [ QQ(rand(-100:100)) for i=1:2, j=1:2 ]
 
     f = evaluate(f, collect(changemat * [x; y]))
     precx = max(2, precx)
@@ -242,7 +247,7 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
     end
 
     # Post processing the data
-    if !generic
+    if !plane_generic
         for i in eachindex(Vert)
             vx, vy = Vert[i]
             Vert[i] = Tuple(changemat * [vx, vy])
