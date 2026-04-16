@@ -1,8 +1,11 @@
 in_inter(I, J) =  J[1] <= I[1] && I[2] <= J[2]
 overlap_inter(I, J) = max(I[1], J[1]) <= min(I[2], J[2])
 
- # Function that isolate roots of a multivariate polynomial with a
- # single variable
+"""
+    isolate(f; prec = 32)
+
+Isolate real roots of a multivariate polynomial with a single variable
+"""
 function isolate(f; prec = 32)
     total_degree(f) == 0 && return []
     @assert is_univariate(f) "Not univariate polynomial"
@@ -11,11 +14,14 @@ function isolate(f; prec = 32)
     return getindex.(sols, 1)
 end
 
-# univariate isolation of roots of a bivariate polynomial f whose
-# ivar-th variable is evaluated at val
+"""
+    isolate_eval(f, ivar, val; prec=64)
+
+Isolate real roots of a bivariate polynomial whose ivar-th variable is
+evaluated at val
+"""
 function isolate_eval(f, ivar, val; prec=64)
     fev = evaluate(f, [ivar], [val])
-    # fev *= fev |> coefficients .|> denominator |> lcm
     fev = fev / content(fev)
     return isolate(fev, prec=prec)
 end
@@ -74,8 +80,12 @@ function _needs_refinement(i, Lfyk, LBcrit, precx)
     return false
 end
 
-# Compute the list of the n-th first derivative of p w.r.t v
-function diff_list(p, v, n)
+"""
+    _diff_list(p, v, n)
+
+Compute the list of the n-th first derivative of p w.r.t v
+"""
+function _diff_list(p, v, n)
     L = Vector{typeof(p)}(undef, n + 1)
     L[1] = p
     @inbounds for j in 2:n+1
@@ -87,14 +97,14 @@ end
 """
     compute_crit_and_singular_boxes(f, params, precx; max_attempts=5, v=0)
 
-Compute insulating boxes for critical points, refining precision if necessary.
-Insulating means that each box contains a single critical point and
-all branches of the curve intersecting the box are incident to this
-critical point.
+Compute insulating boxes for critical points, refining precision if
+necessary. Insulating means that each box contains a single critical
+point and all branches of the curve intersecting the box are incident
+to this critical point.
 """
 function insulate_crit_boxes(f, params, precx; max_attempts=5, v=0)
     LBcrit, Lprecx = Dict(), Dict()
-    Lfyk = diff_list(f, 2, maximum(keys(params), init=2))
+    Lfyk = _diff_list(f, 2, maximum(keys(params), init=2))
 
     for i in keys(params)
         attempts, precxi = 0, precx
@@ -129,7 +139,14 @@ function insulate_crit_boxes(f, params, precx; max_attempts=5, v=0)
     return LBcrit, Lprecx
 end
 
-# Helper function to process a single edge of the box
+"""
+    _isolate_box_edge(f, fixed_dim, fixed_val, target_interval, initial_prec, v; max_retries=5)
+
+Function that computes the intersection of a curve with a vertical
+(fixed_dim=1)/horizontal (fixed_dim=2) line, and identify those in
+target interval.
+Returns isolating intervals and indices of the interval in target_interval
+"""
 function _isolate_box_edge(f, fixed_dim, fixed_val, target_interval, initial_prec, v; max_retries=5)
     prec = initial_prec
 
@@ -154,10 +171,16 @@ function _isolate_box_edge(f, fixed_dim, fixed_val, target_interval, initial_pre
             return BoxEdge{T}(roots, indices_inside)
         end
     end
-    error("Problem when isolating on one side of a box after $max_retries attempts\n Consider increasing the initial precision or genericity position.")
+    error("Problem when isolating on one side of a box after $max_retries attempts\n
+     Consider increasing the initial precision or genericity position.")
 end
 
-# Function that computes the intersection of a curve with a box by isolating roots on the edges
+"""
+    intersect_box(f, B; prec=100, v=0)
+
+Computes the intersection of a curve with a box by
+isolating roots on the edges.
+"""
 function intersect_box(f, B; prec=100, v=0)
     # Evaluate horizontal edges (fix y to B[2][1] and B[2][2], target x-interval B[1])
     edge_y1 = _isolate_box_edge(f, 2, B[2][1], B[1], prec, v)
@@ -197,8 +220,16 @@ function refine_xboxes(F::Vector{T} where T<:Union{PolyRingElem, MPolyRingElem},
     return _update_LB_first_axis!(LB, xnew)
 end
 
-# Function computing the intersection of the vertical sides of the critical boxes with the curve defined by f.
-# If an intersection on top/bottom side is detected, refine the width until this does not happen or max_attemps is reached.
+"""
+    intersect_vertical_boxes(f, params, LBcrit, Lprecx; max_attempts=5, v=0)
+
+Computes the intersection of the vertical sides of the critical boxes
+in LBcrit with the curve defined by f.
+
+If an intersection on top/bottom side is detected, refine the width
+using params and Lprecx until this does not happen or max_attemps is
+reached.
+"""
 function intersect_vertical_boxes(f, params, LBcrit, Lprecx; max_attempts=5, v=0)
     T = QQFieldElem
     LPCside = Dict{Int, Vector{BoxIntersections{T}}}()
@@ -239,11 +270,10 @@ function intersect_vertical_boxes(f, params, LBcrit, Lprecx; max_attempts=5, v=0
             attempt == max_attempts &&
                 error("Problem in computing intersections (i=$i)")
         end
-
+        v > 0 && print("\n")
         LPCside[i] = sides_vec
         LnPCside[i] = nsides_vec
         Lprecx[i] = prec
-        v >= 0 && println()
     end
 
     # ---- Extremal case (i == 1) we vertically enlarge boxes manually -----
