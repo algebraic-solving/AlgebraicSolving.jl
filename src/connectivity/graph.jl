@@ -2,17 +2,26 @@
 # GRAPH DECOMPOSITION
 # =========================================================================
 
-"""
+@doc Markdown.doc"""
     connected_components(G::CurveGraph{T}) where T
 
-Decomposes a graph into its connected components.
+Decomposes a graph into its topologically connected components using a Depth-First Search (DFS).
+
+This function is particularly useful when a single algebraic curve resolves into multiple
+disconnected real branches in space. It guarantees that isolated vertices are preserved as
+their own zero-edge components.
+
+Crucially, this function preserves the `control_nodes` mappings. If a global control node
+belonged to a specific vertex, it is correctly remapped to that vertex's new local index
+within its specific disconnected subgraph.
 
 # Inputs
-- `G::CurveGraph{T}`: The unified curve graph.
+- `G::CurveGraph{T}`: The unified curve graph to be decomposed.
 
 # Outputs
 - `Vector{CurveGraph{T}}`: A list of disjoint subgraphs. Each subgraph retains
   the mapped coordinates, edges, and control nodes belonging to its component.
+
 """
 function connected_components(G::CurveGraph{T}) where T
     nv = length(G.vertices)
@@ -90,22 +99,38 @@ function connected_components(G::CurveGraph{T}) where T
     return subgraphs
 end
 
-"""
+@doc Markdown.doc"""
     group_by_component(G::CurveGraph)
 
+Extracts the control_nodes dictionaries partitioned by the graph's connected components.
+This is primarily used to determine which external connections (or user-defined points)
+belong to which isolated branch of the curve.
+
+# Inputs
+- `G::CurveGraph{T}`: The parent graph structure.
+
 # Outputs
-- `Vector{Dict{Int, Vector{Int}}}`: Returns just the control nodes mapped to each connected component.
+- `Vector{Dict{Int, Vector{Int}}}`: A list of dictionaries, one for each connected component,
+detailing the local vertex indices mapped to specific control IDs.
+
 """
 function group_by_component(G::CurveGraph)
     subgraphs = connected_components(G)
     return [sg.control_nodes for sg in subgraphs if !isempty(sg.vertices)]
 end
 
-"""
+@doc Markdown.doc"""
     number_of_connected_components(G::CurveGraph)
 
+Computes the total number of topologically disconnected branches/components in the graph.
+This is a convenience wrapper for topological validation.
+
+# Inputs
+- `G::CurveGraph{T}`: The parent graph structure.
+
 # Outputs
-- `Int`: The count of isolated subgraphs in the parent structure.
+- `Int`: The count of isolated subgraphs.
+
 """
 number_of_connected_components(G::CurveGraph) = length(connected_components(G))
 
@@ -118,11 +143,23 @@ number_of_connected_components(G::CurveGraph) = length(connected_components(G))
     merge_graphs(graphs::Vector{CurveGraph{T}}) where T
 
 Merges a collection of disjoint graphs into a single graph, mathematically fusing
-vertices that share common `control_nodes` mappings.
+vertices based on their control_nodes dictionnaries that describe a one-to-one
+correspondance between subset of vertices of each graph.
+
+
+# Fusion Mechanism:
+This work as follows. Given V1 = [u1,u2] and V2 = [w1,w2,w3] the vertices of two graphs G1 and G2.
+Let C1= {2 => [1]} and C2 = {1 => [2]} be their respective control_nodes disctionnary.
+Then it merges the first vertex w1 of G2 with the second vertex u2 of G1.
+The merged graph has vertices [u1,u2,w2,w3].
+
+Note that control nodes that refer to external bounds (e.g., indices k <= 0 or k > length(graphs))
+are preserved in the final merged graph to allow for subsequent higher-level merging or tracking.
 
 # Inputs
 - `graphs::Vector{CurveGraph{T}}`: A list of graphs. `graphs[i].control_nodes[k]`
   should contain the local vertex indices in graph `i` that connect to graph `k`.
+  This vertex correspondance must be one-to-one.
 
 # Outputs
 - `CurveGraph{T}`: A unified graph struct.
@@ -145,8 +182,10 @@ function merge_graphs(graphs::Vector{CurveGraph{T}}) where T
 
         # Step 1: Pre-map common control nodes connected to previously merged graphs
         for (k, common_indices_in_i) in G_i.control_nodes
-            if k < i && haskey(graphs[k].control_nodes, i)
+            if k < i && !isempty(common_indices_in_i)
+                @assert haskey(graphs[k].control_nodes, i) "Correspondance is not one-to-one"
                 common_indices_in_k = graphs[k].control_nodes[i]
+                @assert length(common_indices_in_i) == length(common_indices_in_k) "Correspondance is not one-to-one"
                 # Zip ensures we pair corresponding control nodes precisely
                 for (idx_i, idx_k) in zip(common_indices_in_i, common_indices_in_k)
                     global_map[(i, idx_i)] = global_map[(k, idx_k)]

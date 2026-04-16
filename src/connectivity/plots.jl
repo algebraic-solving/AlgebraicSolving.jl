@@ -47,6 +47,7 @@ end
 # ---------- CORE BUILDERS ----------
 """
 # How to plot:
+using Plots
 function plot_graph(P)
   plot(legend=false)
   E = P.edge_group
@@ -93,6 +94,7 @@ end
 
 """
 # How to plot:
+using Plots
 function plot_graphs(CP)
   plot(legend=false)
   for P in CP
