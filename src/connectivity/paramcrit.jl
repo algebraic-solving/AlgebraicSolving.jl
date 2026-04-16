@@ -158,7 +158,7 @@ function intersect_biv(P::Vector, A::MPolyRingElem)
             # Rational reconstruction failed, try next prime
         end
 
-        dA_prev = dA_final
+        dA_prev = dA_current
         compt += 1
     end
 

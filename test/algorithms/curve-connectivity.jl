@@ -22,3 +22,8 @@ or
 
 # Non-generic because two crit-point above (but rat_cur_param works)
 x^4 - x^3 + 2*x^2*y^2 - 7//4*x^2 - x*y^2 + x + y^4 - 7//4*y^2 + 3//4
+
+# Parametrization of a circle with z=0 but with two new generic variables
+# bug in arb_to_rat fixed
+f = 6829*x^2 - 1482*x*y + 9565*y^2 - 64770304,
+g = -1110*x^2 + 11526*x*y + 2076384
