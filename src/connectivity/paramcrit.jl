@@ -118,7 +118,9 @@ Uses a modular CRT loop.
 function intersect_biv(P::Vector, A::MPolyRingElem)
     iszero(A) && return P[1]
 
-    dA_prev, dA_final = Int[], Int[]
+    RSA = symbols(parent(A))
+    dA_Q_prev, dA_Q_final = QQFieldElem[], QQFieldElem[]
+    dA_Z_curr = ZZRingElem[]
     pprod, p = ZZ(1), ZZ(1) << 60
     compt = 0
 
@@ -127,7 +129,7 @@ function intersect_biv(P::Vector, A::MPolyRingElem)
         Fp = GF(p)
         # Prime check
         lcA, lcP = ZZ(leading_coefficient(A)), ZZ(leading_coefficient(P[1]))
-        divides(p, gcd(lcA, lcP))[1] && continue
+        iszero(rem(gcd(lcA, lcP), p)) &&  continue
 
         # Map polynomials natively to Fp
         Pp = [map_coefficients(Fp, poly) for poly in P]
@@ -137,31 +139,30 @@ function intersect_biv(P::Vector, A::MPolyRingElem)
         dAp = gcd(Pp[1], Apev)
 
         # Lift coefficients back to integers for CRT
-        dA_current = [lift(ZZ, c) for c in coefficients(dAp)]
+        dA_Z_next = [lift(ZZ, c) for c in coefficients_of_univariate(dAp)]
 
         if compt > 0
-            dA_current = [crt([d1, d2], [pprod, p]) for (d1, d2) in zip(dA_prev, dA_current)]
+            dA_Z_next = [crt([d1, d2], [pprod, p]) for (d1, d2) in zip(dA_Z_curr, dA_Z_next)]
         end
 
         # Trivial GCD : reduced gcd has larger degree
         # Then, A(x,y) does not vanish on the points defined by q(x)=0
-        all(iszero(c) for c in dA_current[2:end]) && return one(parent(A))
+        all(iszero(c) for c in dA_Z_next[2:end]) && return one(parent(A))
 
         pprod *= p
         try
-            dA_final = [reconstruct(c, pprod) for c in dA_current]
-            if (compt > 0 && dA_final == dA_prev)
-                fact = MPolyBuild(dA_final, RSA, 1)
-                divides(fact, P[1])[1] && return fact
+            dA_Q_final = [reconstruct(c, pprod) for c in dA_Z_next]
+            if (compt > 0 && dA_Q_final == dA_Q_prev)
+                fact = MPolyBuild(dA_Q_final, RSA, 1)
+                divides(P[1], fact)[1] && return fact
             end
         catch
-            # Rational reconstruction failed, try next prime
         end
 
-        dA_prev = dA_current
+        dA_Z_curr = dA_Z_next
+        dA_Q_prev = dA_Q_final
         compt += 1
     end
-
     error("Failed multi-modular computation of apparent sing: $compt primes used")
 end
 

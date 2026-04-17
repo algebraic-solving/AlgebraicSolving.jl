@@ -5,7 +5,7 @@ export compute_graph, connected_components, number_of_connected_components, grou
  # DEBUG
  export interp_subresultants, mmod_subresultants, subresultants, diff, diff_list, trimat_rand, fact_gcd, isolate_eval, isolate,
  rat_to_arb, evaluate_arb, evaluate_arb_rat, int_coeffs, array_to_poly, parray_asvar, poly_to_array, homogenize, rem_var,
- intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit, MPolyBuild, change_ringvar, curve_graph, curve_ratparam_graph
+ intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit, MPolyBuild, change_ringvar, curve_graph, curve_ratparam_graph, curve_arrangement_graph
 
 include("tools.jl")
 include("datastruct.jl")
@@ -16,14 +16,57 @@ include("isolateboxes.jl")
 include("graph.jl")
 include("plots.jl")
 
+@doc Markdown.doc"""
+    curve_arrangement_graph(curves::Vector{Ideal}; generic=true, outf=true, kwargs...)
+    curve_arrangement_graph(curves::Vector{Ideal}, C::Vector; kwargs...)
 
-# =========================================================================
-# MULTIPLE DISPATCH WRAPPERS
-# =========================================================================
+Computes the combined planar graph of an arrangement of multiple space curves.
+Automatically computes the mutual intersections between all curves and guarantees
+they are projected using a shared, unified linear form.
+"""
+function curve_arrangement_graph(curves::Vector{Ideal{P}}; generic=true, outf=true, kwargs...) where {P <: QQMPolyRingElem}
+    N = length(curves)
+    @assert N > 0 "Must provide at least one curve."
+
+    R = parent(curves[1])
+    n = nvars(R)
+
+    # 1. Establish the Shared Projection Context
+    # We MUST generate the linear forms here and force all curves/intersections to use them.
+    lfs = nothing
+    if !generic
+        make_vec(i) = [j <= n ? ZZRingElem(rand(-100:100)) : (j == n+i ? one(ZZRingElem) : zero(ZZRingElem)) for j in 1:n+3]
+        lfs = make_vec.(1:3)
+    end
+
+    # 3. Compute Intersections and Build Individual Graphs
+    graphs = Vector{CurveGraph}(undef, N)
+    p_inter = Dict{Set{Int}, RationalParametrization}()
+    for i in 1:N
+        p_I = lfs === nothing ? rational_curve_parametrization(curves[i]) :
+                                rational_curve_parametrization(curves[i], cfs_lfs=lfs)
+        new_RS = symbols(parent(p_I.elim))
+
+        # Control pts are intersections with all other curves; use Dict to avoid re-computation
+        C_i = Dict{Int, RationalParametrization}( j => p_inter[Set((i,j))] for j in 1:i-1)
+        for j in i+1:N
+            I_ij = vcat(curves[i].gens, curves[j].gens) |> Ideal
+            C_i[j] = isnothing(lfs) ? rational_parametrization(I_ij) : param_use_lfs(I_ij, lfs, new_RS)
+            p_inter[Set((i,j))] =
+                RationalParametrization(C_i[j].vars, C_i[j].cfs_lf, C_i[j].elim, C_i[j].denom, C_i[j].param)
+        end
+
+        graphs[i] = curve_graph(p_I, C_i; outf=outf, kwargs...)
+        graphs[i] = _compute_graph_core(p_I.elim, length(p_I.param) > 0 ? p_I.param[end] : zero(parent(p_I.elim)), C_i; kwargs...)
+    end
+
+    # 4. Merge the graph according to their intersections
+    return merge_graphs(graphs...)
+end
 
 @doc Markdown.doc"""
     curve_graph(I::Ideal; generic=true, outf=true, kwargs...)
-    curve_ratparam_graph(P::RationalCurveParametrization; kwargs...)
+    curve_graph(P::RationalCurveParametrization; kwargs...)
 
     # Both functions accept optional control points C in various formats:
     curve_graph(I, C::Vector{P}; kwargs...)
@@ -33,7 +76,7 @@ include("plots.jl")
 Computes a planar straight-line graph that is homeomorphic to a real algebraic (space) curve.
 
 ### Core Workflow & Pre-processing
-1. **Parametrization (`curve_graph` only):** If given an `Ideal`, it first computes a `RationalCurveParametrization`.
+1. **Parametrization:** If given an `Ideal`, it first computes a `RationalCurveParametrization`.
     If `generic=false`, it applies a random integer shear transformation to place the curve into generic position.
 2. **Coefficient Extraction:** Pulls the planar projection `f(x,y) = 0` and the vertical lift `z = g(x,y) / df/dy(x,y)` from the parametrization.
 3. **Graph Construction:** Computes bounding boxes for critical points, routes connections,
@@ -97,45 +140,38 @@ function curve_graph(I::Ideal{P}, args...; generic=true, outf=true, v=0, kwargs.
             C_input isa AbstractVector || error("Control points C must be a Vector or Dict of Ideals.")
         end
 
-        return curve_ratparam_graph(p_I, C_param; outf=outf, kwargs...)
+        return curve_graph(p_I, C_param; outf=outf, v=v, kwargs...)
     end
 
     # Delegate to the parametrization function, blindly passing any `C` format down
-    return curve_ratparam_graph(p, args...; outf=outf, kwargs...)
+    return curve_graph(p_I, args...; outf=outf, v=v, kwargs...)
 end
 
 # =========================================================================
 # MULTIPLE DISPATCH WRAPPERS (INTERNAL)
 # =========================================================================
 
+
+
 # Case 1: No control points
-curve_ratparam_graph(p::CurveRationalParametrization; kwargs...) =
-    _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)), Vector{Vector{typeof(p.elim)}}(); kwargs...)
+curve_graph(p::RationalCurveParametrization; generic=true, kwargs...) =
+    _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)), Dict{Int, Vector{typeof(p.elim)}}(); kwargs...)
 
 # Case 2: C is a Vector of Parametrizations
-curve_ratparam_graph(p::CurveRationalParametrization, C::Vector{RationalParametrization}; kwargs...) =
+curve_graph(p::RationalCurveParametrization, C::Vector{RationalParametrization}; generic=true, kwargs...) =
     _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)),
-                        [ [c.elim, c.param[end], c.denom] for c in C]; kwargs...)
+                        Dict( i => [c.elim, c.param[end], c.denom] for (i,c) in enumerate(C)); kwargs...)
 
-# Case 3: C is a Dictionary of Parametrizations (Remaps keys post-computation)
-function curve_ratparam_graph(p::CurveRationalParametrization, C::Dict{Int, RationalParametrization}; kwargs...)
-    f = p.elim
-    g = length(p.param) > 0 ? p.param[end] : one(parent(f))
-
-    # Compute graph using the raw vector of parametrizations
-    pC = [ [c.elim, c.param[end], c.denom] for c in values(C)]
-    graph = _compute_graph_core(f, g, pC; kwargs...)
-
-    # Remap Vcon dictionary keys to match the user's original dictionary
-    mapped_vcon = Dict{Int, Vector{Int}}(k => graph.control_nodes[i] for (i, k) in enumerate(keys(C)))
-    return CurveGraph(graph.vertices, graph.edges, mapped_vcon)
-end
+# Case 3: C is a Dictionary of Parametrizations
+curve_graph(p::RationalCurveParametrization, C::Dict{Int, RationalParametrization}; generic=true, kwargs...) =
+     _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)),
+                        Dict( i => [c.elim, c.param[end], c.denom] for (i,c) in C); kwargs...)
 
 # =========================================================================
 # CORE IMPLEMENTATION
 # =========================================================================
 
-function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
+function _compute_graph_core(f::P, g::P, C::Dict{Int, Vector{P}};
                              precx=150, v=0, force_app=false, outf=true) where {P <: MPolyRingElem}
 
     @assert !iszero(f) "Input does not define a curve"
@@ -155,7 +191,7 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
     # Pre-processing the input
     f, g = int_coeffs([f, g])
     precx = max(2, precx)
-    v > 1 && println("f = $f"); println("g = $g")
+    v > 2 && println("f = $f \n g = $g")
 
     # Zero-dim param conditions
     d = total_degree(f)
@@ -164,8 +200,8 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
 
     v > 0 && println("Compute parametrization of critical pts...")
     @iftime (v > 0) params = param_crit_split(f, g, v=v-1, force_app=force_app)
-    for i in 1:length(C)
-        params[-i] = [ [intC(C[i][1])], C[i][2], C[i][3] ]
+    for (i, k) in enumerate(keys(C))
+        params[-i] = [ [intC(C[k][1])], C[k][2], C[k][3] ]
     end
 
     v > 0 && println("Computing insulating critical boxes")
@@ -173,7 +209,7 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
 
     v > 0 && println("Compute intersections with critical boxes..")
     @iftime (v > 0) LPCside, LnPCside = intersect_vertical_boxes(f, params, LBcrit, Lprecx, v=v-1)
-    return LBcrit, LPCside
+
     # Critical values and their order
     xcrit = Dict(i => [LBcrit[i][j][1] for j in eachindex(LBcrit[i])] for i in keys(LBcrit))
     xcritpermut = order_permut2d(xcrit)
@@ -269,7 +305,7 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
             for k in nI_right; push!(Edg, (length(Vert), Corr[i][j].right[k])); end
 
             if i < 0 # Control point
-                push!(Vcon[-i], length(Vert))
+                push!(Vcon[keys(C)[-i]], length(Vert))
             end
         end
 
