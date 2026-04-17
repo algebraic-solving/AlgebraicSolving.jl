@@ -56,3 +56,12 @@ macro iftime(v, ex)
         end
     end
 end
+
+
+function param_use_lfs(I::Ideal, cfs_lfs::Vector{Vector{T}} where T<: RingElem, new_RS::Symbol)
+    new_R = polynomial_ring(base_ring(I), new_RS)
+    new_gens = [change_ringvar(f, new_RS) for f in gens(I)]
+    I_new = Ideal(vcat(new_gens, [transpose(cfs_lf) * gens(new_R) for cfs_lf in cfs_lfs]))
+
+    return rational_parametrization(I_new)
+end

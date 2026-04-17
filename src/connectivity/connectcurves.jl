@@ -5,7 +5,7 @@ export compute_graph, connected_components, number_of_connected_components, grou
  # DEBUG
  export interp_subresultants, mmod_subresultants, subresultants, diff, diff_list, trimat_rand, fact_gcd, isolate_eval, isolate,
  rat_to_arb, evaluate_arb, evaluate_arb_rat, int_coeffs, array_to_poly, parray_asvar, poly_to_array, homogenize, rem_var,
- intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit, MPolyBuild, change_ringvar
+ intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit, MPolyBuild, change_ringvar, curve_graph, curve_ratparam_graph
 
 include("tools.jl")
 include("datastruct.jl")
@@ -16,86 +16,127 @@ include("isolateboxes.jl")
 include("graph.jl")
 include("plots.jl")
 
+
 # =========================================================================
 # MULTIPLE DISPATCH WRAPPERS
 # =========================================================================
 
 @doc Markdown.doc"""
-    compute_graph(f::P, g::P; generic=true, precx=150, v=0, int_coeff=true, outf=true) where {P <: MPolyRingElem}
-    compute_graph(f::P, g::P, C::Vector{P}; kwargs...)
-    compute_graph(f::P, g::P, C::Vector{Vector{P}}; kwargs...)
-    compute_graph(f::P, g::P, C::Dict{Int, Vector{P}}; kwargs...)
+    curve_graph(I::Ideal; generic=true, outf=true, kwargs...)
+    curve_ratparam_graph(P::RationalCurveParametrization; kwargs...)
 
-Computes a planar straight-line graph that is homeomorphic to a 3D space curve.
+    # Both functions accept optional control points C in various formats:
+    curve_graph(I, C::Vector{P}; kwargs...)
+    curve_graph(I, C::Vector{Vector{P}}; kwargs...)
+    curve_graph(I, C::Dict{Int, Vector{P}}; kwargs...)
 
-The input space curve is defined by a 1D parameterization consisting of its planar projection `f(x,y) = 0` and its vertical lift `z = g(x,y) / df/dy(x,y)`. A key feature of this function is its ability to identify and resolve "apparent singularities" in the planar projection—points where two non-singular branches of the 3D curve cross in the 2D projection but do not intersect in 3D space. This is describe in the paper:
+Computes a planar straight-line graph that is homeomorphic to a real algebraic (space) curve.
 
-    A.Poteaux, N.Islam, R.Prébet - Algorithm for Connectivity Queries on Real Algebraic Curves - ISSAC'23
+### Core Workflow & Pre-processing
+1. **Parametrization (`curve_graph` only):** If given an `Ideal`, it first computes a `RationalCurveParametrization`.
+    If `generic=false`, it applies a random integer shear transformation to place the curve into generic position.
+2. **Coefficient Extraction:** Pulls the planar projection `f(x,y) = 0` and the vertical lift `z = g(x,y) / df/dy(x,y)` from the parametrization.
+3. **Graph Construction:** Computes bounding boxes for critical points, routes connections,
+    and identifies "apparent singularities" (2D crossings that do not intersect in 3D).
 
 ### Output Data Structure
 Returns a `CurveGraph{T}` object (where `T` is determined by the `outf` flag), containing:
-* `Vert::Vector{Tuple{T, T}}`: A list of 2D coordinates representing the vertices of the graph (critical points, structural routing nodes, and injected control points).
-* `Edg::Vector{Tuple{Int, Int}}`: A list of index pairs defining the undirected edges between vertices in `Vert`.
-* `Vcon::Dict{Int, Vector{Int}}`: A mapping from the original 1-based index of a control point in the input array `C` to its resulting vertex index in the `Vert` array.
+* `Vert::Vector{Tuple{T, T}}`: 2D coordinates of the graph vertices (critical points, routing nodes, control points).
+* `Edg::Vector{Tuple{Int, Int}}`: Index pairs defining undirected edges between `Vert` indices.
+* `Vcon::Dict{Int, Vector{Int}}`: A mapping from the original index of a control point keys its vertex index in `Vert`.
 
 ### Arguments
-* **`f`** (`MPolyRingElem`): The bivariate polynomial defining the planar projection `f(x,y) = 0`
-* **`g`** (`MPolyRingElem`): The auxiliary polynomial defining the z-coordinate via `z = g / f_y`.
-* **`C`** (`Vector{P}`, Vector{Vector{MPolyRingElem}}`, or `Dict{Int, Vector{P}}`, optionnal): A single/list/dictionnary of user-defined plane points on the curve (control points). Each point is given as a parameterization `[p, a, b]` such that `p(x) = 0` and `y = a(x)/b(x)`.
-* **`generic`** (`Bool`, default `true`): If `false`, applies a random shear transformation to put the curve into generic position (preventing vertical alignments of critical points) and inverses it at the end.
-* **`precx`** (`Int`, default `150`): Base numerical precision used for the real root isolation of critical x-coordinates.
-* **`v`** (`Int`, default `0`): Verbosity level for tracking computational progress.
-* **`force_app`** (`Bool`, default `false`): If `true`, all nodes are considered apparent singularities and the detection step is skipped. This is useful when the original curve is known to have no nodes.
-* **`outf`** (`Bool`, default `true`): If `true`, outputs the vertex coordinates as machine `Float64`. If `false`, preserves exact rational coordinates (`QQFieldElem`).
-
-### Examples
-```jldoctest
-julia> using AlgebraicSolving
-
-julia> R, (x,y) = polynomial_ring(QQ, ["x","y"])
-(Multivariate polynomial ring in 2 variables over QQ, QQMPolyRingElem[x, y])
-
-
-julia> # Define a space curve projection and its z-lift
-       f = -49303382*x^4 + 9395599*x^3*y + 67366686*x^3 - 27407214*x^2*y^2 - 71298014*x^2*y - 24150320*x^2 - 12067817*x*y^3 + 6797370*x*y^2 + 20838420*x*y - 18118613*x + 2357706*y^4 - 13736522*y^3 - 37604516*y^2 - 13868221*y + 6980802;
-       g = 32091920*x^4 - 97772598*x^3*y - 245256584*x^3 + 99093410*x^2*y^2 + 162335273*x^2*y + 239310556*x^2 + 28995368*x*y^3 - 59544597*x*y^2 - 20499914*x*y + 98243402*x + 22738226*y^3 + 111105506*y^2 + 86287748*y - 62439535;
-
-julia> graph = compute_graph(f, g);
-
-julia> number_of_connected_components(graph)
-3
+* **`I`** (`Ideal`): The algebraic ideal defining the curve.
+* **`P`** (`RationalCurveParametrization`): A pre-computed rational parametrization.
+* **`C`** (Optional): User-defined plane points on the curve (control points). Given either as Ideal or RationalParametrization.
+* **`generic`** (`Bool`, default `true`): If `false`, applies a random shear transformation.
+* **`precx`** (`Int`, default `150`): Base numerical precision for real root isolation.
+* **`v`** (`Int`, default `0`): Verbosity level.
+* **`force_app`** (`Bool`, default `false`): Skips 3D intersection checks, treating all 2D nodes as apparent singularities.
+* **`outf`** (`Bool`, default `true`): Output coordinates as `Float64`. If `false`, outputs exact `QQFieldElem`.
 """
-function compute_graph(I::Ideal{P} where P <: QQMPolyRingElem; generic=true, kwargs...)
-    p = rational_curve_parametrization(I, use_lfs = !generic)
-    return compute_graph(p.elim, p.param[1], kwargs...)
+function curve_graph(I::Ideal{P}, args...; generic=true, outf=true, v=0, kwargs...) where {P <: QQMPolyRingElem}
+    R = parent(I)
+    n = nvars(R)
+    typeout = outf ? Float64 : QQFieldElem
+
+    # Base Case: 1D Ideal (Points)
+    if n == 1
+        sols = real_solutions(I)
+        Vert = [(typeout(xi[1]), zero(typeout)) for xi in sols]
+        # If C is a Dict, instantiate keys. If it's a Vector or absent, return empty Dict
+        C_keys = length(args) > 0 && args[1] isa Dict ? keys(args[1]) : Int[]
+        Vcon = Dict{Int, Vector{Int}}(k => Int[] for k in C_keys)
+        return CurveGraph{typeout}(Vert, Tuple{Int, Int}[], Vcon)
+    end
+
+    # Pre-processing: Generic Position Shear
+    # We explicitly define linear forms if !generic to share them with C
+    v > 0 && println("Compute curve rational parametrization...")
+    lfs = nothing
+    if !generic
+        make_vec(i) = [j <= n ? ZZRingElem(rand(-100:100)) : (j == n+i ? one(ZZRingElem) : zero(ZZRingElem)) for j in 1:n+3]
+        lfs = make_vec.(1:3)
+        p_I = rational_curve_parametrization(I, cfs_lfs = lfs)
+    else
+        p_I = rational_curve_parametrization(I)
+    end
+
+    # 2. Process Control Ideals (C) if provided
+    if length(args) > 0
+        C = args[1]
+        new_RS = symbols(parent(p_I.elim))
+
+        # Maps Ideal to the new ring and parameterize it with aligned linear forms
+        C_param =  [ is_nothing(lfs) ? rational_parametrization(c) : param_use_lfs(c, lfs, new_RS) for c in C ]
+
+        # Map C based on its input structure
+        if C_input isa AbstractDict
+            C_param = Dict(k => param_C(v) for (k, v) in C_input)
+        else
+            C_input isa AbstractVector || error("Control points C must be a Vector or Dict of Ideals.")
+        end
+
+        return curve_ratparam_graph(p_I, C_param; outf=outf, kwargs...)
+    end
+
+    # Delegate to the parametrization function, blindly passing any `C` format down
+    return curve_ratparam_graph(p, args...; outf=outf, kwargs...)
 end
 
-# Base case: No 'C' (control points) provided
-compute_graph(f::P, g::P; kwargs...) where {P <: MPolyRingElem} =
-    _compute_graph_core(f, g, Vector{Vector{P}}(); kwargs...)
+# =========================================================================
+# MULTIPLE DISPATCH WRAPPERS (INTERNAL)
+# =========================================================================
 
-# Case 1: C is a Vector of Vectors
-compute_graph(f::P, g::P, C::Vector{Vector{P}}; kwargs...) where {P <: MPolyRingElem} =
-    _compute_graph_core(f, g, C; kwargs...)
+# Case 1: No control points
+curve_ratparam_graph(p::CurveRationalParametrization; kwargs...) =
+    _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)), Vector{Vector{typeof(p.elim)}}(); kwargs...)
 
-# Case 2: C is a Dictionary
-function compute_graph(f::P, g::P, C::Dict{Int, Vector{P}}; kwargs...) where {P <: MPolyRingElem}
-    graph = _compute_graph_core(f, g, collect(values(C)); kwargs...)
-    # Remap Vcon dictionary keys to match original dict keys
+# Case 2: C is a Vector of Parametrizations
+curve_ratparam_graph(p::CurveRationalParametrization, C::Vector{RationalParametrization}; kwargs...) =
+    _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)),
+                        [ [c.elim, c.param[end], c.denom] for c in C]; kwargs...)
+
+# Case 3: C is a Dictionary of Parametrizations (Remaps keys post-computation)
+function curve_ratparam_graph(p::CurveRationalParametrization, C::Dict{Int, RationalParametrization}; kwargs...)
+    f = p.elim
+    g = length(p.param) > 0 ? p.param[end] : one(parent(f))
+
+    # Compute graph using the raw vector of parametrizations
+    pC = [ [c.elim, c.param[end], c.denom] for c in values(C)]
+    graph = _compute_graph_core(f, g, pC; kwargs...)
+
+    # Remap Vcon dictionary keys to match the user's original dictionary
     mapped_vcon = Dict{Int, Vector{Int}}(k => graph.control_nodes[i] for (i, k) in enumerate(keys(C)))
     return CurveGraph(graph.vertices, graph.edges, mapped_vcon)
 end
-
-# Case 3: C is a single Vector
-compute_graph(f::P, g::P, C::Vector{P}; kwargs...) where {P <: MPolyRingElem} =
-    _compute_graph_core(f, g, [C]; kwargs...)
 
 # =========================================================================
 # CORE IMPLEMENTATION
 # =========================================================================
 
 function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
-                             plane_generic=true, precx=150, v=0, force_app=false, outf=true) where {P <: MPolyRingElem}
+                             precx=150, v=0, force_app=false, outf=true) where {P <: MPolyRingElem}
 
     @assert !iszero(f) "Input does not define a curve"
 
@@ -113,11 +154,8 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
 
     # Pre-processing the input
     f, g = int_coeffs([f, g])
-    changemat = plane_generic ? [1 0; 0 1] : [ QQ(rand(-100:100)) for i=1:2, j=1:2 ]
-
-    f = evaluate(f, collect(changemat * [x; y]))
     precx = max(2, precx)
-    v > 1 && println(f)
+    v > 1 && println("f = $f"); println("g = $g")
 
     # Zero-dim param conditions
     d = total_degree(f)
@@ -135,7 +173,7 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
 
     v > 0 && println("Compute intersections with critical boxes..")
     @iftime (v > 0) LPCside, LnPCside = intersect_vertical_boxes(f, params, LBcrit, Lprecx, v=v-1)
-
+    return LBcrit, LPCside
     # Critical values and their order
     xcrit = Dict(i => [LBcrit[i][j][1] for j in eachindex(LBcrit[i])] for i in keys(LBcrit))
     xcritpermut = order_permut2d(xcrit)
@@ -208,7 +246,6 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
         end
 
         # 3. Below the critical point
-        # TODO: many vertices and edges could be removed here
         for k in 1:ymincrit-1
             yval = sum(PCside.left.points[k] + PCside.right.points[k]) / 4
             push!(Vert, (xcmid, yval))
@@ -243,14 +280,6 @@ function _compute_graph_core(f::P, g::P, C::Vector{Vector{P}};
             push!(Corr[i][j].top, length(Vert))
             push!(Edg, (Corr[i][j].left[end-k+1], length(Vert)))
             push!(Edg, (length(Vert), Corr[i][j].right[end-k+1]))
-        end
-    end
-
-    # Post processing the data
-    if !plane_generic
-        for i in eachindex(Vert)
-            vx, vy = Vert[i]
-            Vert[i] = Tuple(changemat * [vx, vy])
         end
     end
 
