@@ -75,7 +75,6 @@ of `GraphPlotData`)
 # Notes
 - All coordinates are converted to `Float64` for compatibility with plotting backends.
 """
-
 function build_graph_data(G::CurveGraph{T}; width=3.0, vert=true, color="#FF0000")  where T <: Union{Float64,QQFieldElem}
     V, Vcon, E = G.vertices, G.control_nodes, G.edges
 
