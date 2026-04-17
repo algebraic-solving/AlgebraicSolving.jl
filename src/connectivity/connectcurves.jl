@@ -5,7 +5,8 @@ export compute_graph, connected_components, number_of_connected_components, grou
  # DEBUG
  export interp_subresultants, mmod_subresultants, subresultants, diff, diff_list, trimat_rand, fact_gcd, isolate_eval, isolate,
  rat_to_arb, evaluate_arb, evaluate_arb_rat, int_coeffs, array_to_poly, parray_asvar, poly_to_array, homogenize, rem_var,
- intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit, MPolyBuild, change_ringvar, curve_graph, curve_ratparam_graph, curve_arrangement_graph
+ intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit, MPolyBuild, change_ringvar, curve_graph, curve_ratparam_graph,
+ curve_arrangement_graph, arb_to_rat
 
 include("tools.jl")
 include("datastruct.jl")
@@ -24,12 +25,14 @@ Computes the combined planar graph of an arrangement of multiple space curves.
 Automatically computes the mutual intersections between all curves and guarantees
 they are projected using a shared, unified linear form.
 """
-function curve_arrangement_graph(curves::Vector{Ideal{P}}; generic=true, outf=true, kwargs...) where {P <: QQMPolyRingElem}
+function curve_arrangement_graph(curves::Vector{Ideal{P}}; generic=true, outf=true, v=0, kwargs...) where {P <: QQMPolyRingElem}
     N = length(curves)
     @assert N > 0 "Must provide at least one curve."
 
     R = parent(curves[1])
     n = nvars(R)
+    typeout = outf ? Float64 : QQFieldElem
+
 
     # 1. Establish the Shared Projection Context
     # We MUST generate the linear forms here and force all curves/intersections to use them.
@@ -37,12 +40,14 @@ function curve_arrangement_graph(curves::Vector{Ideal{P}}; generic=true, outf=tr
     if !generic
         make_vec(i) = [j <= n ? ZZRingElem(rand(-100:100)) : (j == n+i ? one(ZZRingElem) : zero(ZZRingElem)) for j in 1:n+3]
         lfs = make_vec.(1:3)
+        u_lfs = lfs[2][1:end-3] # for zero-dim param of intersect pts
     end
 
     # 3. Compute Intersections and Build Individual Graphs
-    graphs = Vector{CurveGraph}(undef, N)
+    graphs = Vector{CurveGraph{typeout}}(undef, N)
     p_inter = Dict{Set{Int}, RationalParametrization}()
     for i in 1:N
+         v > 0 && println("Compute graph of curve number $i/$N...A,")
         p_I = lfs === nothing ? rational_curve_parametrization(curves[i]) :
                                 rational_curve_parametrization(curves[i], cfs_lfs=lfs)
         new_RS = symbols(parent(p_I.elim))
@@ -51,17 +56,17 @@ function curve_arrangement_graph(curves::Vector{Ideal{P}}; generic=true, outf=tr
         C_i = Dict{Int, RationalParametrization}( j => p_inter[Set((i,j))] for j in 1:i-1)
         for j in i+1:N
             I_ij = vcat(curves[i].gens, curves[j].gens) |> Ideal
-            C_i[j] = isnothing(lfs) ? rational_parametrization(I_ij) : param_use_lfs(I_ij, lfs, new_RS)
+            C_i[j] = isnothing(lfs) ? rational_parametrization(I_ij) : param_use_lfs(I_ij, u_lfs, new_RS[end-1])
             p_inter[Set((i,j))] =
                 RationalParametrization(C_i[j].vars, C_i[j].cfs_lf, C_i[j].elim, C_i[j].denom, C_i[j].param)
         end
-
-        graphs[i] = curve_graph(p_I, C_i; outf=outf, kwargs...)
-        graphs[i] = _compute_graph_core(p_I.elim, length(p_I.param) > 0 ? p_I.param[end] : zero(parent(p_I.elim)), C_i; kwargs...)
+        @show C_i
+        @show graphs
+        graphs[i] = curve_graph(p_I, C_i; outf=outf, v=v-1, kwargs...)
     end
 
     # 4. Merge the graph according to their intersections
-    return merge_graphs(graphs...)
+    return merge_graphs(graphs)
 end
 
 @doc Markdown.doc"""
@@ -120,6 +125,7 @@ function curve_graph(I::Ideal{P}, args...; generic=true, outf=true, v=0, kwargs.
     if !generic
         make_vec(i) = [j <= n ? ZZRingElem(rand(-100:100)) : (j == n+i ? one(ZZRingElem) : zero(ZZRingElem)) for j in 1:n+3]
         lfs = make_vec.(1:3)
+        u_lfs = lfs[2][1:end-3] # for zero-dim param of control pts
         p_I = rational_curve_parametrization(I, cfs_lfs = lfs)
     else
         p_I = rational_curve_parametrization(I)
@@ -131,7 +137,7 @@ function curve_graph(I::Ideal{P}, args...; generic=true, outf=true, v=0, kwargs.
         new_RS = symbols(parent(p_I.elim))
 
         # Maps Ideal to the new ring and parameterize it with aligned linear forms
-        C_param =  [ is_nothing(lfs) ? rational_parametrization(c) : param_use_lfs(c, lfs, new_RS) for c in C ]
+        C_param =  [ is_nothing(lfs) ? rational_parametrization(c) : param_use_lfs(c, u_lfs, new_RS[end-1]) for c in C ]
 
         # Map C based on its input structure
         if C_input isa AbstractDict
@@ -151,21 +157,28 @@ end
 # MULTIPLE DISPATCH WRAPPERS (INTERNAL)
 # =========================================================================
 
+# Small helper
+function prepare_param(P,Q)
+    R = parent(Q)
+    param = is_constant(P.elim) ? [P.elim,P.elim,P.elim] : [P.elim, P.param[end], P.denom]
 
+    return [ evaluate(p, gens(R)[1]) for p in param ]
+end
 
 # Case 1: No control points
 curve_graph(p::RationalCurveParametrization; generic=true, kwargs...) =
-    _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)), Dict{Int, Vector{typeof(p.elim)}}(); kwargs...)
+    _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)),
+                        Dict{Int, Vector{typeof(p.elim)}}(); kwargs...)
 
 # Case 2: C is a Vector of Parametrizations
 curve_graph(p::RationalCurveParametrization, C::Vector{RationalParametrization}; generic=true, kwargs...) =
     _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)),
-                        Dict( i => [c.elim, c.param[end], c.denom] for (i,c) in enumerate(C)); kwargs...)
+                        Dict( i => prepare_param(c, p.elim)  for (i,c) in enumerate(C)); kwargs...)
 
 # Case 3: C is a Dictionary of Parametrizations
 curve_graph(p::RationalCurveParametrization, C::Dict{Int, RationalParametrization}; generic=true, kwargs...) =
      _compute_graph_core(p.elim, length(p.param) > 0 ? p.param[end] : zero(parent(p.elim)),
-                        Dict( i => [c.elim, c.param[end], c.denom] for (i,c) in C); kwargs...)
+                        Dict( i => prepare_param(c, p.elim) for (i,c) in C); kwargs...)
 
 # =========================================================================
 # CORE IMPLEMENTATION
@@ -191,7 +204,7 @@ function _compute_graph_core(f::P, g::P, C::Dict{Int, Vector{P}};
     # Pre-processing the input
     f, g = int_coeffs([f, g])
     precx = max(2, precx)
-    v > 2 && println("f = $f \n g = $g")
+    v > 2 && println("f = $f \n g = $g\n $C")
 
     # Zero-dim param conditions
     d = total_degree(f)
@@ -200,8 +213,9 @@ function _compute_graph_core(f::P, g::P, C::Dict{Int, Vector{P}};
 
     v > 0 && println("Compute parametrization of critical pts...")
     @iftime (v > 0) params = param_crit_split(f, g, v=v-1, force_app=force_app)
-    for (i, k) in enumerate(keys(C))
-        params[-i] = [ [intC(C[k][1])], C[k][2], C[k][3] ]
+    keys_C = collect(keys(C))
+    for (i, k) in enumerate(keys_C)
+        params[-i] = [ [int_coeffs(C[k][1])], int_coeffs(C[k][2]), int_coeffs(C[k][3]) ]
     end
 
     v > 0 && println("Computing insulating critical boxes")
@@ -305,7 +319,7 @@ function _compute_graph_core(f::P, g::P, C::Dict{Int, Vector{P}};
             for k in nI_right; push!(Edg, (length(Vert), Corr[i][j].right[k])); end
 
             if i < 0 # Control point
-                push!(Vcon[keys(C)[-i]], length(Vert))
+                push!(Vcon[keys_C[-i]], length(Vert))
             end
         end
 

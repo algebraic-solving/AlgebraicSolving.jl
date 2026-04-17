@@ -4,14 +4,16 @@
 Return a rational interval enclosing the Arb ball.
 """
 function arb_to_rat(x::ArbFieldElem)
-    r = radius(x)
-    for i in 2:5
-        lo = x - i*r
-        hi = x + i*r
+    m, r = midpoint(x), 2*radius(x)
+    for _ in 2:10
+        lo = m - r
+        hi = m + r
+
         I = map(simplest_rational_inside, [lo, hi])
-        contains(rat_to_arb(I, parent(x)), x) && return I
+        I[1] <= x <= I[2] && return I
+        r *= 10
     end
-    error("Problem in boxes computations with Arb. Try increasing precision.")
+    error("Problem in boxes computations with Arb (arb_to_rat). Try increasing precision.")
 end
 
 
@@ -31,7 +33,7 @@ function rat_to_arb(interval::Vector{QQFieldElem}, field::ArbField)
         all(contains(I, x) for x in interval) && return I
         new_field = ArbField(i * field.prec)
     end
-    error("Problem in boxes computations with Arb. Try increasing precision.")
+    error("Problem in boxes computations with Arb (rat_to_arb). Try increasing precision.")
 end
 
 

@@ -57,11 +57,15 @@ macro iftime(v, ex)
     end
 end
 
+# We compute a zero-dim param of I w.r.t. a new generic variable v
+# given by Sv (Symbol) and defined by the linear form in cfs_lf
+function param_use_lfs(I::Ideal, cfs_lf::Vector{T} where T<: RingElem, Sv::Symbol)
+    R = parent(I)
+    new_RS = vcat(symbols(R), Sv)
+    _, new_V = polynomial_ring(base_ring(R), new_RS)
 
-function param_use_lfs(I::Ideal, cfs_lfs::Vector{Vector{T}} where T<: RingElem, new_RS::Symbol)
-    new_R = polynomial_ring(base_ring(I), new_RS)
-    new_gens = [change_ringvar(f, new_RS) for f in gens(I)]
-    I_new = Ideal(vcat(new_gens, [transpose(cfs_lf) * gens(new_R) for cfs_lf in cfs_lfs]))
+    new_gens = [change_ringvar(f, new_RS) for f in I.gens]
+    I_new = Ideal(vcat(new_gens, [new_V[end] + transpose(cfs_lf) * new_V[1:end-1]]))
 
     return rational_parametrization(I_new)
 end
