@@ -22,8 +22,13 @@ include("siggb/siggb.jl")
 include("progress/main.jl")
 #= interp =#
 include("interp/main.jl")
+#= connectivity =#
+include("connectivity/connectcurves.jl")
+include("connectivity/graph.jl")
+include("connectivity/plots.jl")
 #= examples =#
 include("examples/katsura.jl")
 include("examples/cyclic.jl")
+
 
 end # module AlgebraicSolving

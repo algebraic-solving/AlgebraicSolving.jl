@@ -1,14 +1,7 @@
 
-export compute_graph, connected_components, number_of_connected_components, group_by_component, merge_graphs,
- plot_graph, plot_graphs, plot_graph_comp, Bresultant, param_crit_split, build_graphs_data, build_graph_data
+export connected_components, number_of_connected_components, group_by_component, merge_graphs, build_graph_data,curve_graph,curve_arrangement_graph
 
- # DEBUG
- export interp_subresultants, mmod_subresultants, subresultants, diff, diff_list, trimat_rand, fact_gcd, isolate_eval, isolate,
- rat_to_arb, evaluate_arb, evaluate_arb_rat, int_coeffs, array_to_poly, parray_asvar, poly_to_array, homogenize, rem_var,
- intersect_biv, num_biv_rat_mod, parray_asvarcoeff, mmod_param_crit, MPolyBuild, change_ringvar, curve_graph, curve_ratparam_graph,
- curve_arrangement_graph, arb_to_rat
-
-include("tools.jl")
+ include("tools.jl")
 include("datastruct.jl")
 include("buildpoly.jl")
 include("paramcrit.jl")
