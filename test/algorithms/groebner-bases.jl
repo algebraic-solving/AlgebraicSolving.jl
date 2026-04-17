@@ -1,3 +1,5 @@
+using Distributed
+
 @testset "Algorithms -> Gröbner bases" begin
     R, (x,y,z) = polynomial_ring(GF(101),["x","y","z"], internal_ordering=:degrevlex)
     I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
@@ -28,6 +30,9 @@
 
     @test_throws ErrorException eliminate(I,0)
     L = eliminate(I,2)
+    H = MPolyRingElem[
+        z^4 + 38*z^3 + 95*z^2 + 95*z
+    ]
     @test L == H
     @test I.gb[2] == H
 
@@ -103,7 +108,113 @@
         R(1)
     ]
     @test G == H
-	
+end
+
+@testset "Algorithms -> Gröbner bases (array interface)" begin
+    # Test 1: finite field
+    field_char = 101
+    # we represent [x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y] in msolve format
+    lens = Int32[4, 4, 3]
+    cfs = Int32[
+        1, 2, 2, 100, # 1, 2, 2, -1
+        1, 2, 2, 100, # 1, 2, 2, -1
+        2, 2, 100 # 2, 2, -1
+    ]
+    exps = Int32[
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, # x, y, z, 1
+        2, 0, 0, 0, 2, 0, 0, 0, 2, 1, 0, 0, # x^2, y^2, z^2, x
+        1, 1, 0, 0, 1, 1, 0, 1, 0 # x*y, y*z, y
+    ]
+    # the expected GB is [x+2*y+2*z+100, y*z+82*z^2+10*y+40*z, y^2+60*z^2+20*y+81*z, z^3+28*z^2+64*y+13*z]
+    # we also represent it in msolve format
+    gb_lens = Int32[4, 4, 4, 4]
+    gb_cfs = Int32[
+        1, 2, 2, 100,
+        1, 82, 10, 40,
+        1, 60, 20, 81,
+        1, 28, 64, 13
+    ]
+    gb_exps = Int32[
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, # x, y, z, 1
+        0, 1, 1, 0, 0, 2, 0, 1, 0, 0, 0, 1, # y*z, z^2, y, z
+        0, 2, 0, 0, 0, 2, 0, 1, 0, 0, 0, 1, # y^2, z^2, y, z
+        0, 0, 3, 0, 0, 2, 0, 1, 0, 0, 0, 1 # z^3, z^2, y, z
+    ]
+    @test (gb_lens, gb_cfs, gb_exps) == AlgebraicSolving._core_groebner_basis_array(lens, cfs, exps, field_char)
+
+    # Test 2: rational field
+    field_char = 0
+    # we represent [x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y] in msolve format
+    # lens and exps are the same as Test 1
+    cfs = BigInt[
+        1, 1, 2, 1, 2, 1, -1, 1, # 1/1, 2/1, 2/1, -1/1
+        1, 1, 2, 1, 2, 1, -1, 1, # 1/1, 2/1, 2/1, -1/1
+        2, 1, 2, 1, -1, 1 # 2/1, 2/1, -1/1
+    ]
+    # the expected GB is [x+2*y+2*z-1, 10*y*z+12*z^2-y-4*z, 5*y^2-3*z^2-y+z, 210*z^3-79*z^2+7*y+3*z]
+    # we represent the expected GB in msolve format
+    gb_lens = Int32[4, 4, 4, 4]
+    gb_cfs = BigInt[
+        1, 2, 2, -1,
+        10, 12, -1, -4,
+        5, -3, -1, 1,
+        210, -79, 7, 3
+    ]
+    gb_exps = Int32[
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, # x, y, z, 1
+        0, 1, 1, 0, 0, 2, 0, 1, 0, 0, 0, 1, # y*z, z^2, y, z
+        0, 2, 0, 0, 0, 2, 0, 1, 0, 0, 0, 1, # y^2, z^2, y, z
+        0, 0, 3, 0, 0, 2, 0, 1, 0, 0, 0, 1 # z^3, z^2, y, z
+    ]
+    @test (gb_lens, gb_cfs, gb_exps) == AlgebraicSolving._core_groebner_basis_array(lens, cfs, exps, field_char)
+end
+
+@testset "Algorithms -> Gröbner bases with workers" begin
+    _, (x, y, z) = polynomial_ring(GF(101), ["x", "y", "z"], internal_ordering=:degrevlex)
+    F1 = [x + 2 * y + 2 * z - 1, x^2 + 2 * y^2 + 2 * z^2 - x, 2 * x * y + 2 * y * z - y]
+    H1 = MPolyRingElem[
+        x + 2 * y + 2 * z + 100
+        y * z + 82 * z^2 + 10 * y + 40 * z
+        y^2 + 60 * z^2 + 20 * y + 81 * z
+        z^3 + 28 * z^2 + 64 * y + 13 * z
+    ]
+
+    _, (x1, x2) = polynomial_ring(QQ, ["x1", "x2"])
+    F2 = [3 * x1^2 + ZZ(2)^100, 2 * x1 * x2 + 5 * x1 + ZZ(2)^100]
+    H2 = MPolyRingElem[
+        3 * x1 - 2 * x2 - 5
+        4 * x2^2 + 20 * x2 + 3802951800684688204490109616153
+    ]
+
+    _, (x, y, z) = polynomial_ring(GF(17), ["x", "y", "z"], internal_ordering=:degrevlex)
+    F3 = [x^2 + 1 - 3, x * y - z, x * z^2 - 3 * y^2]
+    H3 = MPolyRingElem[
+        z^2
+        y * z
+        x * z + 15 * y
+        y^2
+        x * y + 16 * z
+        x^2 + 15
+    ]
+
+    nb_tests = 42
+    F = [F1, F2, F3]
+    G = Vector{Vector{MPolyRingElem}}(undef, nb_tests)
+    H = [H1, H2, H3]
+
+    nb_workers = 2
+    worker_ids = addprocs(nb_workers; exeflags="--project=$(Base.active_project())")
+    @everywhere worker_ids using AlgebraicSolving
+    worker_pool = WorkerPool(worker_ids)
+
+    Threads.@threads for i in 1:nb_tests
+        G[i] = groebner_basis(Ideal(F[i%3+1]), worker_pool=worker_pool)
+    end
+    for i in 1:nb_tests
+        @test G[i] == H[i%3+1]
+    end
+
+    rmprocs(worker_ids)
 end
 
 @testset "Algorithms -> Sig Gröbner bases" begin

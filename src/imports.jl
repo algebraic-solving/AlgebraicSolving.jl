@@ -10,6 +10,7 @@ import Plots: plot
 import Random: MersenneTwister, randperm
 import Logging: ConsoleLogger, with_logger, Warn, Info
 import Printf: @sprintf, @printf
+import Distributed: AbstractWorkerPool, remotecall_fetch
 
 import Nemo:
     bell,
