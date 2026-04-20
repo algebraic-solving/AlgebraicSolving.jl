@@ -15,5 +15,5 @@ include("interp/thiele.jl")
 include("interp/newton.jl")
 include("interp/cuyt_lee.jl")
 include("interp/resultant.jl")
-include("algorithms/curve-connectivity.jl")
+include("connectivity/curve-connectivity.jl")
 end
