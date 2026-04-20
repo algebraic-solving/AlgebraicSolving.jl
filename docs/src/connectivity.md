@@ -100,20 +100,20 @@ One can perform different operations on such strutures.
 
 ```@docs
     group_by_components(
-        G::CurveGraph{T}
+        G::CurveGraph
     )
 ```
 
 ```@docs
     number_of_connected_components(
-        G::CurveGraph{T}
+        G::CurveGraph
     )
 ```
 
 ```@docs
     merge_graphs(
-        graphs::Vector{CurveGraph{T}}
-    ) where T
+        graphs::Vector{CurveGraph}
+    )
 ```
 
 ## Displaying curve graph

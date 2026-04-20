@@ -107,7 +107,7 @@ This is primarily used to determine which external connections (or user-defined 
 belong to which isolated branch of the curve.
 
 # Inputs
-- `G::CurveGraph{T}`: The parent graph structure.
+- `G::CurveGraph`: The parent graph structure.
 
 # Outputs
 - `Vector{Dict{Int, Vector{Int}}}`: A list of dictionaries, one for each connected component,
@@ -126,7 +126,7 @@ Computes the total number of topologically disconnected branches/components in t
 This is a convenience wrapper for topological validation.
 
 # Inputs
-- `G::CurveGraph{T}`: The parent graph structure.
+- `G::CurveGraph`: The parent graph structure.
 
 # Outputs
 - `Int`: The count of isolated subgraphs.

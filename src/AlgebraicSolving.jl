@@ -24,8 +24,6 @@ include("progress/main.jl")
 include("interp/main.jl")
 #= connectivity =#
 include("connectivity/connectcurves.jl")
-include("connectivity/graph.jl")
-include("connectivity/plots.jl")
 #= examples =#
 include("examples/katsura.jl")
 include("examples/cyclic.jl")

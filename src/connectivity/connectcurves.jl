@@ -1,7 +1,4 @@
-
-export connected_components, number_of_connected_components, group_by_component, merge_graphs, build_graph_data,curve_graph,curve_arrangement_graph
-
- include("tools.jl")
+include("tools.jl")
 include("datastruct.jl")
 include("buildpoly.jl")
 include("paramcrit.jl")
