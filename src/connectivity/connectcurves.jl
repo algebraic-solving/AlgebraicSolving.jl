@@ -95,6 +95,23 @@ Returns a `CurveGraph{T}` object (where `T` is determined by the `outf` flag), c
 * **`v`** (`Int`, default `0`): Verbosity level.
 * **`force_app`** (`Bool`, default `false`): Skips 3D intersection checks, treating all 2D nodes as apparent singularities.
 * **`outf`** (`Bool`, default `true`): Output coordinates as `Float64`. If `false`, outputs exact `QQFieldElem`.
+
+### Example
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x, y, z) = polynomial_ring(QQ, ["x", "y", "z"]);
+
+julia> f = -42*x^2 + 101*x*y - 8*x*z - 88*x + 53*y^2 + 71*y*z + 154*y + 53*z^2 + 2*z - 32;
+       g = -7*x^2 - 144*x*y - 126*x*z - 7*x + 30*y^2 - 34*y*z + 72*y + 71*z^2 + 46*z + 5;
+
+julia> I = Ideal([f, g]);
+
+julia> G = curve_graph(I);
+
+julia> number_of_connected_components(G)
+3
+```
 """
 function curve_graph(I::Ideal{P}, args...; generic=true, outf=true, v=0, kwargs...) where {P <: QQMPolyRingElem}
     R = parent(I)
