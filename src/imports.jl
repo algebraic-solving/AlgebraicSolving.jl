@@ -3,11 +3,8 @@ using msolve_jll
 using Nemo
 using LinearAlgebra
 using StaticArrays
-using Plots, Colors
-#pythonplot()
 
-import Plots: plot
-import Random: MersenneTwister, randperm
+import Random: MersenneTwister
 import Logging: ConsoleLogger, with_logger, Warn, Info
 import Printf: @sprintf, @printf
 import Distributed: AbstractWorkerPool, remotecall_fetch
