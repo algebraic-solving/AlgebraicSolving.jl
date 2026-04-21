@@ -12,37 +12,163 @@ Construct the rational parametrization of the solution set computed via msolve.
 function _get_rational_parametrization(
         nr::Int32,
         lens::Vector{Int32},
-        cfs::Ptr{BigInt},
-        cfs_lf::Ptr{BigInt},
+        cfs::Vector{BigInt},
+        cfs_lf::Vector{BigInt},
         nr_vars::Int32
     )
-    if cfs_lf != Ptr{BigInt}(0)
-        lf = [ZZRingElem(unsafe_load(cfs_lf, i)) for i in 1:nr_vars]
+    if !isempty(cfs_lf)
+        lf = [ZZRingElem(cfs_lf[i]) for i in 1:nr_vars]
     else
         lf = ZZRingElem[]
     end
     C, x  = polynomial_ring(QQ,"x")
     ctr   = 0
 
-    elim  = C([unsafe_load(cfs, i) for i in 1:lens[1]])
+    elim  = C([cfs[i] for i in 1:lens[1]])
     ctr += lens[1]
 
-    denom = C([unsafe_load(cfs, i+ctr) for i in 1:lens[2]])
+    denom = C([cfs[i+ctr] for i in 1:lens[2]])
     ctr +=  lens[2]
 
     size  = nr-2
     p = Vector{QQPolyRingElem}(undef, size)
     k = 1
     for i in 3:nr
-        p[k]  = C([unsafe_load(cfs, j+ctr) for j in 1:lens[i]-1])
+        p[k]  = C([cfs[j+ctr] for j in 1:lens[i]-1])
         # multiply parametrization polynomial directly with
         # corresponding coefficients
-        p[k]  *=   (-1) // ZZRingElem(unsafe_load(cfs, lens[i]+ctr))
+        p[k]  *=   (-1) // ZZRingElem(cfs[lens[i]+ctr])
         ctr   +=  lens[i]
         k     +=  1
     end
 
     return lf, elim, denom, p
+end
+
+@doc Markdown.doc"""
+    _core_msolve_array(lens::Vector{Int32}, cfs::Union{Vector{Int32},Vector{BigInt}}, exps::Vector{Int32}, variable_names::Vector{String}, field_char::Int; <keyword arguments>)
+
+Compute a rational parametrization and the real solutions of the ideal via msolve.
+
+**Note**: Both the input and output of this function are given as flattened arrays of integers and strings instead of polynomials.
+
+# Arguments
+- `lens::Vector{Int32}`: vector of number of terms per generator.
+- `cfs::Union{Vector{Int32},Vector{BigInt}}`: vector of coefficients of all generators, concatenated. When working over the rationals, the coefficients are given as pairs of numerators and denominators, i.e. `cfs[2*i-1]` is the numerator and `cfs[2*i]` the denominator of the `i`-th coefficient.
+- `exps::Vector{Int32}`: vector of exponent vectors of all generators, concatenated.
+- `variable_names::Vector{String}`: vector of variable names.
+- `field_char::Int`: characteristic of the ground field, `0` for the rationals.
+- `initial_hts::Int=17`: initial hash table size `log_2`.
+- `nr_thrds::Int=1`: number of threads for parallel linear algebra.
+- `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
+- `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
+- `get_param::Int=1`: parametrization option: no (`0`), yes (`1`, default), only rational parametrization, no solutions are computed (`2`).
+- `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
+- `precision::Int=32`: bit precision for the computed solutions.
+```
+
+**Note**: This is an internal function.
+"""
+function _core_msolve_array(
+    lens::Vector{Int32},
+    cfs::Union{Vector{Int32},Vector{BigInt}},
+    exps::Vector{Int32},
+    variable_names::Vector{String},
+    field_char::Int;
+    initial_hts::Int=17,
+    nr_thrds::Int=1,
+    max_nr_pairs::Int=0,
+    la_option::Int=2,
+    get_param::Int=1,
+    info_level::Int=0,
+    precision::Int=32
+)::Tuple{Vector{Int32},Vector{String},Vector{BigInt},Vector{BigInt},Vector{BigInt},Vector{Int32}}
+    if field_char != 0
+        error("At the moment we only support the rationals as ground field.")
+    end
+
+    nr_gens = length(lens)
+    nr_vars = length(exps) ÷ sum(lens)
+
+    #= add new variables and linear forms, =#
+    genericity_handling = 2
+
+    reset_ht = 0
+    print_gb = 0
+
+    mon_order = 0
+    elim_block_size = 0
+    use_signatures = 0
+
+    res_ld = Ref(Cint(0))
+    res_nr_vars = Ref(Cint(0))
+    res_dim = Ref(Cint(0))
+    res_dquot = Ref(Cint(0))
+    nb_sols = Ref(Cint(0))
+    res_len = Ref(Ptr{Cint}(0))
+    res_vnames = Ref(Ptr{Ptr{Cchar}}(0))
+    res_cf_lf = Ref(Ptr{Cvoid}(0))
+    res_cf = Ref(Ptr{Cvoid}(0))
+    sols_num = Ref(Ptr{Cvoid}(0))
+    sols_den = Ref(Ptr{Cint}(0))
+
+    ccall((:msolve_julia, libmsolve), Cvoid,
+        (Ptr{Nothing}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},
+            Ptr{Ptr{Cint}}, Ptr{Ptr{Ptr{Cchar}}}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cint}, Ptr{Cvoid}, Ptr{Ptr{Cint}},
+            Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Ptr{Ptr{Cchar}}, Ptr{Cchar}, Cint, Cint,
+            Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint,
+            Cint, Cint, Cint, Cint, Cint, Cint),
+        cglobal(:jl_malloc), res_ld, res_nr_vars, res_dim, res_dquot,
+        res_len, res_vnames, res_cf_lf, res_cf, nb_sols, sols_num, sols_den,
+        lens, exps, cfs, variable_names, "/dev/null", field_char, mon_order,
+        elim_block_size, nr_vars, nr_gens, initial_hts, nr_thrds, max_nr_pairs, reset_ht, la_option,
+        use_signatures, print_gb, get_param, genericity_handling, precision, info_level)
+
+    # convert to julia array, also give memory management to julia
+    jl_ld = res_ld[]
+    jl_rp_nr_vars = res_nr_vars[]
+    jl_dim = res_dim[]
+    jl_dquot = res_dquot[]
+
+    if jl_dim > 0
+        error("Dimension of ideal is greater than zero, no solutions provided.")
+    end
+
+    if jl_dquot == 0
+        return Int32[], String[], BigInt[], BigInt[], BigInt[], Int32[]
+    end
+
+    # get rational parametrization
+    jl_len = Vector{Int32}(Base.unsafe_wrap(Array, res_len[], jl_ld))
+
+    jl_vnames_ptrs = Base.unsafe_wrap(Array, res_vnames[], jl_rp_nr_vars)
+    jl_vnames = [unsafe_string(jl_vnames_ptrs[i]) for i in 1:jl_rp_nr_vars]
+
+    jl_cf_lf_ptr = reinterpret(Ptr{BigInt}, res_cf_lf[])
+    if jl_cf_lf_ptr != Ptr{BigInt}(0)
+        jl_cf_lf = BigInt[deepcopy(unsafe_load(jl_cf_lf_ptr, i)) for i in 1:jl_rp_nr_vars]
+    else
+        jl_cf_lf = BigInt[]
+    end
+    jl_cf_ptr = reinterpret(Ptr{BigInt}, res_cf[])
+    jl_cf = BigInt[deepcopy(unsafe_load(jl_cf_ptr, i)) for i in 1:sum(jl_len)]
+
+    jl_nb_sols = nb_sols[]
+
+    # get solutions
+    len = 2 * jl_nb_sols * nr_vars
+    jl_sols_num_ptr = reinterpret(Ptr{BigInt}, sols_num[])
+    jl_sols_num = BigInt[deepcopy(unsafe_load(jl_sols_num_ptr, i)) for i in 1:len]
+    jl_sols_den_ptr = reinterpret(Ptr{Int32}, sols_den[])
+    jl_sols_den = Vector{Int32}(Base.unsafe_wrap(Array, jl_sols_den_ptr, len))
+
+    ccall((:free_msolve_julia_result_data, libmsolve), Nothing,
+        (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
+            Ptr{Ptr{Cvoid}}, Ptr{Ptr{Cint}}, Cint, Cint, Cint),
+        cglobal(:jl_free), res_len, res_cf, sols_num, sols_den,
+        jl_ld, jl_nb_sols, field_char)
+
+    return jl_len, jl_vnames, jl_cf_lf, jl_cf, jl_sols_num, jl_sols_den
 end
 
 @doc Markdown.doc"""
@@ -75,64 +201,27 @@ function _core_msolve(
 
     variable_names = map(string, R.S)
 
-    #= add new variables and linear forms, =#
-    genericity_handling = 2
-
-    reset_ht  = 0
-    print_gb  = 0
-
-    mon_order       = 0
-    elim_block_size = 0
-    use_signatures  = 0
-
     if field_char != 0
         error("At the moment we only support the rationals as ground field.")
     end
     # convert Singular ideal to flattened arrays of ints
     lens, cfs, exps, nr_gens = _convert_to_msolve(F)
 
-    res_ld      = Ref(Cint(0))
-    res_nr_vars = Ref(Cint(0))
-    res_dim     = Ref(Cint(0))
-    res_dquot   = Ref(Cint(0))
-    nb_sols     = Ref(Cint(0))
-    res_len     = Ref(Ptr{Cint}(0))
-    res_vnames  = Ref(Ptr{Ptr{Cchar}}(0))
-    res_cf_lf   = Ref(Ptr{Cvoid}(0))
-    res_cf      = Ref(Ptr{Cvoid}(0))
-    sols_num    = Ref(Ptr{Cvoid}(0))
-    sols_den    = Ref(Ptr{Cint}(0))
+    jl_len, jl_vnames, jl_cf_lf, jl_cf, jl_sols_num, jl_sols_den =
+        _core_msolve_array(lens, cfs, exps, variable_names, field_char;
+            initial_hts, nr_thrds, max_nr_pairs, la_option, get_param, info_level, precision)
 
-    ccall((:msolve_julia, libmsolve), Cvoid,
-        (Ptr{Nothing}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Ptr{Cint}},
-         Ptr{Ptr{Ptr{Cchar}}}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cint}, Ptr{Cvoid}, Ptr{Ptr{Cint}}, Ptr{Cint},
-        Ptr{Cint}, Ptr{Cvoid}, Ptr{Ptr{Cchar}}, Ptr{Cchar}, Cint, Cint,
-        Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint,
-        Cint, Cint, Cint),
-        cglobal(:jl_malloc), res_ld, res_nr_vars, res_dim, res_dquot, res_len, res_vnames,
-        res_cf_lf, res_cf,
-        nb_sols, sols_num, sols_den, lens, exps, cfs, variable_names,
-        "/dev/null", field_char, mon_order, elim_block_size, nr_vars,
-        nr_gens, initial_hts, nr_thrds, max_nr_pairs, reset_ht, la_option,
-        use_signatures, print_gb, get_param, genericity_handling, precision,
-        info_level)
     # convert to julia array, also give memory management to julia
-    jl_ld         = res_ld[]
-    jl_rp_nr_vars = res_nr_vars[]
-    jl_dim        = res_dim[]
-    jl_dquot      = res_dquot[]
-    jl_nb_sols    = nb_sols[]
+    jl_ld = Int32(length(jl_len))
+    jl_rp_nr_vars = Int32(length(jl_vnames))
+    jl_nb_sols = length(jl_sols_num) ÷ (2 * nr_vars)
 
-    if jl_dim > 0
-        error("Dimension of ideal is greater than zero, no solutions provided.")
-    end
     I.dim = 0
 
     # get rational parametrization
-    jl_len  = Base.unsafe_wrap(Array, res_len[], jl_ld)
     nterms  = 0
 
-    if jl_dquot == 0
+    if jl_ld == 0
         I.dim = -1
         C,x = polynomial_ring(QQ,"x")
         I.rat_param = RationalParametrization(Symbol[], ZZRingElem[], C(-1), C(-1), QQPolyRingElem[])
@@ -141,11 +230,8 @@ function _core_msolve(
         return I.rat_param, I.real_sols
     end
     [nterms += jl_len[i] for i=1:jl_ld]
-    jl_cf = reinterpret(Ptr{BigInt}, res_cf[])
-    jl_cf_lf = reinterpret(Ptr{BigInt}, res_cf_lf[])
 
-    jl_vnames = Base.unsafe_wrap(Array, res_vnames[], jl_rp_nr_vars)
-    vsymbols  = [Symbol(unsafe_string(jl_vnames[i])) for i in 1:jl_rp_nr_vars]
+    vsymbols  = [Symbol(jl_vnames[i]) for i in 1:jl_rp_nr_vars]
     #= get possible variable permutation, ignoring additional variables=#
     perm      = indexin(R.S, vsymbols)
 
@@ -165,14 +251,6 @@ function _core_msolve(
         return rat_param, Vector{QQFieldElem}[]
     end
 
-    # get solutions
-    jl_sols_num = reinterpret(Ptr{BigInt}, sols_num[])
-    jl_sols_den = reinterpret(Ptr{Int32}, sols_den[])
-    # elseif is_prime(field_char)
-    #     jl_cf       = reinterpret(Ptr{Int32}, res_cf[])
-    #     jl_sols_num   = reinterpret(Ptr{Int32}, sols_num[])
-    # end
-
     #= solutions are returned as intervals, i.e. a minimum and a maximum entry for
      = the numerator and denominator; we also sum up and divide by 2 =#
 
@@ -188,8 +266,8 @@ function _core_msolve(
         tmp = Vector{QQFieldElem}(undef, nr_vars)
         while j <= nr_vars
             inter_tmp_coeff = Vector{QQFieldElem}(undef, 2)
-            inter_tmp_coeff[1] = QQFieldElem(unsafe_load(jl_sols_num, i)) >> Int64(unsafe_load(jl_sols_den, i))
-            inter_tmp_coeff[2] = QQFieldElem(unsafe_load(jl_sols_num, i+1)) >> Int64(unsafe_load(jl_sols_den, i+1))
+            inter_tmp_coeff[1] = QQFieldElem(jl_sols_num[i]) >> Int64(jl_sols_den[i])
+            inter_tmp_coeff[2] = QQFieldElem(jl_sols_num[i+1]) >> Int64(jl_sols_den[i+1])
             inter_tmp[perm[j]] = inter_tmp_coeff
             tmp[perm[j]] = sum(inter_tmp_coeff) >> 1
             i += 2
@@ -201,12 +279,6 @@ function _core_msolve(
     end
     I.inter_sols = inter_solutions
     I.real_sols = solutions
-
-    ccall((:free_msolve_julia_result_data, libmsolve), Nothing ,
-        (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
-        Ptr{Ptr{Cvoid}}, Ptr{Ptr{Cint}}, Cint, Cint, Cint),
-        cglobal(:jl_free), res_len, res_cf, sols_num, sols_den,
-        jl_ld, jl_nb_sols, field_char)
 
     return rat_param, solutions
 end
