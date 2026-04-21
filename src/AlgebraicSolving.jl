@@ -22,6 +22,8 @@ include("siggb/siggb.jl")
 include("progress/main.jl")
 #= interp =#
 include("interp/main.jl")
+#= rag =#
+include("rag/main.jl")
 #= examples =#
 include("examples/katsura.jl")
 include("examples/cyclic.jl")
