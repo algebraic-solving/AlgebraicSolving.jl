@@ -1,6 +1,6 @@
 @testset "Algorithms -> Solvers" begin
     R, (x1,x2,x3,x4) = polynomial_ring(QQ,["x1","x2","x3","x4"], internal_ordering=:degrevlex)
-    I = Ideal([x1 + 2*x2 + 2*x3 + 2*x4 - 1,
+    I = AlgebraicSolving.Ideal([x1 + 2*x2 + 2*x3 + 2*x4 - 1,
          x1^2 + 2*x2^2 + 2*x3^2 + 2*x4^2 - x1,
          2*x1*x2 + 2*x2*x3 + 2*x3*x4 - x2,
          x2^2 + 2*x1*x3 + 2*x2*x4 - x3])
@@ -53,12 +53,12 @@
     @test I.rat_param.param[2] == p2
     @test I.rat_param.param[3] == p3
 
-    I = Ideal([x1^2-x2, x1*x3-x4, x2*x4-12, x4^3-x3^2])
+    I = AlgebraicSolving.Ideal([x1^2-x2, x1*x3-x4, x2*x4-12, x4^3-x3^2])
     real_solutions(I)
     @test I.rat_param.vars == Symbol[]
     @test I.dim == -1
 
-    I = Ideal([x1^2-x2, x1*x3, x2-12])
+    I = AlgebraicSolving.Ideal([x1^2-x2, x1*x3, x2-12])
 	@test_throws ErrorException real_solutions(I)
     @test_throws ErrorException real_solutions(I, interval=true)
 	@test_throws ErrorException rational_solutions(I)
@@ -66,25 +66,25 @@
 
     R, (x, y) = polynomial_ring(QQ,["x","y"])
     # issue 54
-    I = Ideal([R(0)])
+    I = AlgebraicSolving.Ideal([R(0)])
 	@test_throws ErrorException real_solutions(I)
-    I = Ideal([x-1,y+2,R(0)])
+    I = AlgebraicSolving.Ideal([x-1,y+2,R(0)])
     @test issetequal(real_solutions(I), Vector{QQFieldElem}[[1, -2]])
 
     # check variable permutation
-    I = Ideal([x^2-1, y])
+    I = AlgebraicSolving.Ideal([x^2-1, y])
     sols = Vector{QQFieldElem}[
         [-1, 0],
         [1, 0]
             ]
     @test issetequal(sols, real_solutions(I))
 
-    I = Ideal([x^2-1, y^2])
+    I = AlgebraicSolving.Ideal([x^2-1, y^2])
     @test issetequal(sols, real_solutions(I))
 
     # issue 5741 from Oscar
     R, (x,y,z) = polynomial_ring(QQ, ["x","y","z"])
-    I = Ideal([(x-1)*x, y-2, z-3])
+    I = AlgebraicSolving.Ideal([(x-1)*x, y-2, z-3])
     rat_sols = Vector{QQFieldElem}[[1, 2, 3], [0, 2, 3]]
     @test issetequal(rat_sols, rational_solutions(I))
 end
