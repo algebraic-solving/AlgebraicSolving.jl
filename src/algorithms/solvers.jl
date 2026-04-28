@@ -187,7 +187,8 @@ function _core_msolve(
         la_option::Int=2,                     # linear algebra option
         get_param::Int=1,                     # get rational parametrization
         info_level::Int=0,                    # info level for print outs
-        precision::Int=32                     # precision of the solution set
+        precision::Int=32,                    # precision of the solution set
+        worker_pool::Union{Nothing,AbstractWorkerPool}=nothing, # worker pool for parallel computation
         )
 
     F = I.gens
@@ -207,9 +208,14 @@ function _core_msolve(
     # convert Singular ideal to flattened arrays of ints
     lens, cfs, exps, nr_gens = _convert_to_msolve(F)
 
-    jl_len, jl_vnames, jl_cf_lf, jl_cf, jl_sols_num, jl_sols_den =
-        _core_msolve_array(lens, cfs, exps, variable_names, field_char;
-            initial_hts, nr_thrds, max_nr_pairs, la_option, get_param, info_level, precision)
+    run_core_array = () -> _core_msolve_array(lens, cfs, exps, variable_names, field_char;
+        initial_hts, nr_thrds, max_nr_pairs, la_option, get_param, info_level, precision)
+
+    jl_len, jl_vnames, jl_cf_lf, jl_cf, jl_sols_num, jl_sols_den = if isnothing(worker_pool)
+        run_core_array()
+    else
+        remotecall_fetch(run_core_array, worker_pool)
+    end
 
     # convert to julia array, also give memory management to julia
     jl_ld = Int32(length(jl_len))
@@ -490,7 +496,8 @@ function real_solutions(
         la_option::Int=2,                     # linear algebra option
         info_level::Int=0,                    # info level for print outs
         precision::Int=32,                    # precision of the solution set
-        interval::Bool=false                  # return real solutions as intervals
+        interval::Bool=false,                  # return real solutions as intervals
+        worker_pool::Union{Nothing,AbstractWorkerPool}=nothing, # worker pool for parallel computation
         )
 
     isdefined(I, :real_sols) ||
@@ -500,7 +507,8 @@ function real_solutions(
                  max_nr_pairs = max_nr_pairs,
                  la_option = la_option,
                  info_level = info_level,
-                 precision = precision)
+                 precision = precision,
+                 worker_pool = worker_pool)
 
     if interval
         return I.inter_sols

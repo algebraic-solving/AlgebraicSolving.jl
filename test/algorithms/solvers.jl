@@ -1,3 +1,5 @@
+using Distributed
+
 @testset "Algorithms -> Solvers" begin
     R, (x1,x2,x3,x4) = polynomial_ring(QQ,["x1","x2","x3","x4"], internal_ordering=:degrevlex)
     I = Ideal([x1 + 2*x2 + 2*x3 + 2*x4 - 1,
@@ -121,4 +123,41 @@ end
 
     @test (res_len, res_vnames, res_cf_lf, res_cf, res_sols_num, res_sols_den) == AlgebraicSolving._core_msolve_array(
         lens, cfs, exps, variable_names, field_char; get_param=2)
+end
+
+@testset "Algorithms -> Solvers with workers" begin
+    R, (x, y) = polynomial_ring(QQ, ["x", "y"])
+
+    F1 = [x - 1, y + 2, R(0)]
+    H1 = Vector{QQFieldElem}[
+        [1, -2]
+    ]
+
+    F2 = [x^2 - 1, y]
+    H2 = Vector{QQFieldElem}[
+        [-1, 0],
+        [1, 0]
+    ]
+
+    F3 = [x^2 - 1, y^2]
+    H3 = H2
+
+    nb_tests = 42
+    F = [F1, F2, F3]
+    G = Vector{Vector{Vector{QQFieldElem}}}(undef, nb_tests)
+    H = [H1, H2, H3]
+
+    nb_workers = 2
+    worker_ids = addprocs(nb_workers; exeflags="--project=$(Base.active_project())")
+    @everywhere worker_ids using AlgebraicSolving
+    worker_pool = WorkerPool(worker_ids)
+
+    Threads.@threads for i in 1:nb_tests
+        G[i] = real_solutions(Ideal(F[i%3+1]), worker_pool=worker_pool)
+    end
+    for i in 1:nb_tests
+        @test issetequal(G[i], H[i%3+1])
+    end
+
+    rmprocs(worker_ids)
 end
