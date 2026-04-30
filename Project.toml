@@ -1,7 +1,7 @@
 name = "AlgebraicSolving"
 uuid = "66b61cbe-0446-4d5d-9090-1ff510639f9d"
 authors = ["ederc <ederc@mathematik.uni-kl.de>", "Mohab Safey El Din <Mohab.Safey@lip6.fr", "Rafael Mohr <rafael.mohr@lip6.fr>", "Rémi Prebet <remi.prebet@ens-lyon.fr>"]
-version = "0.10.4"
+version = "0.10.5"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -26,7 +26,7 @@ Distributed = "1.6"
 LinearAlgebra = "1.6"
 Logging = "1.6"
 Markdown = "1.6"
-Nemo = "0.43, 0.44, 0.45, 0.46, 0.47, 0.48, 0.49, 0.50, 0.51, 0.52, 0.53, 0.54"
+Nemo = "0.43, 0.44, 0.45, 0.46, 0.47, 0.48, 0.49, 0.50, 0.51, 0.52, 0.53, 0.54, 0.55"
 Printf = "1.6"
 Random = "1.6"
 REPL = "1.6"
