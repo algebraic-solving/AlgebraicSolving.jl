@@ -1,5 +1,5 @@
 @doc Markdown.doc"""
-    rational_curve_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
+    curve_rational_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
 
 Given a **radical** ideal `I` with solution set X being of dimension 1 over the complex numbers,
 return a rational curve parametrization of the one-dimensional irreducible components of X.
@@ -28,14 +28,14 @@ julia> R, (x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
 julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1])
 QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2]
 
-julia> rational_curve_parametrization(I)
-AlgebraicSolving.RationalCurveParametrization([:x1, :x2, :x3], Vector{ZZRingElem}[], x^2 + 4//3*x*y - 1//3*x + y^2 - 1//3*y, 4//3*x + 2*y - 1//3, QQMPolyRingElem[4//3*x^2 - 4//3*x*y + 2//3*x + 4//3*y - 1//3])
+julia> curve_rational_parametrization(I)
+AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3], Vector{ZZRingElem}[], x^2 + 4//3*x*y - 1//3*x + y^2 - 1//3*y, 4//3*x + 2*y - 1//3, QQMPolyRingElem[4//3*x^2 - 4//3*x*y + 2//3*x + 4//3*y - 1//3])
 
-julia> rational_curve_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-8,2,2,-1,-8], [8,-7,-5,8,-7]]))
-AlgebraicSolving.RationalCurveParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-8, 2, 2, -1, -8], [8, -7, -5, 8, -7]], 4963//30508*x^2 - 6134//7627*x*y - 647//7627*x + y^2 + 1640//7627*y + 88//7627, -6134//7627*x + 2*y + 1640//7627, QQMPolyRingElem[8662//22881*x^2 - 21442//22881*x*y - 2014//7627*x + 9458//22881*y + 1016//22881, -2769//30508*x^2 + 4047//15254*x*y - 875//7627*x + 3224//7627*y + 344//7627, -9017//91524*x^2 + 9301//45762*x*y - 1185//7627*x + 8480//22881*y + 920//22881])
+julia> curve_rational_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-8,2,2,-1,-8], [8,-7,-5,8,-7]]))
+AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-8, 2, 2, -1, -8], [8, -7, -5, 8, -7]], 4963//30508*x^2 - 6134//7627*x*y - 647//7627*x + y^2 + 1640//7627*y + 88//7627, -6134//7627*x + 2*y + 1640//7627, QQMPolyRingElem[8662//22881*x^2 - 21442//22881*x*y - 2014//7627*x + 9458//22881*y + 1016//22881, -2769//30508*x^2 + 4047//15254*x*y - 875//7627*x + 3224//7627*y + 344//7627, -9017//91524*x^2 + 9301//45762*x*y - 1185//7627*x + 8480//22881*y + 920//22881])
 ```
 """
-function rational_curve_parametrization(
+function curve_rational_parametrization(
         I::Ideal{P} where P<:QQMPolyRingElem;                       # input generators
         info_level::Int=0,                                          # info level for print outs
         use_lfs::Bool = false,                                      # add generic variables
@@ -43,6 +43,8 @@ function rational_curve_parametrization(
         nr_thrds::Int=1,                                            # number of threads (msolve)
         check_gen::Bool = true                                      # perform genericity check
     )
+    @assert(nvars(parent(I))>=2, "I must be defined in a ring with at least 2 variables")
+
     info_level>0 && println("Compute ideal data" * (check_gen ? " and genericity check" : ""))
     lucky_prime = _generate_lucky_primes(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
     Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
@@ -51,16 +53,10 @@ function rational_curve_parametrization(
     if Itest.dim == -1
         T = polynomial_ring(QQ, [:x,:y])[1]
         I.dim = -1
-        I.rat_param = RationalCurveParametrization(Symbol[], Vector{ZZRingElem}[], T(-1), T(-1), QQMPolyRingElem[])
+        I.rat_param = CurveRationalParametrization(Symbol[], Vector{ZZRingElem}[], T(-1), T(-1), QQMPolyRingElem[])
         return I.rat_param
     end
     @assert(Itest.dim==1, "I must define a curve or an empty set")
-    if nvars(parent(I)) == 1
-        T, (x,y) = polynomial_ring(QQ, [:x,:y])
-        I.dim = 1
-        I.rat_param = RationalCurveParametrization(Symbol[:x, :y], Vector{ZZRingElem}[[0,1]], y, T(1), QQMPolyRingElem[])
-        return I.rat_param
-    end
 
     DEG = hilbert_degree(Itest)
     # If generic variables must be added
@@ -102,12 +98,9 @@ function rational_curve_parametrization(
         LFeval = Ideal.(_evalvar(F, N-1, curr_values))
         # Compute parametrization of each evaluation
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
-        for j in 1:length(free_ind)
-            info_level>0 && print("Evaluated parametrizations: $(j+DEG+2-length(free_ind))/$(DEG+2)", "\r")
+        for j in eachindex(free_ind)
+            info_level>0 && print("Evaluated parametrizations: $(j)/$(length(free_ind))", "\r")
             Lr[j] = rational_parametrization(LFeval[j], nr_thrds=nr_thrds)
-        end
-        info_level>0 && println()
-        for j in 1:length(free_ind)
             # Specialization checks: same vars order, generic degree
             if  Lr[j].vars == [symbols(R)[1:N-2]; symbols(R)[N]] && degree(Lr[j].elim) == DEG
                 if isnothing(lc)
@@ -118,21 +111,23 @@ function rational_curve_parametrization(
                     fact = lc / leading_coefficient(Lr[j].elim)
                     rr = [ p*fact for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
                 end
-                PARAM[j] = rr
-                _values[j] = curr_values[j]
+                PARAM[free_ind[j]] = rr
+                _values[free_ind[j]] = curr_values[j]
                 used_ind[j] = true
-            else
-                info_level>0 && println("bad specialization: ", i+j-1)
             end
         end
+        # Update range, free indices and used indices
         i += length(free_ind)
         free_ind = [ free_ind[j] for j in eachindex(free_ind) if !used_ind[j] ]
         used_ind = zeros(Bool, length(free_ind))
+
+        info_level * length(free_ind) != 0 &&
+        println("bad specialization(s): ", curr_values[free_ind])
     end
 
     # Interpolate each coefficient of each poly in the param
-    T = polynomial_ring(QQ, [:x,:y])[1]
-    A = polynomial_ring(QQ)[1]
+    T, = polynomial_ring(QQ, [:x,:y])
+    A, = polynomial_ring(QQ)
 
     POLY_PARAM = Vector{QQMPolyRingElem}(undef,N)
     for count in 1:N
@@ -141,6 +136,7 @@ function rational_curve_parametrization(
         for deg in 0:DEG
             _evals = [coeff(PARAM[i][count], deg) for i in eachindex(PARAM)]
             # Remove denominators for faster interpolation with FLINT
+            # TODO: remove dens mult when interface's ready in Nemo
             den = foldl(lcm, denominator.(_evals))
             scaled_evals = [ZZ(_evals[i] * den) for i in eachindex(_evals)]
             COEFFS[deg+1] = interpolate(A, _values, scaled_evals) / (lc*den)
@@ -156,7 +152,7 @@ function rational_curve_parametrization(
     info_level>0 && println()
     # Output: [vars, linear forms, elim, denom, [nums_param]]
     I.dim = 1 # If we reached here, I has necessarily dimension 1
-    I.rat_param = RationalCurveParametrization( symbols(R), cfs_lfs, POLY_PARAM[1],
+    I.rat_param = CurveRationalParametrization( symbols(R), cfs_lfs, POLY_PARAM[1],
                                                 POLY_PARAM[2], POLY_PARAM[3:end]    )
     return I.rat_param
 end
@@ -264,4 +260,9 @@ function _generate_lucky_primes(
         is_lucky && push!(Lprim, cur_prim)
     end
     return Lprim
+end
+
+function rational_curve_parametrization(I::Ideal{P}; kwargs...) where P<:QQMPolyRingElem
+    @warn "rational_curve_parametrization is deprecated; use curve_rational_parametrization instead."
+    return curve_rational_parametrization(I; kwargs...)
 end
