@@ -61,13 +61,35 @@ const MaskSig = Tuple{SigIndex, DivMask}
 const Polynomial = Tuple{Vector{Coeff}, Vector{MonIdx}}
 const ModCache{N} = Dict{Tuple{Sig{N}, SigIndex}, Polynomial}
 
+# For monomial diagram
+
+# Define a monomial structure for representing monomial ideals
+struct Diagram
+    id::Int
+    edges::Vector{Tuple{Exp, Diagram}}
+end
+
+# Define an Edge as a tuple of an exponent and a Diagram
+const Edge = Tuple{Exp, Diagram}
+
+# Define a mutable struct to hold the hash state
+mutable struct HashState
+    hashtable::Dict{Vector{Edge}, Diagram}
+    counter::Int64
+    numberofinsertion::Int64
+    numberofmembershiptests::Int64
+end
+
+# Define a constant for an empty diagram
+const EMPTY_DIAGRAM = Diagram(-1, Tuple{Int,Diagram}[])
+
 mutable struct Basis{N}
     sigs::Vector{Sig{N}}
     sigmasks::Vector{MaskSig}
 
     sigratios::Vector{Monomial{N}}
 
-    # tree structure:
+    # monomial divisibility diagram:
     #   - length of data for i is rewrite_nodes[i][1]
     #   - parent of i is rewrite_nodes[i][2]
     #   - children of i are rewrite_nodes[i][3:end]
@@ -75,6 +97,11 @@ mutable struct Basis{N}
     rewrite_nodes::Vector{Vector{Int}}
 
     lm_masks::Vector{DivMask}
+
+    # monomial divisibility diagram
+    lm_diagram::Diagram
+    koszul_diagram::Diagram
+    hashstate::HashState
 
     monomials::Vector{Vector{MonIdx}}
     coefficients::Vector{Vector{Coeff}}
@@ -200,6 +227,7 @@ mutable struct LocClosedSet{T<:MPolyRingElem}
     gbs::Vector{Vector{T}}
 end
 
+
 # for benchmarking
 mutable struct Timings
     sym_pp_time::Float32
@@ -209,4 +237,6 @@ mutable struct Timings
     arit_ops::Int64
     module_time::Float32
     comp_lc_time::Float32
+    time_for_mdd::Float32
+    time_for_membership::Float32
 end

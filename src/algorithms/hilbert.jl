@@ -1,10 +1,15 @@
 @doc Markdown.doc"""
-    hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
+    hilbert_series(I::Ideal{T}; use_mdd = false) where T <: MPolyRingElem
 
 Compute the Hilbert series of a given polynomial ideal `I`.
 
-Based on: Anna M. Bigatti, Computation of Hilbert-Poincaré series,
-Journal of Pure and Applied Algebra, 1997.
+If `use_mdd == false` then the method is based on: Anna M. Bigatti,
+Computation of Hilbert-Poincaré series, Journal of Pure and Applied
+Algebra, 1997.
+
+Otherwise monomial divisibility diagrams are used, as defined in
+Pierre Lairez, Rafael Mohr, Théo Ternier, A data structure for
+monomial ideals with applications to signature Gröbner bases.
 
 **Notes**:
 * This requires a Gröbner basis of `I`, which is computed internally if not already known.
@@ -22,19 +27,30 @@ julia> hilbert_series(I)
 (-2*t - 1)//(t - 1)
 ```
 """
-function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
+function hilbert_series(I::Ideal{T}; use_mdd = false) where T <: MPolyRingElem
 
     gb = get!(I.gb, 0) do
         groebner_basis(I, complete_reduction = true)
     end
     lead_exps = [ _lead_exp_ord(g, :degrevlex) for g in gb if !iszero(g) ]
-    return _hilbert_series_mono(lead_exps, nvars(parent(I)))
+    if use_mdd
+        n = ngens(parent(I))
+        diagram = create_diagram([monomial(SVector{n}(e)) for e in lead_exps])
+        return hilbert_series_mdd(diagram)
+    else
+        return _hilbert_series_mono(lead_exps, nvars(parent(I)))
+    end
 end
 
 @doc Markdown.doc"""
-    hilbert_degree(I::Ideal{T}) where T <: MPolyRingElem
+    hilbert_degree(I::Ideal{T}; use_mdd = false) where T <: MPolyRingElem
 
 Compute the degree of a given polynomial ideal `I` by first computing its Hilbert series.
+
+If `use_mdd == true`, monomial divisibility diagrams are used to
+compute the Hilbert series, as defined in Pierre Lairez, Rafael Mohr,
+Théo Ternier, A data structure for monomial ideals with applications
+to signature Gröbner bases.
 
 **Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
 
@@ -50,17 +66,22 @@ julia> hilbert_degree(I)
 3
 ```
 """
-function hilbert_degree(I::Ideal{T}) where T <: MPolyRingElem
+function hilbert_degree(I::Ideal{T}; use_mdd = false) where T <: MPolyRingElem
 
     !isnothing(I.deg) && return I.deg
-    I.deg = numerator(hilbert_series(I))(1) |> abs
+    I.deg = numerator(hilbert_series(I, use_mdd = use_mdd))(1) |> abs
     return I.deg
 end
 
 @doc Markdown.doc"""
-    hilbert_dimension(I::Ideal{T}) where T <: MPolyRingElem
+    hilbert_dimension(I::Ideal{T}; use_mdd = false) where T <: MPolyRingElem
 
 Compute the Krull dimension of a given polynomial ideal `I` by first computing its Hilbert series.
+
+If `use_mdd == true`, monomial divisibility diagrams are used to
+compute the Hilbert series, as defined in Pierre Lairez, Rafael Mohr,
+Théo Ternier, A data structure for monomial ideals with applications
+to signature Gröbner bases.
 
 **Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
 
@@ -76,15 +97,15 @@ julia> hilbert_dimension(I)
 1
 ```
 """
-function hilbert_dimension(I::Ideal{T}) where T <: MPolyRingElem
+function hilbert_dimension(I::Ideal{T}; use_mdd = false) where T <: MPolyRingElem
 
-    H = hilbert_series(I)
+    H = hilbert_series(I, use_mdd = use_mdd)
     I.dim = iszero(H) ? -1 : degree(denominator(H))
     return I.dim
 end
 
 @doc Markdown.doc"""
-    hilbert_polynomial(I::Ideal{T}) where T <: MPolyRingElem
+    hilbert_polynomial(I::Ideal{T}; use_mdd = false) where T <: MPolyRingElem
 
 Compute the Hilbert polynomial and the index of regularity of a given polynomial ideal `I`
 by first computing its Hilbert series. The index of regularity is the smallest integer such that
@@ -92,6 +113,11 @@ the Hilbert function and polynomial match.
 
 Note that the Hilbert polynomial of I has leading term (e/d!)*t^d, where e and d are respectively
 the degree and Krull dimension of I.
+
+If `use_mdd == true`, monomial divisibility diagrams are used to
+compute the Hilbert series, as defined in Pierre Lairez, Rafael Mohr,
+Théo Ternier, A data structure for monomial ideals with applications
+to signature Gröbner bases.
 
 **Note**: This requires a Gröbner basis of `I`, which is computed internally if not already known.
 
@@ -107,10 +133,10 @@ julia> hilbert_polynomial(I)
 (3*s + 3, 1)
 ```
 """
-function hilbert_polynomial(I::Ideal{T}) where T <: MPolyRingElem
+function hilbert_polynomial(I::Ideal{T}; use_mdd = false) where T <: MPolyRingElem
 
     A, s = polynomial_ring(QQ, :s)
-    H = hilbert_series(I)
+    H = hilbert_series(I, use_mdd = use_mdd)
     dim = degree(denominator(H))
     num = iseven(dim) ? numerator(H) : -numerator(H)
     dim==0 && return num(s), 0

@@ -187,7 +187,8 @@ function select_normal!(pairset::Pairset{N},
     return deg, compat_ind, sigind
 end
 
-function symbolic_pp!(basis::Basis{N},
+function symbolic_pp!(timer::Timings,
+                      basis::Basis{N},
                       matrix::MacaulayMatrix,
                       ht::MonomialHashtable,
                       symbol_ht::MonomialHashtable,
@@ -231,6 +232,12 @@ function symbolic_pp!(basis::Basis{N},
 
         exp = symbol_ht.exponents[i]
         divm = symbol_ht.hashdata[i].divmask
+
+        basis.hashstate.numberofmembershiptests += 1
+        if !is_in_diagram(exp, basis.lm_diagram)
+            i += one(MonIdx)
+            continue
+        end
         
         j = basis.basis_offset 
         @label target
@@ -293,7 +300,7 @@ function symbolic_pp!(basis::Basis{N},
             if rewriteable(basis, ht, j, mul_cand_sig,
                            cand_sig_mask,
                            ind_order, tags, true,
-                           mod_ord)
+                           mod_ord, timer)
                 j += 1
                 @goto target
             end

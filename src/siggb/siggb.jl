@@ -19,6 +19,7 @@ include("normalform.jl")
 include("affine_cells.jl")
 include("interfaces.jl")
 include("helpers.jl")
+include("monomial_diagram.jl")
 
 
 #---------------- user functions --------------------#
@@ -94,6 +95,9 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
                                 mod_ord)
         @info "$(arit_ops) total submul's"
         @info timer
+        @info "Size of the mdd: $(number_of_distinct_nodes(basis.lm_diagram))"
+        @info "Number of insertions: $(basis.hashstate.numberofinsertion)"
+        @info "Number of tests: $(basis.hashstate.numberofmembershiptests)"
     end
 
     # output
@@ -151,7 +155,7 @@ function siggb!(basis::Basis{N},
                                                               ind_order, tags,
                                                               mod_ord)
         timer.select_time += tim
-        tim = @elapsed symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+        tim = @elapsed symbolic_pp!(timer, basis, matrix, basis_ht, symbol_ht,
                                     ind_order, tags, sigind, compat_ind,
                                     mod_ord)
         timer.sym_pp_time += tim
@@ -163,7 +167,7 @@ function siggb!(basis::Basis{N},
             arit_ops += arit_ops_new
             timer.lin_alg_time += tim
 
-            tim = @elapsed added_unit = update_siggb!(basis, matrix, pairset, symbol_ht,
+            tim = @elapsed added_unit = update_siggb!(timer, basis, matrix, pairset, symbol_ht,
                                                       basis_ht, ind_order, tags,
                                                       tr, char, syz_queue, mod_ord)
             timer.update_time += tim
@@ -204,6 +208,10 @@ function siggb!(basis::Basis{N},
             # minimize à la F5c
             min_idx = iszero(p_idx) ? zero(SigIndex) : curr_ind
             minimize!(basis, basis_ht, min_idx, ind_order, tags)
+
+            if !iszero(p_idx)
+                basis.koszul_diagram = basis.lm_diagram
+            end
         end
     end
     return false, arit_ops, nz_conds
@@ -339,7 +347,7 @@ function siggb_for_split!(basis::Basis{N},
         tim = @elapsed deg, _, _ = select_normal!(pairset, basis, matrix,
                                                   basis_ht, symbol_ht, ind_order, tags)
         timer.select_time += tim
-        tim = @elapsed symbolic_pp!(basis, matrix, basis_ht, symbol_ht,
+        tim = @elapsed symbolic_pp!(timer, basis, matrix, basis_ht, symbol_ht,
                                     ind_order, tags)
         timer.sym_pp_time += tim
 
@@ -348,7 +356,7 @@ function siggb_for_split!(basis::Basis{N},
         tim = @elapsed echelonize!(matrix, tags, ind_order, char, shift, tr)
         timer.lin_alg_time += tim
 
-        time = @elapsed update_siggb!(basis, matrix, pairset,
+        time = @elapsed update_siggb!(timer, basis, matrix, pairset,
                                       symbol_ht, basis_ht,
                                       ind_order, tags,
                                       tr, char, syz_queue)
