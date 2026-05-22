@@ -101,7 +101,7 @@ function curve_rational_parametrization(
             info_level>0 && print("Evaluated parametrizations: $(j)/$(length(free_ind))", "\r")
             Lr[j] = rational_parametrization(LFeval[j], nr_thrds=nr_thrds)
             # Specialization checks: same vars order, generic degree
-            if  Lr[j].vars == [symbols(R)[1:N-2]; symbols(R)[N]] && degree(Lr[j].elim) == DEG
+            if  Lr[j].vars == symbols(R)[1:N-1] && degree(Lr[j].elim) == DEG
                 if isnothing(lc)
                     lc = leading_coefficient(Lr[j].elim)
                     rr = [ p for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
