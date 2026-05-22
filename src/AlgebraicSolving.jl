@@ -16,6 +16,7 @@ include("algorithms/dimension.jl")
 include("algorithms/decomposition.jl")
 include("algorithms/curve-param.jl")
 include("algorithms/hilbert.jl")
+include("algorithms/sampling.jl")
 #= siggb =#
 include("siggb/siggb.jl")
 #= progress =#

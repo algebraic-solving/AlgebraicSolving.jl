@@ -1,3 +1,5 @@
+using Distributed
+
 @testset "Algorithms -> Solvers" begin
     R, (x1,x2,x3,x4) = polynomial_ring(QQ,["x1","x2","x3","x4"], internal_ordering=:degrevlex)
     I = Ideal([x1 + 2*x2 + 2*x3 + 2*x4 - 1,
@@ -87,4 +89,75 @@
     I = Ideal([(x-1)*x, y-2, z-3])
     rat_sols = Vector{QQFieldElem}[[1, 2, 3], [0, 2, 3]]
     @test issetequal(rat_sols, rational_solutions(I))
+end
+
+@testset "Algorithms -> Solvers (array interface)" begin
+    # we represent [x+2*y+2*z-1, x^2-x+2*y^2+2*z^2, 2*x*y+2*y*z-y] in msolve format
+    lens = Int32[4, 4, 3]
+    cfs = BigInt[
+        1, 1, 2, 1, 2, 1, -1, 1, # 1, 2, 2, -1
+        1, 1, -1, 1, 2, 1, 2, 1, # 1, -1, 2, 2
+        2, 1, 2, 1, -1, 1 # 2, 2, -1
+    ]
+    exps = Int32[
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, # x, y, z, 1
+        2, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 2, # x^2, x, y^2, z^2
+        1, 1, 0, 0, 1, 1, 0, 1, 0 # x * y, y * z, y
+    ]
+    variable_names = ["x", "y", "z"]
+    field_char = 0
+
+    # the expected parametrization is 84*x^4-40*x^3+x^2+x, 336*x^3-120*x^2+2*x+1, [184*x^3-80*x^2+4*x+1, 36*x^3-18*x^2+2*x]
+    # we also represent it in msolve format
+    res_len = Int32[5, 4, 5, 5]
+    res_vnames = ["x", "y", "z"]
+    res_cf_lf = BigInt[]
+    res_cf = BigInt[
+        0, 1, 1, -40, 84, # 84*x^4 - 40*x^3 + x^2 + x
+        1, 2, -120, 336, # 336*x^3 - 120*x^2 + 2*x + 1
+        -1, -4, 80, -184, 1, # (-184*x^3 + 80*x^2 - 4*x - 1) * (-1 // 1)
+        0, -2, 18, -36, 1 # (-36*x^3 + 18*x^2 - 2*x) * (-1 // 1)
+    ]
+    res_sols_num = BigInt[]
+    res_sols_den = Int32[]
+
+    @test (res_len, res_vnames, res_cf_lf, res_cf, res_sols_num, res_sols_den) == AlgebraicSolving._core_msolve_array(
+        lens, cfs, exps, variable_names, field_char; get_param=2)
+end
+
+@testset "Algorithms -> Solvers with workers" begin
+    R, (x, y) = polynomial_ring(QQ, ["x", "y"])
+
+    F1 = [x - 1, y + 2, R(0)]
+    H1 = Vector{QQFieldElem}[
+        [1, -2]
+    ]
+
+    F2 = [x^2 - 1, y]
+    H2 = Vector{QQFieldElem}[
+        [-1, 0],
+        [1, 0]
+    ]
+
+    F3 = [x^2 - 1, y^2]
+    H3 = H2
+
+    nb_tests = 42
+    F = [F1, F2, F3]
+    G = Vector{Vector{Vector{QQFieldElem}}}(undef, nb_tests)
+    H = [H1, H2, H3]
+
+    nb_workers = 2
+    worker_ids = addprocs(nb_workers; exeflags="--project=$(Base.active_project())")
+    @everywhere worker_ids using AlgebraicSolving
+    worker_pool = WorkerPool(worker_ids)
+
+    Threads.@threads for i in 1:nb_tests
+        G[i] = real_solutions(Ideal(F[i%3+1]), worker_pool=worker_pool)
+    end
+    for i in 1:nb_tests
+        @test issetequal(G[i], H[i%3+1])
+    end
+
+    rmprocs(worker_ids)
 end

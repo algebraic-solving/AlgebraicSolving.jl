@@ -185,6 +185,9 @@ function newton(
         end
     end
     populate(Vector{ZZRingElem}(), 1; num_threads=nr_thrds)
+    perm = sortperm(x)
+    x = x[perm]
+    y = y[perm]
     f = newton(R, x, y, d)
     finish!(prog)
     return f
