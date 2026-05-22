@@ -4,8 +4,7 @@
 Given a **radical** ideal `I` with solution set X being of dimension 1 over the complex numbers,
 return a rational curve parametrization of the one-dimensional irreducible components of X.
 
-In the output, the variables `x`,`y` of the parametrization correspond to the last two
-entries of the `vars` attribute, in that order.
+**Important**: In the output, the variables x and y correspond respectively to the last and second-to-last entries of the vars attribute.
 
 **Note**: At the moment only QQ is supported as ground field. If the dimension of the ideal
 is not one an ErrorException is thrown.
@@ -32,7 +31,7 @@ julia> rational_curve_parametrization(I)
 AlgebraicSolving.RationalCurveParametrization([:x1, :x2, :x3], Vector{ZZRingElem}[], x^2 + 4//3*x*y - 1//3*x + y^2 - 1//3*y, 4//3*x + 2*y - 1//3, QQMPolyRingElem[4//3*x^2 - 4//3*x*y + 2//3*x + 4//3*y - 1//3])
 
 julia> rational_curve_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-8,2,2,-1,-8], [8,-7,-5,8,-7]]))
-AlgebraicSolving.RationalCurveParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-8, 2, 2, -1, -8], [8, -7, -5, 8, -7]], 4963//30508*x^2 - 6134//7627*x*y - 647//7627*x + y^2 + 1640//7627*y + 88//7627, -6134//7627*x + 2*y + 1640//7627, QQMPolyRingElem[8662//22881*x^2 - 21442//22881*x*y - 2014//7627*x + 9458//22881*y + 1016//22881, -2769//30508*x^2 + 4047//15254*x*y - 875//7627*x + 3224//7627*y + 344//7627, -9017//91524*x^2 + 9301//45762*x*y - 1185//7627*x + 8480//22881*y + 920//22881])
+AlgebraicSolving.RationalCurveParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-8, 2, 2, -1, -8], [8, -7, -5, 8, -7]], 30508//4963*x^2 - 24536//4963*x*y + 6560//4963*x + y^2 - 2588//4963*y + 352//4963, -24536//4963*x + 2*y - 2588//4963, QQMPolyRingElem[85768//14889*x^2 - 34648//14889*x*y + 1032//4963*x + 2446//14889*y - 628//14889, -8094//4963*x^2 + 2769//4963*x*y - 7334//4963*x + 2225//4963*y - 680//4963, -18602//14889*x^2 + 9017//14889*x*y - 5450//4963*x + 6991//14889*y - 1528//14889])
 ```
 """
 function rational_curve_parametrization(
@@ -99,7 +98,7 @@ function rational_curve_parametrization(
         # plus one point at -(length(free_ind)+1)/2 if the length if odd.
         # This reduces a bit the bitsize of the evaluation
         curr_values = ZZ.([-(i-1+(length(free_ind)+1)÷2):-i;i:(i-1+length(free_ind)÷2)])
-        LFeval = Ideal.(_evalvar(F, N-1, curr_values))
+        LFeval = Ideal.(_evalvar(F, N, curr_values))
         # Compute parametrization of each evaluation
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
         for j in 1:length(free_ind)
@@ -109,7 +108,7 @@ function rational_curve_parametrization(
         info_level>0 && println()
         for j in 1:length(free_ind)
             # Specialization checks: same vars order, generic degree
-            if  Lr[j].vars == [symbols(R)[1:N-2]; symbols(R)[N]] && degree(Lr[j].elim) == DEG
+            if  Lr[j].vars == symbols(R)[1:N-1] && degree(Lr[j].elim) == DEG
                 if isnothing(lc)
                     lc = leading_coefficient(Lr[j].elim)
                     rr = [ p for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]

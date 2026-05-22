@@ -57,15 +57,18 @@ macro iftime(v, ex)
     end
 end
 
-# We compute a zero-dim param of I w.r.t. a new generic variable v
-# given by Sv (Symbol) and defined by the linear form in cfs_lf
-function param_use_lfs(I::Ideal, cfs_lf::Vector{T} where T<: RingElem, Sv::Symbol)
+# We compute a zero-dim param of I w.r.t. the last variable after adding new variables
+# and equally many provided linear forms.
+function param_newvars(I::Ideal, new_S::Vector{Symbol}, cfs_lfs::Vector{Vector{T}} where T<: RingElem)
     R = parent(I)
-    new_RS = vcat(symbols(R), Sv)
-    _, new_V = polynomial_ring(base_ring(R), new_RS)
+    _, new_V = polynomial_ring(base_ring(R), new_S)
 
-    new_gens = [change_ringvar(f, new_RS) for f in I.gens]
-    I_new = Ideal(vcat(new_gens, [new_V[end] + transpose(cfs_lf) * new_V[1:end-1]]))
+    new_gens = [change_ringvar(f, new_S) for f in I.gens]
+    I_new = Ideal(vcat(new_gens, [transpose(c) * new_V for c in cfs_lfs]))
 
-    return rational_parametrization(I_new)
+    Pnew = rational_parametrization(I_new)
+
+    @assert degree(Pnew.elim) == 0 || Pnew.vars == new_S "Provided linear form is not generic : ($(Pnew.vars) != $(new_S))"
+
+    return Pnew
 end
