@@ -65,18 +65,7 @@ function curve_rational_parametrization(
     R = parent(first(F))
     N = nvars(R)
     if check_gen let
-        val = [ZZ(), ZZ()]
-        # Bound on bifurcation set degree (e.g. Jelonek & Kurdyka, 2005)
-        bif_bound = ZZ(1) << ( N * floor(Int, log2(maximum(total_degree.(F)))) + 1 )
-        while any(is_divisible_by.(val, Ref(lucky_prime)))
-            val = rand(-bif_bound:bif_bound, 2)
-        end
-        for ivar in [N-1, N]
-            Fnew = vcat(F, val[1]*gens(R)[ivar] + val[2])
-            new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-            local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
-            @assert(dimension(INEW) == 0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
-        end
+        _check_genericity(F)
     end end
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
@@ -162,14 +151,20 @@ end
 # + newvars linear forms provided by coefficients in cfs_lfs + random ones
 function _add_genvars(
     F::Vector{P} where P<:MPolyRingElem,
-    ngenvars::Int,
     cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]
 )
-    if length(cfs_lfs) > ngenvars
-        error("Too many linear forms provided ($(length(cfs_lfs))>$(ngenvars))")
+    if !isempty(cfs_lfs) && length(cfs_lfs) != 2
+        error("Wrong number of linear forms provided")
     end
+
     R = parent(first(F))
     N = nvars(R)
+
+    if isempty(cfs_lfs)
+        cfs_lfs = _find_generic_lf(F)
+    end
+
+
     # Add new variables (reverse alphabetical order)
     newS = vcat(symbols(R), Symbol.(["_Z$i" for i in ngenvars:-1:1]))
     R_ext, all_vars = polynomial_ring(base_ring(R), newS)
@@ -178,25 +173,122 @@ function _add_genvars(
     ctx = MPolyBuildCtx(R_ext)
     for i in eachindex(F)
         for (e, c) in zip(exponent_vectors(F[i]), coefficients(F[i]))
-            push_term!(ctx, c, vcat(e, zeros(Int,ngenvars)))
+            push_term!(ctx, c, vcat(e, zeros(Int, ngenvars)))
         end
         Fnew[i] = finish(ctx)
     end
 
-    # Complete possible incomplete provided linear forms
-    for i in eachindex(cfs_lfs)
-        if N+ngenvars < length(cfs_lfs[i])
-            error("Too many coeffs ($(length(cfs_lfs[i]))>$(N+ngenvars)) for the $(i)th linear form")
-        else
-            append!(cfs_lfs[i], rand(ZZ.(setdiff(-100:100,0)), N+ngenvars - length(cfs_lfs[i])))
-        end
-    end
-    # Add missing linear forms if needed
-    append!(cfs_lfs, [rand(ZZ.(setdiff(-100:100,0)), N+ngenvars) for _ in 1:ngenvars-length(cfs_lfs)])
     # Construct and append linear forms
     append!(Fnew, [transpose(cfs_lf) * all_vars for cfs_lf in cfs_lfs])
 
     return Fnew, cfs_lfs
+end
+
+function _combinations(v::UnitRange{Int}, k::Int)
+    # Compute the k-subsets of v
+    n = length(v)
+    ans = Vector{Int}[]
+    k > n && return ans
+    _combinations_dfs!(ans, Vector{Int}(undef, k), v, n, k)
+    return ans
+end
+
+function _combinations_dfs!(ans::Vector{Vector{Int}}, comb::Vector{Int}, v::UnitRange{Int}, n::Int, k::Int)
+    k < 1 && (pushfirst!(ans, comb[:]); return)
+    for m in n:-1:k
+        comb[k] = v[m]
+        _combinations_dfs!(ans, comb, v, m - 1, k - 1)
+    end
+end
+
+function _next_form(L)
+    n = length(L[1])
+    isone(n) && return vcat(L, map(l->l .+ 1, L))
+
+    return Vector{typeof(L[1][1])}[
+        [l[k] + (k in p ? 1 : 0) for k in eachindex(l)]
+        for i in 1:n-1
+        for p in _combinations(1:n-1, i)
+        for l in L
+    ]
+end
+
+#TODO: adapt for two variables:
+# * find a first generic linear form (this will be x)
+# * then find a second generic linear form that is different from the first one (it should be enough to resume the search from the first generic linear form)
+# * finally test that the second linear form is generic when the first is specialized at a generic point (e.g. it's a separating form (check number of images, what else?)).
+# Search for a generic linear form
+function find_generic_linear_form(F)
+    max_iter = 10000
+
+    # First compute the generic degree
+    lucky_prime = _generate_lucky_primes(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+    Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
+    DEG = hilbert_degree(Itest)
+
+    # Then compute generic specializations
+    val = [ZZ(), ZZ()]
+    # Bound on bifurcation set degree (e.g. Jelonek & Kurdyka, 2005)
+    bif_bound = ZZ(1) << ( N * floor(Int, log2(maximum(total_degree.(F)))) + 1 )
+    while any(is_divisible_by.(val, Ref(lucky_prime)))
+        val = rand(-bif_bound:bif_bound, 2)
+    end
+
+    for ivar in [N-1, N]
+        Fnew = vcat(F, val[1]*gens(R)[ivar] + val[2])
+        new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
+        @assert(dimension(INEW) == 0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
+    end
+
+    vars = gens(R)
+    n = length(vars)
+    # Try coordinate projections backward from the last variable
+    for i in n:-1:1
+        coeffs = zeros(ZZ, n)
+        coeffs[i] = 1
+
+        Fnew = vcat(F, val[1]*vars[i] + val[2])
+        new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+        INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
+        if dimension(INEW) == 0 && hilbert_degree(INEW) == DEG
+            return coeffs
+        end
+    end
+
+    L = [ones(ZZ, n)]
+    tested = Set{Tuple{Vararg{ZZRingElem}}}()
+    push!(tested, Tuple(L[1]))
+
+    ntests = 0
+    while ntest < max_iter
+        # Test current layer
+        for coeffs in L
+            Fnew = vcat(F, val[1]*(transpose(coeffs) * vars) + val[2])
+            new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+            INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
+            if dimension(INEW) == 0 && hilbert_degree(INEW) == DEG
+                return coeffs
+            end
+            ntests += 1
+        end
+
+        # Generate next layer
+        new_L = _next_form(L)
+        # Remove redundancy
+        filtered_L = Vector{Vector{ZZRingElem}}()
+        for coeffs in new_L
+            t = Tuple(coeffs)
+            if !(t in tested)
+                push!(filtered_L, coeffs)
+                push!(tested, t)
+            end
+        end
+
+        L = filtered_L
+    end
+
+    error("Failed to find a generic linear form after $max_iter tests.")
 end
 
 # for each a in La, evaluate each poly in F in x_i=a
