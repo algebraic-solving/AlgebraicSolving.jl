@@ -150,13 +150,8 @@ function _add_genvars(
     F = I.gens
     R = parent(I)
     K, n = base_ring(R), nvars(R)
-    if isempty(cfs_lfs)
-        @assert characteristic(K)==0 "No generic linear forms generation in char>0"
-        (DEG, DIM), cfs_lfs = _find_generic_linear_forms(F, ngenvars)
-    elseif characteristic(K) == 0
-        lucky_prime = first(_generate_lucky_primes(F, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
-        Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), F))
-        DEG, DIM = hilbert_degree(Itest), dimension(Itest)
+    if characteristic(K) == 0
+        (DEG, DIM), cfs_lfs = _find_generic_linear_forms(F, ngenvars, cfs_lfs)
     else
         DEG, DIM = hilbert_degree(I), dimension(I)
     end
@@ -189,11 +184,11 @@ function _add_genvars(
     return Inew, cfs_lfs
 end
 
-# Computes ngenvars sequential generic linear forms.
-function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPolyRingElem
+# Compute/test ngenvars sequential generic linear forms
+function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int, cfs_lfs::Vector{Vector{ZZRingElem}}) where T <: MPolyRingElem
     R = parent(first(F))
     n, vars = nvars(R), gens(R)
-    cfs_lfs = Vector{Vector{ZZRingElem}}()
+    cfs_lfs_out = Vector{Vector{ZZRingElem}}()
 
     # 1. Compute the degree of the system
     lucky_prime = first(_generate_lucky_primes(F, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
@@ -206,8 +201,20 @@ function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPol
     max_deg = maximum(f -> total_degree(f), F; init=1)
     bif_bound = ZZ(1) << (n * floor(Int, log2(max_deg)) + 1)
 
-    # 3. Instantiate the stateful generator ONCE for all iterations
-    candidate_stream = _candidate_stream(n)
+    # 3. Setup stream and iteration limits depending on the mode
+    is_verif = !isempty(cfs_lfs)
+    max_iter = is_verif ? 1 : 10000
+
+    if is_verif
+        # Wrap the provided linear forms into a sequential stream
+        candidate_stream = Channel{Vector{ZZRingElem}}() do ch
+            for coeffs in cfs_lfs
+                put!(ch, coeffs)
+            end
+        end
+    else
+        candidate_stream = _candidate_stream(n)
+    end
 
     # Running system to test subsequent linear forms
     current_F = copy(F)
@@ -219,8 +226,8 @@ function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPol
         end
 
         # 4. Find the next generic linear form
-        coeffs = _search_single_linear_form(current_F, val, DEG, DIM, k, candidate_stream)
-        push!(cfs_lfs, coeffs)
+        coeffs = _search_single_linear_form(current_F, val, DEG, DIM, k, candidate_stream, max_iter)
+        push!(cfs_lfs_out, coeffs)
 
         # 5. Specialize the current linear form
         L = sum(coeffs[i] * vars[i] for i in 1:n)
@@ -228,13 +235,13 @@ function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPol
 
     end
 
-    return (DEG, DIM), cfs_lfs
+    return (DEG, DIM), cfs_lfs_out
 end
 
 
 # Returns a generic linear form provided the current situation
 # It gets the next candidate from the stream and applies genericity tests
-function _search_single_linear_form(F, val, DEG, DIM, k, candidate_stream; max_iter=10000)
+function _search_single_linear_form(F, val, DEG, DIM, k, candidate_stream, max_iter)
     R = parent(first(F))
     n, vars = nvars(R), gens(R)
 
@@ -259,7 +266,11 @@ function _search_single_linear_form(F, val, DEG, DIM, k, candidate_stream; max_i
         end
     end
 
-    error("Failed to find a generic linear form after $max_iter tests.")
+    if max_iter == 1
+        error("Provided linear form number $k, failed the genericity test.")
+    else
+        error("Failed to find a generic linear form after $max_iter tests.")
+    end
 end
 
 # A stateful, lazy generator for candidate linear forms with n vars
