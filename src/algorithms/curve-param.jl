@@ -12,10 +12,8 @@ is not one an ErrorException is thrown.
 # Arguments
 - `I::Ideal{T} where T <: QQMPolyRingElem`: input generators.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
-- `use_lfs::Bool=false`: add new variables (_Z2, _Z1) + 2 generic linear forms
 - `cfs_lfs::Vector{Vector{ZZRingElem}} = []`: coefficients for the above linear forms
 - `nr_thrds::Int=1`: number of threads for msolve
-- `check_gen::Bool = true`: perform some genericity position checks on the last two variables
 
 # Examples
 ```jldoctest
@@ -37,77 +35,69 @@ AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vecto
 function curve_rational_parametrization(
         I::Ideal{P} where P<:QQMPolyRingElem;                       # input generators
         info_level::Int=0,                                          # info level for print outs
-        use_lfs::Bool = false,                                      # add generic variables
         cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[], # coeffs of linear forms
         nr_thrds::Int=1,                                            # number of threads (msolve)
-        check_gen::Bool = true                                      # perform genericity check
     )
     @assert(nvars(parent(I))>=2, "I must be defined in a ring with at least 2 variables")
 
-    info_level>0 && println("Compute ideal data" * (check_gen ? " and genericity check" : ""))
-    lucky_prime = _generate_lucky_primes(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-    Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
-    Itest.dim = I.dim
-    dimension(Itest)
-    if Itest.dim == -1
+    info_level>0 && println("Compute generic linear forms...")
+    Inew, cfs_lfs = _add_genvars(I, 2, cfs_lfs)
+
+    if Inew.dim == -1
         T = polynomial_ring(QQ, [:x,:y])[1]
         I.dim = -1
         I.rat_param = CurveRationalParametrization(Symbol[], Vector{ZZRingElem}[], T(-1), T(-1), QQMPolyRingElem[])
         return I.rat_param
     end
-    @assert(Itest.dim==1, "I must define a curve or an empty set")
+    @assert Inew.dim == 1 "I must define a curve or an empty set"
 
-    DEG = hilbert_degree(Itest)
-    # If generic variables must be added
-    F, cfs_lfs = use_lfs ? _add_genvars(I.gens, max(2, length(cfs_lfs)), cfs_lfs) :
-             !isempty(cfs_lfs) ? _add_genvars(I.gens, length(cfs_lfs), cfs_lfs) :
-             (I.gens, Vector{ZZRingElem}[])
-    R = parent(first(F))
+    R = parent(Inew)
     N = nvars(R)
-    if check_gen let
-        _check_genericity(F)
-    end end
+    DEG, F = Inew.deg, Inew.gens
 
     # Compute DEG+2 evaluations of x in the param (whose total deg is bounded by DEG)
     PARAM  = Vector{Vector{QQPolyRingElem}}(undef, DEG+2)
     _values = Vector{ZZRingElem}(undef, DEG+2)
+
     i = 1
     free_ind = collect(1:DEG+2)
-    used_ind = zeros(Bool, DEG+2)
+    used_ind = falses(DEG+2)
     lc = nothing
+
     while length(free_ind) > 0
         if i > 2*(DEG+2)
-            error("Too many bad specializations. Check radicality, else permute variables or use_lfs=true")
+            error("Too many bad specializations. Check radicality and generic linear forms.")
         end
-        # Evaluation of the generator at values x s.t. 0 <= |x|-i <= length(free_ind)/2
-        # plus one point at -(length(free_ind)+1)/2 if the length if odd.
-        # This reduces a bit the bitsize of the evaluation
-        curr_values = ZZ.([-(i-1+(length(free_ind)+1)÷2):-i;i:(i-1+length(free_ind)÷2)])
+        # Determine values to evaluate at to keep bitsize low
+        curr_values = ZZ.([-(i - 1 + (length(free_ind) + 1) ÷ 2):-i;i:(i - 1 + length(free_ind) ÷ 2)])
         LFeval = Ideal.(_evalvar(F, N, curr_values))
         # Compute parametrization of each evaluation
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
+
         for j in eachindex(free_ind)
             info_level>0 && print("Evaluated parametrizations: $(j)/$(length(free_ind))", "\r")
             Lr[j] = rational_parametrization(LFeval[j], nr_thrds=nr_thrds)
+
             # Specialization checks: same vars order, generic degree
             if  Lr[j].vars == symbols(R)[1:N-1] && degree(Lr[j].elim) == DEG
                 if isnothing(lc)
                     lc = leading_coefficient(Lr[j].elim)
-                    rr = [ p for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
+                    rr = vcat([Lr[j].elim, Lr[j].denom], Lr[j].param)
                 else
                     # Adjust when the rat_param is multiplied by some constant factor
                     fact = lc / leading_coefficient(Lr[j].elim)
-                    rr = [ p*fact for p in vcat(Lr[j].elim, Lr[j].denom, Lr[j].param) ]
+                    rr = vcat([Lr[j].elim * fact, Lr[j].denom * fact], Lr[j].param .* fact)
                 end
                 PARAM[free_ind[j]] = rr
                 _values[free_ind[j]] = curr_values[j]
                 used_ind[j] = true
             end
         end
+
         # Update range, free indices and used indices
         i += length(free_ind)
-        free_ind = [ free_ind[j] for j in eachindex(free_ind) if !used_ind[j] ]
-        used_ind = zeros(Bool, length(free_ind))
+        free_ind = free_ind[.!used_ind]
+        used_ind = falses(length(free_ind))
 
         info_level * length(free_ind) != 0 &&
         println("bad specialization(s): ", curr_values[free_ind])
@@ -127,8 +117,9 @@ function curve_rational_parametrization(
             # TODO: remove dens mult when interface's ready in Nemo
             den = foldl(lcm, denominator.(_evals))
             scaled_evals = [ZZ(_evals[i] * den) for i in eachindex(_evals)]
-            COEFFS[deg+1] = interpolate(A, _values, scaled_evals) / (lc*den)
+            COEFFS[deg+1] = interpolate(A, _values, scaled_evals) / (lc * den)
         end
+
         ctx = MPolyBuildCtx(T)
         for (i, c) in enumerate(COEFFS)
             for (j, coeff) in enumerate(coefficients(c))
@@ -138,37 +129,45 @@ function curve_rational_parametrization(
         POLY_PARAM[count] = finish(ctx)
     end
     info_level>0 && println()
+
     # Output: [vars, linear forms, elim, denom, [nums_param]]
-    I.dim = 1 # If we reached here, I has necessarily dimension 1
+    I.deg, I.dim = Inew.deg, Inew.dim
     I.rat_param = CurveRationalParametrization( symbols(R), cfs_lfs, POLY_PARAM[1],
                                                 POLY_PARAM[2], POLY_PARAM[3:end]    )
     return I.rat_param
 end
 
 
-# Inject polynomials in F in a polynomial ring with ngenvars new variables
-# return these polynomials
-# + newvars linear forms provided by coefficients in cfs_lfs + random ones
+# Return F in a polynomial ring with ngenvars new variables
+# + newvars linear forms provided by coefficients in cfs_lfs or generic ones internally computed
+# TODO: handle the cases when I.dim or I.deg or I.gb is already known
 function _add_genvars(
-    F::Vector{P} where P<:MPolyRingElem,
-    cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[]
+    I::Ideal{P} where P<:MPolyRingElem,
+    ngenvars::Int,
+    cfs_lfs::Vector{Vector{T}} where T<:RingElem
 )
-    if !isempty(cfs_lfs) && length(cfs_lfs) != 2
-        error("Wrong number of linear forms provided")
-    end
 
-    R = parent(first(F))
-    N = nvars(R)
-
+    F = I.gens
+    R = parent(I)
+    K, n = base_ring(R), nvars(R)
     if isempty(cfs_lfs)
-        cfs_lfs = _find_generic_lf(F)
+        @assert characteristic(K)==0 "No generic linear forms generation in char>0"
+        (DEG, DIM), cfs_lfs = _find_generic_linear_forms(F, ngenvars)
+    elseif characteristic(K) == 0
+        lucky_prime = first(_generate_lucky_primes(F, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
+        Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), F))
+        DEG, DIM = hilbert_degree(Itest), dimension(Itest)
+    else
+        DEG, DIM = hilbert_degree(I), dimension(I)
     end
 
+    @assert length(cfs_lfs) == ngenvars "Wrong number of linear forms provided"
 
-    # Add new variables (reverse alphabetical order)
+    # Add new variables (reverse index order)
     newS = vcat(symbols(R), Symbol.(["_Z$i" for i in ngenvars:-1:1]))
-    R_ext, all_vars = polynomial_ring(base_ring(R), newS)
-    # Inject F in this new ring
+    R_ext, all_vars = polynomial_ring(K, newS)
+
+    # Inject F in this new ring efficiently using evaluation
     Fnew = Vector{MPolyRingElem}(undef, length(F))
     ctx = MPolyBuildCtx(R_ext)
     for i in eachindex(F)
@@ -178,114 +177,127 @@ function _add_genvars(
         Fnew[i] = finish(ctx)
     end
 
-    # Construct and append linear forms
-    append!(Fnew, [transpose(cfs_lf) * all_vars for cfs_lf in cfs_lfs])
-
-    return Fnew, cfs_lfs
-end
-
-function _combinations(v::UnitRange{Int}, k::Int)
-    # Compute the k-subsets of v
-    n = length(v)
-    ans = Vector{Int}[]
-    k > n && return ans
-    _combinations_dfs!(ans, Vector{Int}(undef, k), v, n, k)
-    return ans
-end
-
-function _combinations_dfs!(ans::Vector{Vector{Int}}, comb::Vector{Int}, v::UnitRange{Int}, n::Int, k::Int)
-    k < 1 && (pushfirst!(ans, comb[:]); return)
-    for m in n:-1:k
-        comb[k] = v[m]
-        _combinations_dfs!(ans, comb, v, m - 1, k - 1)
+    # Append linear forms: associating L_i(X) with the new variable Z_i -> L_i(X) - Z_i = 0
+    for i in 1:ngenvars
+        L = sum(cfs_lfs[i][j] * all_vars[j] for j in 1:n)
+        push!(Fnew, L - all_vars[end-i+1])
     end
+
+    Inew = Ideal(Fnew)
+    Inew.deg, Inew.dim = DEG, DIM
+
+    return Inew, cfs_lfs
 end
 
+# Computes ngenvars sequential generic linear forms.
+function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPolyRingElem
+    R = parent(first(F))
+    n, vars = nvars(R), gens(R)
+    cfs_lfs = Vector{Vector{ZZRingElem}}()
+
+    # 1. Compute the degree of the system
+    lucky_prime = first(_generate_lucky_primes(F, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
+    Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), F))
+    DEG, DIM = hilbert_degree(Itest), dimension(Itest)
+    @assert ngenvars < DIM + 2 "Too many generic linear forms asked > dim + 1"
+
+    # 2. Compute a bound for generic specialization values
+    # Bound on bifurcation set degree (e.g., Jelonek & Kurdyka, 2005)
+    max_deg = maximum(f -> total_degree(f), F; init=1)
+    bif_bound = ZZ(1) << (n * floor(Int, log2(max_deg)) + 1)
+
+    # Running system to test subsequent linear forms
+    current_F = copy(F)
+    for k in 1:ngenvars
+        # 3. Compute a generic specialization value
+        val = [ZZ(), ZZ()]
+        while iszero(val[1]) || is_divisible_by(val[1], lucky_prime) || is_divisible_by(val[2], lucky_prime)
+            val = rand(-bif_bound:bif_bound, 2)
+        end
+
+        # 4. Find the next generic linear form
+        coeffs = _search_single_linear_form(current_F, vars, val, DEG, DIM, n, k)
+        push!(cfs_lfs, coeffs)
+
+        # 5. Specialize the current linear form at a generic point to prepare for the next iteration
+        L = sum(coeffs[i] * vars[i] for i in 1:n)
+        push!(current_F, val[1] * L + val[2])
+
+    end
+
+    return (DEG, DIM), cfs_lfs
+end
+
+# Add 1 to each possible subset of coordinates exluding the last one
+# Use binary masks to represent these subsets
 function _next_form(L)
     n = length(L[1])
-    isone(n) && return vcat(L, map(l->l .+ 1, L))
+    isone(n) && return vcat(L, map(l -> l .+ 1, L))
 
-    return Vector{typeof(L[1][1])}[
-        [l[k] + (k in p ? 1 : 0) for k in eachindex(l)]
-        for i in 1:n-1
-        for p in _combinations(1:n-1, i)
+    # Generate all masks, sorted by number of 1s to prioritize smaller subsets
+    sorted_masks = sort(collect(1:(1 << (n-1)) - 1), by=count_ones)
+
+    return [
+        l .+ [ZZ((mask >> (k-1)) & 1) for k in 1:n]
+        for mask in sorted_masks
         for l in L
     ]
 end
 
-#TODO: adapt for two variables:
-# * find a first generic linear form (this will be x)
-# * then find a second generic linear form that is different from the first one (it should be enough to resume the search from the first generic linear form)
-# * finally test that the second linear form is generic when the first is specialized at a generic point (e.g. it's a separating form (check number of images, what else?)).
-# Search for a generic linear form
-function find_generic_linear_form(F)
+function _search_single_linear_form(F, vars, val, DEG, DIM, n, k)
     max_iter = 10000
 
-    # First compute the generic degree
-    lucky_prime = _generate_lucky_primes(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-    Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
-    DEG = hilbert_degree(Itest)
+    # Unified validation closure
+    function is_generic(coeffs)
+        L = sum(coeffs[i] * vars[i] for i in 1:n)
 
-    # Then compute generic specializations
-    val = [ZZ(), ZZ()]
-    # Bound on bifurcation set degree (e.g. Jelonek & Kurdyka, 2005)
-    bif_bound = ZZ(1) << ( N * floor(Int, log2(maximum(total_degree.(F)))) + 1 )
-    while any(is_divisible_by.(val, Ref(lucky_prime)))
-        val = rand(-bif_bound:bif_bound, 2)
-    end
+        if k <= DIM
+            # --- Case A: Projection Form ---
+            Fnew = vcat(F, val[1] * L + val[2])
+            lucky_prime = first(_generate_lucky_primes(Fnew, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
+            INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), Fnew))
+            return dimension(INEW) == DIM - k && hilbert_degree(INEW) == DEG
+        else
+            # --- Case B: Separating Form (k == DIM + 1) ---
+            lucky_prime = first(_generate_lucky_primes(vcat(F, L), one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
+            Fnew = [change_base_ring(GF(lucky_prime), p) for p in F]
 
-    for ivar in [N-1, N]
-        Fnew = vcat(F, val[1]*gens(R)[ivar] + val[2])
-        new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
-        @assert(dimension(INEW) == 0 && hilbert_degree(INEW) == DEG, "The curve is not in generic position")
-    end
-
-    vars = gens(R)
-    n = length(vars)
-    # Try coordinate projections backward from the last variable
-    for i in n:-1:1
-        coeffs = zeros(ZZ, n)
-        coeffs[i] = 1
-
-        Fnew = vcat(F, val[1]*vars[i] + val[2])
-        new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-        INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
-        if dimension(INEW) == 0 && hilbert_degree(INEW) == DEG
-            return coeffs
+            INEW, _ = _add_genvars(Ideal(Fnew), 1, [GF(lucky_prime).(coeffs)])
+            INEW_elim = Ideal(eliminate(INEW, n))
+            return hilbert_degree(INEW_elim) == DEG
         end
     end
 
-    L = [ones(ZZ, n)]
-    tested = Set{Tuple{Vararg{ZZRingElem}}}()
-    push!(tested, Tuple(L[1]))
+    # 1. Quick coordinate projection check backward from the last variable
+    for i in n:-1:1
+        coeffs = zeros(ZZ, n)
+        coeffs[i] = 1
+        k < DIM + 1 && is_generic_projection(coeffs) && return coeffs
+        is_generic(coeffs) && return coeffs
+    end
 
+    # 2. Bitmask Layering Search
+    queue = [ones(ZZRingElem, n)]
+    tested = Set{Vector{ZZRingElem}}([queue[1]])
     ntests = 0
-    while ntest < max_iter
+
+    while ntests < max_iter
         # Test current layer
-        for coeffs in L
-            Fnew = vcat(F, val[1]*(transpose(coeffs) * vars) + val[2])
-            new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-            INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
-            if dimension(INEW) == 0 && hilbert_degree(INEW) == DEG
-                return coeffs
-            end
+        for coeffs in queue
+            is_generic(coeffs) && return coeffs
             ntests += 1
         end
 
         # Generate next layer
-        new_L = _next_form(L)
-        # Remove redundancy
-        filtered_L = Vector{Vector{ZZRingElem}}()
+        new_L = _next_form(queue)
+
+        queue = Vector{Vector{ZZRingElem}}()
         for coeffs in new_L
-            t = Tuple(coeffs)
-            if !(t in tested)
-                push!(filtered_L, coeffs)
-                push!(tested, t)
+            if !(coeffs in tested)
+                push!(tested, coeffs)
+                push!(queue, coeffs)
             end
         end
-
-        L = filtered_L
     end
 
     error("Failed to find a generic linear form after $max_iter tests.")
@@ -300,6 +312,7 @@ function _evalvar(
     R = parent(first(F))
     indnewvars = setdiff(1:nvars(R), i)
     C, = polynomial_ring(base_ring(R), symbols(R)[indnewvars])
+
     LFeval = Vector{typeof(zero(C))}[]
     ctx = MPolyBuildCtx(C)
 
