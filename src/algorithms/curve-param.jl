@@ -161,7 +161,7 @@ function _add_genvars(
         DEG, DIM = hilbert_degree(I), dimension(I)
     end
 
-    @assert length(cfs_lfs) == ngenvars "Wrong number of linear forms provided"
+    @assert length(cfs_lfs) == ngenvars "Must provide $ngenvars linear forms (here $(length(cfs_lfs)))"
 
     # Add new variables (reverse index order)
     newS = vcat(symbols(R), Symbol.(["_Z$i" for i in ngenvars:-1:1]))
@@ -206,6 +206,9 @@ function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPol
     max_deg = maximum(f -> total_degree(f), F; init=1)
     bif_bound = ZZ(1) << (n * floor(Int, log2(max_deg)) + 1)
 
+    # 3. Instantiate the stateful generator ONCE for all iterations
+    candidate_stream = _candidate_stream(n)
+
     # Running system to test subsequent linear forms
     current_F = copy(F)
     for k in 1:ngenvars
@@ -216,10 +219,10 @@ function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPol
         end
 
         # 4. Find the next generic linear form
-        coeffs = _search_single_linear_form(current_F, vars, val, DEG, DIM, n, k)
+        coeffs = _search_single_linear_form(current_F, val, DEG, DIM, k, candidate_stream)
         push!(cfs_lfs, coeffs)
 
-        # 5. Specialize the current linear form at a generic point to prepare for the next iteration
+        # 5. Specialize the current linear form
         L = sum(coeffs[i] * vars[i] for i in 1:n)
         push!(current_F, val[1] * L + val[2])
 
@@ -228,79 +231,74 @@ function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPol
     return (DEG, DIM), cfs_lfs
 end
 
-# Add 1 to each possible subset of coordinates exluding the last one
-# Use binary masks to represent these subsets
-function _next_form(L)
-    n = length(L[1])
-    isone(n) && return vcat(L, map(l -> l .+ 1, L))
 
-    # Generate all masks, sorted by number of 1s to prioritize smaller subsets
-    sorted_masks = sort(collect(1:(1 << (n-1)) - 1), by=count_ones)
+# Returns a generic linear form provided the current situation
+# It gets the next candidate from the stream and applies genericity tests
+function _search_single_linear_form(F, val, DEG, DIM, k, candidate_stream; max_iter=10000)
+    R = parent(first(F))
+    n, vars = nvars(R), gens(R)
 
-    return [
-        l .+ [ZZ((mask >> (k-1)) & 1) for k in 1:n]
-        for mask in sorted_masks
-        for l in L
-    ]
-end
-
-function _search_single_linear_form(F, vars, val, DEG, DIM, n, k)
-    max_iter = 10000
-
-    # Unified validation closure
-    function is_generic(coeffs)
+   # Take candidates from the stream until we find a match
+    for _ in 1:max_iter
+        coeffs = take!(candidate_stream)
+        @show coeffs
         L = sum(coeffs[i] * vars[i] for i in 1:n)
+        Feval = vcat(F, val[1] * L + val[2])
+        lucky_prime = first(_generate_lucky_primes(Feval, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
+        Imod = Ideal(change_base_ring.(Ref(GF(lucky_prime)), k <= DIM ? Feval : F))
 
         if k <= DIM
             # --- Case A: Projection Form ---
-            Fnew = vcat(F, val[1] * L + val[2])
-            lucky_prime = first(_generate_lucky_primes(Fnew, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
-            INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), Fnew))
-            return dimension(INEW) == DIM - k && hilbert_degree(INEW) == DEG
+            dimension(Imod) == DIM - k && hilbert_degree(Imod) == DEG && return coeffs
         else
             # --- Case B: Separating Form (k == DIM + 1) ---
-            lucky_prime = first(_generate_lucky_primes(vcat(F, L), one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
-            Fnew = [change_base_ring(GF(lucky_prime), p) for p in F]
+            Iext, _ = _add_genvars(Imod, 1, [GF(lucky_prime).(coeffs)])
+            Iext_elim = Ideal(eliminate(Iext, n))
 
-            INEW, _ = _add_genvars(Ideal(Fnew), 1, [GF(lucky_prime).(coeffs)])
-            INEW_elim = Ideal(eliminate(INEW, n))
-            return hilbert_degree(INEW_elim) == DEG
-        end
-    end
-
-    # 1. Quick coordinate projection check backward from the last variable
-    for i in n:-1:1
-        coeffs = zeros(ZZ, n)
-        coeffs[i] = 1
-        k < DIM + 1 && is_generic_projection(coeffs) && return coeffs
-        is_generic(coeffs) && return coeffs
-    end
-
-    # 2. Bitmask Layering Search
-    queue = [ones(ZZRingElem, n)]
-    tested = Set{Vector{ZZRingElem}}([queue[1]])
-    ntests = 0
-
-    while ntests < max_iter
-        # Test current layer
-        for coeffs in queue
-            is_generic(coeffs) && return coeffs
-            ntests += 1
-        end
-
-        # Generate next layer
-        new_L = _next_form(queue)
-
-        queue = Vector{Vector{ZZRingElem}}()
-        for coeffs in new_L
-            if !(coeffs in tested)
-                push!(tested, coeffs)
-                push!(queue, coeffs)
-            end
+            hilbert_degree(Iext_elim) == DEG && return coeffs
         end
     end
 
     error("Failed to find a generic linear form after $max_iter tests.")
+end
+
+# A stateful, lazy generator for candidate linear forms with n vars
+function _candidate_stream(n::Int)
+    Channel{Vector{ZZRingElem}}() do ch
+        # 1. Quick coordinate projection check backward from the last variable
+        for i in n:-1:1
+            coeffs = zeros(ZZ, n)
+            coeffs[i] = 1
+            put!(ch, coeffs)
+        end
+
+        # 2. Bitmask Layering Search
+        sorted_masks = sort(collect(1:(1 << (n-1)) - 1), by=count_ones)
+        queue = [ones(ZZRingElem, n)]
+        tested = Set{Vector{ZZRingElem}}([queue[1]])
+
+        while true
+            # Yield the current layer's candidates one by one
+            for coeffs in queue
+                put!(ch, coeffs)
+            end
+
+            # Generate the next layer
+            new_L = [
+                l .+ [ZZ((mask >> (k-1)) & 1) for k in 1:n]
+                for mask in sorted_masks
+                for l in queue
+            ]
+
+            queue = Vector{Vector{ZZRingElem}}()
+            for coeffs in new_L
+                if !(coeffs in tested)
+                    push!(tested, coeffs)
+                    push!(queue, coeffs)
+                end
+            end
+        end
+    end
 end
 
 # for each a in La, evaluate each poly in F in x_i=a
