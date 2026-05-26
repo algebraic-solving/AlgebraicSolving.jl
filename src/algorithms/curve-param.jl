@@ -26,10 +26,13 @@ julia> I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1])
 QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2]
 
 julia> curve_rational_parametrization(I)
-AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3], Vector{ZZRingElem}[], x^2 + 4//3*x*y - 1//3*x + y^2 - 1//3*y, 4//3*x + 2*y - 1//3, QQMPolyRingElem[4//3*x^2 - 4//3*x*y + 2//3*x + 4//3*y - 1//3])
+AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[0, 0, 1, 0, -1], [0, 1, 0, -1, 0]], x^2 + 4//3*x*y - 1//3*x + y^2 - 1//3*y, 4//3*x + 2*y - 1//3, QQMPolyRingElem[4//3*x^2 - 4//3*x*y + 2//3*x + 4//3*y - 1//3, -2*x^2 - 4//3*x*y + 2//3*x + 1//3*y, 4//3*x^2 + 2*x*y - 1//3*x])
 
-julia> curve_rational_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-8,2,2,-1,-8], [8,-7,-5,8,-7]]))
-AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-8, 2, 2, -1, -8], [8, -7, -5, 8, -7]], 30508//4963*x^2 - 24536//4963*x*y + 6560//4963*x + y^2 - 2588//4963*y + 352//4963, -24536//4963*x + 2*y - 2588//4963, QQMPolyRingElem[85768//14889*x^2 - 34648//14889*x*y + 1032//4963*x + 2446//14889*y - 628//14889, -8094//4963*x^2 + 2769//4963*x*y - 7334//4963*x + 2225//4963*y - 680//4963, -18602//14889*x^2 + 9017//14889*x*y - 5450//4963*x + 6991//14889*y - 1528//14889])
+julia> curve_rational_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-3,2,2], [1,4,-3]]))
+AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-3, 2, 2, 0, -1], [1, 4, -3, -1, 0]], 127//128*x^2 + 3//8*x*y + 161//64*x + y^2 - 7//8*y - 49//128, 3//8*x + 2*y - 7//8, QQMPolyRingElem[-3//32*x^2 - 1//2*x*y + 5//16*x + 1//2*y - 7//32, -1//4*x^2 + 1//8*x*y - 3//4*x + 3//8*y, 19//64*x^2 + 1//8*x*y + 25//32*x + 3//8*y - 21//64])
+
+julia> curve_rational_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-3,2,2,-1,-2], [1,4,-3,2,-1]]))
+AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-3, 2, 2, -1, -2], [1, 4, -3, 2, -1]], 244//181*x^2 - 148//543*x*y + 532//543*x + y^2 + 182//181*y - 49//543, -148//543*x + 2*y + 182//181, QQMPolyRingElem[440//543*x^2 - 580//543*x*y - 44//543*x + 136//181*y + 112//543, 80//181*x^2 + 320//543*x*y + 122//181*x + 81//181*y + 49//543, -460//543*x^2 - 10//181*x*y - 418//543*x + 32//181*y + 56//181])
 ```
 """
 function curve_rational_parametrization(
@@ -140,28 +143,14 @@ end
 
 # Return F in a polynomial ring with ngenvars new variables
 # + newvars linear forms provided by coefficients in cfs_lfs or generic ones internally computed
-# TODO: handle the cases when I.dim or I.deg or I.gb is already known
 function _add_genvars(
     I::Ideal{P} where P<:MPolyRingElem,
     ngenvars::Int,
     cfs_lfs::Vector{Vector{T}} where T<:RingElem
 )
-
     F = I.gens
     R = parent(I)
     K, n = base_ring(R), nvars(R)
-    if isempty(cfs_lfs)
-        @assert characteristic(K)==0 "No generic linear forms generation in char>0"
-        (DEG, DIM), cfs_lfs = _find_generic_linear_forms(F, ngenvars)
-    elseif characteristic(K) == 0
-        lucky_prime = first(_generate_lucky_primes(F, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
-        Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), F))
-        DEG, DIM = hilbert_degree(Itest), dimension(Itest)
-    else
-        DEG, DIM = hilbert_degree(I), dimension(I)
-    end
-
-    @assert length(cfs_lfs) == ngenvars "Must provide $ngenvars linear forms (here $(length(cfs_lfs)))"
 
     # Add new variables (reverse index order)
     newS = vcat(symbols(R), Symbol.(["_Z$i" for i in ngenvars:-1:1]))
@@ -177,11 +166,27 @@ function _add_genvars(
         Fnew[i] = finish(ctx)
     end
 
-    # Append linear forms: associating L_i(X) with the new variable Z_i -> L_i(X) - Z_i = 0
-    for i in 1:ngenvars
-        L = sum(cfs_lfs[i][j] * all_vars[j] for j in 1:n)
-        push!(Fnew, L - all_vars[end-i+1])
+    # Find generic linear forms
+    if !isempty(cfs_lfs)
+        @assert length(cfs_lfs) == ngenvars "Expected $ngenvars linear forms, got $(length(cfs_lfs))"
+        @assert all(length(c) in [n, n + ngenvars] for c in cfs_lfs) "Linear forms must have $n or $(n + ngenvars) coefficients"
     end
+    if characteristic(K) == 0
+        (DEG, DIM), cfs_lfs = _find_generic_linear_forms(I, ngenvars, cfs_lfs)
+    else
+        DEG, DIM = hilbert_degree(I), dimension(I)
+    end
+
+    # Extend coefficient vectors if only X-coefficients are provided
+    if length(first(cfs_lfs)) == n
+        cfs_lfs = [
+            vcat(c, [-ZZ(j == i) for j in ngenvars:-1:1])
+            for (i, c) in enumerate(cfs_lfs)
+        ]
+    end
+
+    # Add equations Li(X) - Zi = 0
+    append!(Fnew, [transpose(c) * all_vars for c in cfs_lfs])
 
     Inew = Ideal(Fnew)
     Inew.deg, Inew.dim = DEG, DIM
@@ -190,16 +195,22 @@ function _add_genvars(
 end
 
 # Computes ngenvars sequential generic linear forms.
-function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPolyRingElem
-    R = parent(first(F))
+function _find_generic_linear_forms(I::Ideal{T}, ngenvars::Int, cfs_lfs) where T <: MPolyRingElem
+    R, F = parent(I), I.gens
     n, vars = nvars(R), gens(R)
-    cfs_lfs = Vector{Vector{ZZRingElem}}()
+    cfs_lfs_out = Vector{Vector{ZZRingElem}}()
 
     # 1. Compute the degree of the system
     lucky_prime = first(_generate_lucky_primes(F, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
-    Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), F))
-    DEG, DIM = hilbert_degree(Itest), dimension(Itest)
-    @assert ngenvars < DIM + 2 "Too many generic linear forms asked > dim + 1"
+    if haskey(I.gb, 0)
+        DEG, DIM = hilbert_degree(I), dimension(I)
+    else
+        Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), F))
+        DEG, DIM = hilbert_degree(Itest), dimension(Itest)
+    end
+    @assert DIM < 0 || ngenvars < DIM + 2 "Too many generic linear forms asked > dim + 1"
+
+    !isempty(cfs_lfs) && return (DEG, DIM), cfs_lfs
 
     # 2. Compute a bound for generic specialization values
     # Bound on bifurcation set degree (e.g., Jelonek & Kurdyka, 2005)
@@ -220,7 +231,7 @@ function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPol
 
         # 4. Find the next generic linear form
         coeffs = _search_single_linear_form(current_F, val, DEG, DIM, k, candidate_stream)
-        push!(cfs_lfs, coeffs)
+        push!(cfs_lfs_out, coeffs)
 
         # 5. Specialize the current linear form
         L = sum(coeffs[i] * vars[i] for i in 1:n)
@@ -228,7 +239,7 @@ function _find_generic_linear_forms(F::Vector{T}, ngenvars::Int) where T <: MPol
 
     end
 
-    return (DEG, DIM), cfs_lfs
+    return (DEG, DIM), cfs_lfs_out
 end
 
 
@@ -241,7 +252,7 @@ function _search_single_linear_form(F, val, DEG, DIM, k, candidate_stream; max_i
    # Take candidates from the stream until we find a match
     for _ in 1:max_iter
         coeffs = take!(candidate_stream)
-        @show coeffs
+
         L = sum(coeffs[i] * vars[i] for i in 1:n)
         Feval = vcat(F, val[1] * L + val[2])
         lucky_prime = first(_generate_lucky_primes(Feval, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
@@ -267,7 +278,7 @@ function _candidate_stream(n::Int)
     Channel{Vector{ZZRingElem}}() do ch
         # 1. Quick coordinate projection check backward from the last variable
         for i in n:-1:1
-            coeffs = zeros(ZZ, n)
+            coeffs = zeros(ZZRingElem, n)
             coeffs[i] = 1
             put!(ch, coeffs)
         end
