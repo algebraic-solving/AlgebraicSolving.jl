@@ -104,8 +104,8 @@ function curve_rational_parametrization(
         used_ind = falses(length(free_ind))
 
         if info_level * length(free_ind) != 0
-        println("bad specialization(s): ", curr_values[free_ind])
-    end
+            println("bad specialization(s): ", curr_values[free_ind])
+        end
     end
 
     # Interpolate each coefficient of each poly in the param
@@ -116,7 +116,7 @@ function curve_rational_parametrization(
     for count in 1:N
         info_level > 0 && print("Interpolate parametrizations: $count/$N\r")
         COEFFS = Vector{QQPolyRingElem}(undef, DEG + 1)
-        
+
         for deg in 0:DEG
             _evals = [coeff(PARAM[i][count], deg) for i in eachindex(PARAM)]
             # Remove denominators for faster interpolation with FLINT
@@ -164,7 +164,7 @@ function _add_genvars(
     F_ext = Vector{MPolyRingElem}(undef, length(F))
     ctx = MPolyBuildCtx(R_ext)
     new_e = zeros(Int, n + n_gen) # Pre-allocated buffer
-    
+
     for i in eachindex(F)
         for (e, c) in zip(exponent_vectors(F[i]), coefficients(F[i]))
             new_e[1:n] .= e
@@ -228,7 +228,7 @@ function _find_generic_linear_forms(
 
         # 3. Setup stream and iteration limits depending on the mode
     is_verif = !isempty(cfs_lfs)
-    max_iter = is_verif ? 1 : 1000  # Bumped to 1000 for standard bitmask searches
+    max_iter = is_verif ? 1 : 10000
 
     if is_verif
         # Wrap the provided linear forms into a sequential stream
@@ -246,16 +246,17 @@ function _find_generic_linear_forms(
     # Running system to test subsequent linear forms
     current_F = copy(F)
     for k in 1:n_gen
-        # 3. Compute a generic specialization value
+        # 1. Compute a generic specialization value
         val = [ZZ(), ZZ()]
         while iszero(val[1]) || is_divisible_by(val[1], lucky_prime) || is_divisible_by(val[2], lucky_prime)
             val = rand(-bif_bound:bif_bound, 2)
         end
 
-        # 4. Find the next generic linear form
+        # 2. Find the next generic linear form
         coeffs = _search_single_linear_form(current_F, val, DEG, DIM, k, candidate_stream, max_iter)
         push!(cfs_lfs_out, coeffs)
 
+        # 3. Specialize the current linear form
         L = sum(c * v for (c, v) in zip(coeffs, vars))
         push!(current_F, L, val[1] * vars[n - k + 1] + val[2])
     end
@@ -275,7 +276,7 @@ function _search_single_linear_form(F, val, DEG, DIM, k, candidate_stream, max_i
 
         FL = vcat(F, sum(coeffs[i] * vars[i] for i in 1:n))
         Feval = vcat(FL, val[1] * vars[n - k + 1] + val[2])
-        
+
         lucky_prime = first(_generate_lucky_primes(Feval, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
         modK = GF(lucky_prime)
         Imod = Ideal(change_base_ring.(Ref(modK), 2*k <= DIM ? Feval : FL))
@@ -353,12 +354,10 @@ function _evalvar(
 
     LFeval = Vector{Vector{elem_type(C)}}()
     ctx = MPolyBuildCtx(C)
-    
-    # Precompute maximum degree to avoid dictionary hashing in the inner loop
+
     max_deg = isempty(F) ? 0 : maximum(f -> degree(f, i), F)
 
     for a in La
-        # O(1) Array lookup for powers instead of Dict
         pow_a = [one(parent(a))]
         for d in 1:max_deg
             push!(pow_a, pow_a[end] * a)
@@ -390,18 +389,19 @@ function _generate_lucky_primes(
     for f in LF, c in coefficients(f)
         !isone(numerator(c)) && push!(CF_set, numerator(c))
         !isone(denominator(c)) && push!(CF_set, denominator(c))
-        end
+    end
 
     CF = sort!(collect(CF_set), rev=true)
     Lprim = ZZRingElem[]
+
     while length(Lprim) < N
         cur_prim = next_prime(rand(low:up))
         is_lucky = !(cur_prim in Lprim)
-        i = firstindex(CF)
+        idx = firstindex(CF)
         # Exploit decreasing order of CF
-        while is_lucky && i <= lastindex(CF) && CF[i] > cur_prim
-            is_lucky = !is_divisible_by(CF[i], cur_prim)
-            i += 1
+        while is_lucky && idx <= lastindex(CF) && CF[idx] > cur_prim
+            is_lucky = !is_divisible_by(CF[idx], cur_prim)
+            idx += 1
         end
         is_lucky && push!(Lprim, cur_prim)
     end
