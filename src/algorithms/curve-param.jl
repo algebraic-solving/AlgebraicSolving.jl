@@ -28,20 +28,23 @@ QQMPolyRingElem[x1 + 2*x2 + 2*x3 - 1, x1^2 - x1 + 2*x2^2 + 2*x3^2]
 julia> curve_rational_parametrization(I)
 AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[0, 0, 1, 0, -1], [0, 1, 0, -1, 0]], x^2 + 4//3*x*y - 1//3*x + y^2 - 1//3*y, 4//3*x + 2*y - 1//3, QQMPolyRingElem[4//3*x^2 - 4//3*x*y + 2//3*x + 4//3*y - 1//3, -2*x^2 - 4//3*x*y + 2//3*x + 1//3*y, 4//3*x^2 + 2*x*y - 1//3*x])
 
-julia> curve_rational_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-3,2,2], [1,4,-3]]))
+julia> curve_rational_parametrization(I, cfs_lfs=[[-3,2,2], [1,4,-3]])
 AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-3, 2, 2, 0, -1], [1, 4, -3, -1, 0]], 127//128*x^2 + 3//8*x*y + 161//64*x + y^2 - 7//8*y - 49//128, 3//8*x + 2*y - 7//8, QQMPolyRingElem[-3//32*x^2 - 1//2*x*y + 5//16*x + 1//2*y - 7//32, -1//4*x^2 + 1//8*x*y - 3//4*x + 3//8*y, 19//64*x^2 + 1//8*x*y + 25//32*x + 3//8*y - 21//64])
 
-julia> curve_rational_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-3,2,2,-1,-2], [1,4,-3,2,-1]]))
+julia> curve_rational_parametrization(I, cfs_lfs=[[-3,2,2,-1,-2], [1,4,-3,2,-1]])
 AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vector{ZZRingElem}[[-3, 2, 2, -1, -2], [1, 4, -3, 2, -1]], 244//181*x^2 - 148//543*x*y + 532//543*x + y^2 + 182//181*y - 49//543, -148//543*x + 2*y + 182//181, QQMPolyRingElem[440//543*x^2 - 580//543*x*y - 44//543*x + 136//181*y + 112//543, 80//181*x^2 + 320//543*x*y + 122//181*x + 81//181*y + 49//543, -460//543*x^2 - 10//181*x*y - 418//543*x + 32//181*y + 56//181])
 ```
 """
 function curve_rational_parametrization(
-        I::Ideal{<:QQMPolyRingElem};                                # input generators
-        info_level::Int=0,                                          # info level for print outs
-        cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[], # coeffs of linear forms
-        nr_thrds::Int=1,                                            # number of threads (msolve)
+        I::Ideal{<:QQMPolyRingElem};                                                        # input generators
+        info_level::Int=0,                                                                  # info level for print outs
+        cfs_lfs::Union{Vector{<:Vector{<:Union{Int,ZZRingElem}}}, Nothing} = nothing,  # coeffs of linear forms
+        nr_thrds::Int=1,                                                                    # number of threads (msolve)
     )
     @assert nvars(parent(I)) >= 2 "I must be defined in a ring with at least 2 variables"
+    if !isnothing(cfs_lfs)
+        cfs_lfs = Vector{ZZRingElem}[[ ZZRingElem(c) for c in cfs_lf] for cfs_lf in cfs_lfs] # Convert Int64 into ZZRingElem
+    end
 
     info_level > 0 && println("Compute generic linear forms...")
     Inew, cfs_lfs = _add_genvars(I, 2, cfs_lfs)
@@ -147,7 +150,7 @@ end
 function _add_genvars(
     I::Ideal{<:MPolyRingElem},
     n_gen::Int,
-    cfs_lfs::Vector{<:Vector{<:RingElem}},
+    cfs_lfs::Union{Vector{<:Vector{<:RingElem}}, Nothing},
     genS::Vector{Symbol} = Symbol[]
 )
     F = I.gens
@@ -175,7 +178,7 @@ function _add_genvars(
     I_ext = Ideal(F_ext)
 
     # Find generic linear forms
-    if !isempty(cfs_lfs)
+    if !isnothing(cfs_lfs)
         @assert length(cfs_lfs) == n_gen "Expected $n_gen linear forms, got $(length(cfs_lfs))"
         @assert all(length(c) in [n, n + n_gen] for c in cfs_lfs) "Linear forms must have $n or $(n + n_gen) coefficients"
         if length(first(cfs_lfs)) == n
@@ -192,7 +195,7 @@ function _add_genvars(
     # Add equations Li(X) - Zi = 0
     append!(F_ext, [transpose(c) * all_vars for c in cfs_lfs])
     Inew = Ideal(F_ext)
-    Inew.deg, Inew.dim = DEG, DIM - n_gen
+    Inew.deg, Inew.dim = DEG, max(DIM - n_gen, -1)
 
     return Inew, cfs_lfs
 end
@@ -203,7 +206,7 @@ end
 function _find_generic_linear_forms(
         I::Ideal{<:MPolyRingElem},
         n_gen::Int,
-        cfs_lfs::Vector{Vector{ZZRingElem}}
+        cfs_lfs::Union{Vector{Vector{ZZRingElem}}, Nothing}
     )
     R, F = parent(I), I.gens
     n, vars = nvars(R), gens(R)
@@ -219,7 +222,7 @@ function _find_generic_linear_forms(
         Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), F))
         DEG, DIM = hilbert_degree(Itest), dimension(Itest)
     end
-    @assert DIM < 0 || n_gen < DIM + 2 "Too many generic linear forms asked > dim + 1"
+    @assert DIM < 0 || 2*n_gen < DIM + 2 "Too many generic linear forms asked > dim + 1"
 
     # 2. Compute a bound for generic specialization values
     # Bound on bifurcation set degree (e.g., Jelonek & Kurdyka, 2005)
@@ -227,7 +230,7 @@ function _find_generic_linear_forms(
     bif_bound = uZ << (n * floor(Int, log2(max_deg)) + 1)
 
         # 3. Setup stream and iteration limits depending on the mode
-    is_verif = !isempty(cfs_lfs)
+    is_verif = !isnothing(cfs_lfs)
     max_iter = is_verif ? 1 : 10000
 
     if is_verif
