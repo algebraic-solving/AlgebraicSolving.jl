@@ -27,7 +27,9 @@ function hilbert_series(I::Ideal{T}) where T <: MPolyRingElem
     gb = get!(I.gb, 0) do
         groebner_basis(I, complete_reduction = true)
     end
-    lead_exps = [ _lead_exp_ord(g, :degrevlex) for g in gb if !iszero(g) ]
+
+    lead_exps = Vector{Int64}[ _lead_exp_ord(g, :degrevlex) for g in gb if !iszero(g) ]
+
     return _hilbert_series_mono(lead_exps, nvars(parent(I)))
 end
 

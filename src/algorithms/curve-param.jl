@@ -141,88 +141,110 @@ function curve_rational_parametrization(
 end
 
 
-# Return F in a polynomial ring with ngenvars new variables
+# Return F in a polynomial ring with n_gen new variables
 # + newvars linear forms provided by coefficients in cfs_lfs or generic ones internally computed
 function _add_genvars(
     I::Ideal{P} where P<:MPolyRingElem,
-    ngenvars::Int,
-    cfs_lfs::Vector{Vector{T}} where T<:RingElem
+    n_gen::Int,
+    cfs_lfs::Vector{Vector{T}} where T<:RingElem,
+    genS::Vector{Symbol} = Symbol[]
 )
     F = I.gens
     R = parent(I)
     K, n = base_ring(R), nvars(R)
 
     # Add new variables (reverse index order)
-    newS = vcat(symbols(R), Symbol.(["_Z$i" for i in ngenvars:-1:1]))
+    @assert isempty(genS) || (length(unique(genS)) == length(genS) == n_gen) "Bad provided names for generic variables"
+    genS = isempty(genS) ? Symbol.(["_Z$i" for i in n_gen:-1:1]) : genS
+    newS = vcat(symbols(R), genS)
     R_ext, all_vars = polynomial_ring(K, newS)
 
     # Inject F in this new ring efficiently using evaluation
-    Fnew = Vector{MPolyRingElem}(undef, length(F))
+    F_ext = Vector{MPolyRingElem}(undef, length(F))
     ctx = MPolyBuildCtx(R_ext)
     for i in eachindex(F)
         for (e, c) in zip(exponent_vectors(F[i]), coefficients(F[i]))
-            push_term!(ctx, c, vcat(e, zeros(Int, ngenvars)))
+            push_term!(ctx, c, vcat(e, zeros(Int, n_gen)))
         end
-        Fnew[i] = finish(ctx)
+        F_ext[i] = finish(ctx)
     end
+    I_ext = Ideal(F_ext)
 
     # Find generic linear forms
     if !isempty(cfs_lfs)
-        @assert length(cfs_lfs) == ngenvars "Expected $ngenvars linear forms, got $(length(cfs_lfs))"
-        @assert all(length(c) in [n, n + ngenvars] for c in cfs_lfs) "Linear forms must have $n or $(n + ngenvars) coefficients"
+        @assert length(cfs_lfs) == n_gen "Expected $n_gen linear forms, got $(length(cfs_lfs))"
+        @assert all(length(c) in [n, n + n_gen] for c in cfs_lfs) "Linear forms must have $n or $(n + n_gen) coefficients"
+        if length(first(cfs_lfs)) == n
+            cfs_lfs = [
+                vcat(c, [-ZZ(j == i) for j in n_gen:-1:1])
+                for (i, c) in enumerate(cfs_lfs)
+            ]
+        end
     end
     if characteristic(K) == 0
-        (DEG, DIM), cfs_lfs = _find_generic_linear_forms(I, ngenvars, cfs_lfs)
+        (DEG, DIM), cfs_lfs = _find_generic_linear_forms(I_ext, n_gen, cfs_lfs)
     else
-        DEG, DIM = hilbert_degree(I), dimension(I)
-    end
-
-    # Extend coefficient vectors if only X-coefficients are provided
-    if length(first(cfs_lfs)) == n
-        cfs_lfs = [
-            vcat(c, [-ZZ(j == i) for j in ngenvars:-1:1])
-            for (i, c) in enumerate(cfs_lfs)
-        ]
+        DEG, DIM = hilbert_degree(I_ext), dimension(I_ext)
     end
 
     # Add equations Li(X) - Zi = 0
-    append!(Fnew, [transpose(c) * all_vars for c in cfs_lfs])
+    append!(F_ext, [transpose(c) * all_vars for c in cfs_lfs])
 
-    Inew = Ideal(Fnew)
-    Inew.deg, Inew.dim = DEG, DIM
+    Inew = Ideal(F_ext)
+    Inew.deg, Inew.dim = DEG, DIM - n_gen
 
     return Inew, cfs_lfs
 end
 
-# Computes ngenvars sequential generic linear forms.
-function _find_generic_linear_forms(I::Ideal{T}, ngenvars::Int, cfs_lfs) where T <: MPolyRingElem
+# Computes/Tests n_gen sequential generic linear forms
+# so that the last n_gen variables are in generic positions
+# w.r.t each other, starting from the last one.
+function _find_generic_linear_forms(
+        I::Ideal{P} where P <: MPolyRingElem,
+        n_gen::Int,
+        cfs_lfs::Vector{Vector{ZZRingElem}}
+    )
     R, F = parent(I), I.gens
     n, vars = nvars(R), gens(R)
+    n_nogen = n - n_gen
     cfs_lfs_out = Vector{Vector{ZZRingElem}}()
+    uZ = one(ZZRingElem)
 
     # 1. Compute the degree of the system
-    lucky_prime = first(_generate_lucky_primes(F, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
+    lucky_prime = first(_generate_lucky_primes(F, uZ<<30, (uZ<<31)-1, 1))
     if haskey(I.gb, 0)
         DEG, DIM = hilbert_degree(I), dimension(I)
     else
         Itest = Ideal(change_base_ring.(Ref(GF(lucky_prime)), F))
         DEG, DIM = hilbert_degree(Itest), dimension(Itest)
     end
-    @assert DIM < 0 || ngenvars < DIM + 2 "Too many generic linear forms asked > dim + 1"
-
-    !isempty(cfs_lfs) && return (DEG, DIM), cfs_lfs
+    @assert DIM < 0 || n_gen < DIM + 2 "Too many generic linear forms asked > dim + 1"
 
     # 2. Compute a bound for generic specialization values
     # Bound on bifurcation set degree (e.g., Jelonek & Kurdyka, 2005)
     max_deg = maximum(f -> total_degree(f), F; init=1)
-    bif_bound = ZZ(1) << (n * floor(Int, log2(max_deg)) + 1)
+    bif_bound = uZ << (n * floor(Int, log2(max_deg)) + 1)
 
-    # 3. Instantiate the stateful generator ONCE for all iterations
-    candidate_stream = _candidate_stream(n)
+        # 3. Setup stream and iteration limits depending on the mode
+    is_verif = !isempty(cfs_lfs)
+    max_iter = is_verif ? 1 : 10
+
+    if is_verif
+        # Wrap the provided linear forms into a sequential stream
+        cand = Channel{Vector{ZZRingElem}}() do ch
+            for coeffs in cfs_lfs
+                put!(ch, coeffs)
+            end
+        end
+        candidate_stream = k -> take!(cand)
+    else
+        cand = _candidate_stream(n_nogen)
+        candidate_stream = k -> vcat(take!(cand), [-ZZ(j == k) for j in n_gen:-1:1])
+    end
 
     # Running system to test subsequent linear forms
     current_F = copy(F)
-    for k in 1:ngenvars
+    for k in 1:n_gen
         # 3. Compute a generic specialization value
         val = [ZZ(), ZZ()]
         while iszero(val[1]) || is_divisible_by(val[1], lucky_prime) || is_divisible_by(val[2], lucky_prime)
@@ -230,12 +252,12 @@ function _find_generic_linear_forms(I::Ideal{T}, ngenvars::Int, cfs_lfs) where T
         end
 
         # 4. Find the next generic linear form
-        coeffs = _search_single_linear_form(current_F, val, DEG, DIM, k, candidate_stream)
+        coeffs = _search_single_linear_form(current_F, val, DEG, DIM, k, candidate_stream, max_iter)
         push!(cfs_lfs_out, coeffs)
 
         # 5. Specialize the current linear form
         L = sum(coeffs[i] * vars[i] for i in 1:n)
-        push!(current_F, val[1] * L + val[2])
+        push!(current_F, L, val[1] * vars[n - k + 1] + val[2])
 
     end
 
@@ -245,32 +267,40 @@ end
 
 # Returns a generic linear form provided the current situation
 # It gets the next candidate from the stream and applies genericity tests
-function _search_single_linear_form(F, val, DEG, DIM, k, candidate_stream; max_iter=10000)
+function _search_single_linear_form(F, val, DEG, DIM, k, candidate_stream, max_iter)
     R = parent(first(F))
     n, vars = nvars(R), gens(R)
-
    # Take candidates from the stream until we find a match
     for _ in 1:max_iter
-        coeffs = take!(candidate_stream)
+        coeffs = candidate_stream(k)
 
-        L = sum(coeffs[i] * vars[i] for i in 1:n)
-        Feval = vcat(F, val[1] * L + val[2])
+        FL = vcat(F, sum(coeffs[i] * vars[i] for i in 1:n))
+        Feval = vcat(FL, val[1] * vars[n - k + 1] + val[2])
         lucky_prime = first(_generate_lucky_primes(Feval, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
-        Imod = Ideal(change_base_ring.(Ref(GF(lucky_prime)), k <= DIM ? Feval : F))
+        modK = GF(lucky_prime)
+        Imod = Ideal(change_base_ring.(Ref(modK), 2*k <= DIM ? Feval : FL))
 
-        if k <= DIM
+        if 2*k <= DIM
             # --- Case A: Projection Form ---
-            dimension(Imod) == DIM - k && hilbert_degree(Imod) == DEG && return coeffs
+
+            dimension(Imod) == DIM - 2*k && hilbert_degree(Imod) == DEG && return coeffs
         else
-            # --- Case B: Separating Form (k == DIM + 1) ---
-            Iext, _ = _add_genvars(Imod, 1, [GF(lucky_prime).(coeffs)])
+            # --- Case B: Separating Form (2*k == DIM + 1) ---
+            new_coeffs = [ modK(i in (n-k+1, n+1)) for i in 1:n+1]
+
+            Iext, _ = _add_genvars(Imod, 1, [new_coeffs], [:_ZZ1])
             Iext_elim = Ideal(eliminate(Iext, n))
+            Iext_elim.gb[0] = Iext_elim.gens
 
             hilbert_degree(Iext_elim) == DEG && return coeffs
         end
     end
 
-    error("Failed to find a generic linear form after $max_iter tests.")
+    if max_iter == 1
+        error("Provided linear form number $k, failed the genericity test.")
+    else
+        error("Failed to find a generic linear form after $max_iter tests.")
+    end
 end
 
 # A stateful, lazy generator for candidate linear forms with n vars
