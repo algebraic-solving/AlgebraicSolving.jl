@@ -1,5 +1,5 @@
 @doc Markdown.doc"""
-    curve_rational_parametrization(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
+    curve_rational_parametrization(I::Ideal{<:MPolyRingElem}, <keyword arguments>)
 
 Given a **radical** ideal `I` with solution set X being of dimension 1 over the complex numbers,
 return a rational curve parametrization of the one-dimensional irreducible components of X.
@@ -10,7 +10,7 @@ return a rational curve parametrization of the one-dimensional irreducible compo
 is not one an ErrorException is thrown.
 
 # Arguments
-- `I::Ideal{T} where T <: QQMPolyRingElem`: input generators.
+- `I::Ideal{<:QQMPolyRingElem}`: input generators.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
 - `cfs_lfs::Vector{Vector{ZZRingElem}} = []`: coefficients for the above linear forms
 - `nr_thrds::Int=1`: number of threads for msolve
@@ -36,18 +36,18 @@ AlgebraicSolving.CurveRationalParametrization([:x1, :x2, :x3, :_Z2, :_Z1], Vecto
 ```
 """
 function curve_rational_parametrization(
-        I::Ideal{P} where P<:QQMPolyRingElem;                       # input generators
+        I::Ideal{<:QQMPolyRingElem};                                # input generators
         info_level::Int=0,                                          # info level for print outs
         cfs_lfs::Vector{Vector{ZZRingElem}} = Vector{ZZRingElem}[], # coeffs of linear forms
         nr_thrds::Int=1,                                            # number of threads (msolve)
     )
-    @assert(nvars(parent(I))>=2, "I must be defined in a ring with at least 2 variables")
+    @assert nvars(parent(I)) >= 2 "I must be defined in a ring with at least 2 variables"
 
-    info_level>0 && println("Compute generic linear forms...")
+    info_level > 0 && println("Compute generic linear forms...")
     Inew, cfs_lfs = _add_genvars(I, 2, cfs_lfs)
 
     if Inew.dim == -1
-        T = polynomial_ring(QQ, [:x,:y])[1]
+        T = polynomial_ring(QQ, [:x, :y])[1]
         I.dim = -1
         I.rat_param = CurveRationalParametrization(Symbol[], Vector{ZZRingElem}[], T(-1), T(-1), QQMPolyRingElem[])
         return I.rat_param
@@ -68,21 +68,22 @@ function curve_rational_parametrization(
     lc = nothing
 
     while length(free_ind) > 0
-        if i > 2*(DEG+2)
+        if i > 2 * (DEG + 2)
             error("Too many bad specializations. Check radicality and generic linear forms.")
         end
+
         # Determine values to evaluate at to keep bitsize low
-        curr_values = ZZ.([-(i - 1 + (length(free_ind) + 1) ÷ 2):-i;i:(i - 1 + length(free_ind) ÷ 2)])
-        LFeval = Ideal.(_evalvar(F, N, curr_values))
+        curr_values = ZZ.([-(i - 1 + (length(free_ind) + 1) ÷ 2):-i; i:(i - 1 + length(free_ind) ÷ 2)])
+        LFeval = _evalvar(F, N, curr_values)
+
         # Compute parametrization of each evaluation
         Lr = Vector{RationalParametrization}(undef, length(free_ind))
-
         for j in eachindex(free_ind)
-            info_level>0 && print("Evaluated parametrizations: $(j)/$(length(free_ind))", "\r")
-            Lr[j] = rational_parametrization(LFeval[j], nr_thrds=nr_thrds)
+            info_level > 0 && print("Evaluated parametrizations: $(j)/$(length(free_ind))\r")
+            Lr[j] = rational_parametrization(Ideal(LFeval[j]), nr_thrds=nr_thrds)
 
             # Specialization checks: same vars order, generic degree
-            if  Lr[j].vars == symbols(R)[1:N-1] && degree(Lr[j].elim) == DEG
+            if Lr[j].vars == symbols(R)[1:N-1] && degree(Lr[j].elim) == DEG
                 if isnothing(lc)
                     lc = leading_coefficient(Lr[j].elim)
                     rr = vcat([Lr[j].elim, Lr[j].denom], Lr[j].param)
@@ -102,41 +103,41 @@ function curve_rational_parametrization(
         free_ind = free_ind[.!used_ind]
         used_ind = falses(length(free_ind))
 
-        info_level * length(free_ind) != 0 &&
+        if info_level * length(free_ind) != 0
         println("bad specialization(s): ", curr_values[free_ind])
+    end
     end
 
     # Interpolate each coefficient of each poly in the param
-    T, = polynomial_ring(QQ, [:x,:y])
+    T, = polynomial_ring(QQ, [:x, :y])
     A, = polynomial_ring(QQ)
 
-    POLY_PARAM = Vector{QQMPolyRingElem}(undef,N)
+    POLY_PARAM = Vector{QQMPolyRingElem}(undef, N)
     for count in 1:N
-        info_level>0 && print("Interpolate parametrizations: $count/$N\r")
-        COEFFS = Vector{QQPolyRingElem}(undef, DEG+1)
+        info_level > 0 && print("Interpolate parametrizations: $count/$N\r")
+        COEFFS = Vector{QQPolyRingElem}(undef, DEG + 1)
+        
         for deg in 0:DEG
             _evals = [coeff(PARAM[i][count], deg) for i in eachindex(PARAM)]
             # Remove denominators for faster interpolation with FLINT
             # TODO: remove dens mult when interface's ready in Nemo
-            den = foldl(lcm, denominator.(_evals))
+            den = reduce(lcm, (denominator(e) for e in _evals), init=one(ZZ))
             scaled_evals = [ZZ(_evals[i] * den) for i in eachindex(_evals)]
-            COEFFS[deg+1] = interpolate(A, _values, scaled_evals) / (lc * den)
+            COEFFS[deg + 1] = interpolate(A, _values, scaled_evals) / (lc * den)
         end
 
         ctx = MPolyBuildCtx(T)
-        for (i, c) in enumerate(COEFFS)
-            for (j, coeff) in enumerate(coefficients(c))
-                !iszero(coeff) && push_term!(ctx, coeff, [j-1, i-1])
+        for (idx, c) in enumerate(COEFFS)
+            for (j, coef) in enumerate(coefficients(c))
+                !iszero(coef) && push_term!(ctx, coef, [j - 1, idx - 1])
             end
         end
         POLY_PARAM[count] = finish(ctx)
     end
-    info_level>0 && println()
+    info_level > 0 && println()
 
-    # Output: [vars, linear forms, elim, denom, [nums_param]]
     I.deg, I.dim = Inew.deg, Inew.dim
-    I.rat_param = CurveRationalParametrization( symbols(R), cfs_lfs, POLY_PARAM[1],
-                                                POLY_PARAM[2], POLY_PARAM[3:end]    )
+    I.rat_param = CurveRationalParametrization(symbols(R), cfs_lfs, POLY_PARAM[1], POLY_PARAM[2], POLY_PARAM[3:end])
     return I.rat_param
 end
 
@@ -144,9 +145,9 @@ end
 # Return F in a polynomial ring with n_gen new variables
 # + newvars linear forms provided by coefficients in cfs_lfs or generic ones internally computed
 function _add_genvars(
-    I::Ideal{P} where P<:MPolyRingElem,
+    I::Ideal{<:MPolyRingElem},
     n_gen::Int,
-    cfs_lfs::Vector{Vector{T}} where T<:RingElem,
+    cfs_lfs::Vector{<:Vector{<:RingElem}},
     genS::Vector{Symbol} = Symbol[]
 )
     F = I.gens
@@ -155,16 +156,19 @@ function _add_genvars(
 
     # Add new variables (reverse index order)
     @assert isempty(genS) || (length(unique(genS)) == length(genS) == n_gen) "Bad provided names for generic variables"
-    genS = isempty(genS) ? Symbol.(["_Z$i" for i in n_gen:-1:1]) : genS
+    genS = isempty(genS) ? [Symbol("_Z", i) for i in n_gen:-1:1] : genS
     newS = vcat(symbols(R), genS)
     R_ext, all_vars = polynomial_ring(K, newS)
 
     # Inject F in this new ring efficiently using evaluation
     F_ext = Vector{MPolyRingElem}(undef, length(F))
     ctx = MPolyBuildCtx(R_ext)
+    new_e = zeros(Int, n + n_gen) # Pre-allocated buffer
+    
     for i in eachindex(F)
         for (e, c) in zip(exponent_vectors(F[i]), coefficients(F[i]))
-            push_term!(ctx, c, vcat(e, zeros(Int, n_gen)))
+            new_e[1:n] .= e
+            push_term!(ctx, c, new_e)
         end
         F_ext[i] = finish(ctx)
     end
@@ -175,12 +179,10 @@ function _add_genvars(
         @assert length(cfs_lfs) == n_gen "Expected $n_gen linear forms, got $(length(cfs_lfs))"
         @assert all(length(c) in [n, n + n_gen] for c in cfs_lfs) "Linear forms must have $n or $(n + n_gen) coefficients"
         if length(first(cfs_lfs)) == n
-            cfs_lfs = [
-                vcat(c, [-ZZ(j == i) for j in n_gen:-1:1])
-                for (i, c) in enumerate(cfs_lfs)
-            ]
+            cfs_lfs = [vcat(c, [-ZZ(j == i) for j in n_gen:-1:1]) for (i, c) in enumerate(cfs_lfs)]
         end
     end
+
     if characteristic(K) == 0
         (DEG, DIM), cfs_lfs = _find_generic_linear_forms(I_ext, n_gen, cfs_lfs)
     else
@@ -189,7 +191,6 @@ function _add_genvars(
 
     # Add equations Li(X) - Zi = 0
     append!(F_ext, [transpose(c) * all_vars for c in cfs_lfs])
-
     Inew = Ideal(F_ext)
     Inew.deg, Inew.dim = DEG, DIM - n_gen
 
@@ -200,7 +201,7 @@ end
 # so that the last n_gen variables are in generic positions
 # w.r.t each other, starting from the last one.
 function _find_generic_linear_forms(
-        I::Ideal{P} where P <: MPolyRingElem,
+        I::Ideal{<:MPolyRingElem},
         n_gen::Int,
         cfs_lfs::Vector{Vector{ZZRingElem}}
     )
@@ -227,7 +228,7 @@ function _find_generic_linear_forms(
 
         # 3. Setup stream and iteration limits depending on the mode
     is_verif = !isempty(cfs_lfs)
-    max_iter = is_verif ? 1 : 10
+    max_iter = is_verif ? 1 : 1000  # Bumped to 1000 for standard bitmask searches
 
     if is_verif
         # Wrap the provided linear forms into a sequential stream
@@ -255,10 +256,8 @@ function _find_generic_linear_forms(
         coeffs = _search_single_linear_form(current_F, val, DEG, DIM, k, candidate_stream, max_iter)
         push!(cfs_lfs_out, coeffs)
 
-        # 5. Specialize the current linear form
-        L = sum(coeffs[i] * vars[i] for i in 1:n)
+        L = sum(c * v for (c, v) in zip(coeffs, vars))
         push!(current_F, L, val[1] * vars[n - k + 1] + val[2])
-
     end
 
     return (DEG, DIM), cfs_lfs_out
@@ -276,6 +275,7 @@ function _search_single_linear_form(F, val, DEG, DIM, k, candidate_stream, max_i
 
         FL = vcat(F, sum(coeffs[i] * vars[i] for i in 1:n))
         Feval = vcat(FL, val[1] * vars[n - k + 1] + val[2])
+        
         lucky_prime = first(_generate_lucky_primes(Feval, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
         modK = GF(lucky_prime)
         Imod = Ideal(change_base_ring.(Ref(modK), 2*k <= DIM ? Feval : FL))
@@ -342,28 +342,33 @@ function _candidate_stream(n::Int)
     end
 end
 
-# for each a in La, evaluate each poly in F in x_i=a
 function _evalvar(
-    F::Vector{P} where P<:MPolyRingElem,
+    F::Vector{<:MPolyRingElem},
     i::Int,
-    La::Vector{T} where T<:RingElem
+    La::Vector{<:RingElem}
     )
     R = parent(first(F))
     indnewvars = setdiff(1:nvars(R), i)
     C, = polynomial_ring(base_ring(R), symbols(R)[indnewvars])
 
-    LFeval = Vector{typeof(zero(C))}[]
+    LFeval = Vector{Vector{elem_type(C)}}()
     ctx = MPolyBuildCtx(C)
+    
+    # Precompute maximum degree to avoid dictionary hashing in the inner loop
+    max_deg = isempty(F) ? 0 : maximum(f -> degree(f, i), F)
 
     for a in La
-        powa = Dict(0=>one(parent(a)), 1=>a) #no recompute powers
-        push!(LFeval, typeof(zero(C))[])
+        # O(1) Array lookup for powers instead of Dict
+        pow_a = [one(parent(a))]
+        for d in 1:max_deg
+            push!(pow_a, pow_a[end] * a)
+        end
+
+        push!(LFeval, elem_type(C)[])
         for f in F
-            for (e,c) in zip(exponent_vectors(f), coefficients(f))
-                aei = get!(powa, e[i]) do
-                    a^e[i]
-                end
-                push_term!(ctx, c*aei, [e[j] for j in indnewvars ])
+            for (e, c) in zip(exponent_vectors(f), coefficients(f))
+                aei = pow_a[e[i] + 1]
+                push_term!(ctx, c * aei, [e[j] for j in indnewvars])
             end
             push!(LFeval[end], finish(ctx))
         end
@@ -375,22 +380,19 @@ end
 # that do not divide any numerator/denominator
 # of any coefficient in polynomials from LP
 function _generate_lucky_primes(
-    LF::Vector{P} where P<:MPolyRingElem,
+    LF::Vector{<:MPolyRingElem},
     low::ZZRingElem,
     up::ZZRingElem,
     N::Int64
     )
-    # Avoid repetitive enumeration and redundant divisibility check
-    CF = ZZRingElem[]
-    for f in LF, c in coefficients(f), part in (numerator(c), denominator(c))
-        if !isone(part)
-            push!(CF, part)
+    # Using a Set avoids resizing and `unique!` shifting overhead
+    CF_set = Set{ZZRingElem}()
+    for f in LF, c in coefficients(f)
+        !isone(numerator(c)) && push!(CF_set, numerator(c))
+        !isone(denominator(c)) && push!(CF_set, denominator(c))
         end
-    end
-    sort!(CF, rev=true)
-    unique!(CF)
 
-    # Test primes
+    CF = sort!(collect(CF_set), rev=true)
     Lprim = ZZRingElem[]
     while length(Lprim) < N
         cur_prim = next_prime(rand(low:up))
