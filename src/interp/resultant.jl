@@ -1,30 +1,3 @@
-function _map_exponent_vectors(f, p::MPolyRingElem, R::MPolyRing)::MPolyRingElem
-    cvzip = zip(coefficients(p), exponent_vectors(p))
-    M = MPolyBuildCtx(R)
-    for (c, v) in cvzip
-        push_term!(M, coefficient_ring(R)(c), f(v))
-    end
-    finish(M)
-end
-
-function _change_ring(p::MPolyRingElem, R::MPolyRing)::MPolyRingElem
-    n = length(gens(parent(p)))
-    n′ = length(gens(R))
-    if n == 0 || n′ == 0
-        return R(constant_coefficient(p))
-    end
-    indices = Vector{Int}()
-    for s in symbols(R)
-        i = findfirst(==(s), symbols(parent(p)))
-        if isnothing(i)
-            push!(indices, 0)
-        else
-            push!(indices, i)
-        end
-    end
-    return _map_exponent_vectors(v -> [i == 0 ? 0 : v[i] for i in indices], p, R)
-end
-
 # TODO: remove this once the next version of Nemo is released
 function _flint_discriminant(f::QQMPolyRingElem, i::Int)::QQMPolyRingElem
     R = parent(f)
