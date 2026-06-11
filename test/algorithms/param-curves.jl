@@ -30,12 +30,12 @@
 	@test_throws AssertionError rational_curve_parametrization(I)
     @test_throws ErrorException rational_curve_parametrization(Ideal([x1^2-x2, x1*x3, x2-12]), check_gen=false)
 
-    elim    = 5041//2500*x^2 - 71//25*x*y - 3834//625*x + y^2 + 108//25*y - 6492//625
-    denom   = -71//25*x + 2*y + 108//25
-    p1      = 672//25
-    p2      = -852//25*x + 24*y + 1296//25
+    elim    = 2500//5041*x^2 - 100//71*x*y + 10800//5041*x + y^2 - 216//71*y - 25968//5041
+    denom   = -100//71*x + 2*y - 216//71
+    p1      = -1344//71
+    p2      = -1200//71*x + 24*y - 2592//71
     p3      = zero(C)
-    p4      = -923//625*x^2 + 26//25*x*y - 18192//625*x + 552//25*y + 8304//625
+    p4      = -2600//5041*x^2 + 52//71*x*y - 89616//5041*x + 1680//71*y - 20160//5041
 
     param = rational_curve_parametrization(I, cfs_lfs=map.(Ref(ZZ),[[-8,2,2,-1,-8,6], [8,-7,-5,8,-7,2]]))
 
