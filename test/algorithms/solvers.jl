@@ -153,7 +153,7 @@ end
     worker_pool = WorkerPool(worker_ids)
 
     Threads.@threads for i in 1:nb_tests
-        G[i] = real_solutions(Ideal(F[i%3+1]), worker_pool=worker_pool)
+        G[i] = real_solutions(AlgebraicSolving.Ideal(F[i%3+1]), worker_pool=worker_pool)
     end
     for i in 1:nb_tests
         @test issetequal(G[i], H[i%3+1])
