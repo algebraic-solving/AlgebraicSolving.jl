@@ -343,7 +343,7 @@ function _core_leading_monomials(
         )
 
     F = I.gens
-    R  = first(F).parents
+    R  = first(F).parent
     field_char  = Int(characteristic(R))
 
     if !iszero(field_char) # positive field characteristic -> just compute a GB
@@ -378,5 +378,5 @@ function _core_leading_monomials(
 
     #  convert to monomials
     return _convert_rational_array_to_abstract_algebra(
-        jl_ld, jl_len, jl_cf, jl_exp, R, normalize, eliminate)
+        jl_ld, jl_len, jl_cf, jl_exp, R)
 end
