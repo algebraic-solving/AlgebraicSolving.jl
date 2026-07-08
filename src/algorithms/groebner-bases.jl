@@ -1,6 +1,6 @@
 import msolve_jll: libneogb, libmsolve
 
-export groebner_basis, eliminate
+export groebner_basis, leading_monomials, eliminate
 
 @doc Markdown.doc"""
     eliminate(I::Ideal{T} where T <: MPolyRingElem, eliminate::Int,  <keyword arguments>)
@@ -143,6 +143,62 @@ function groebner_basis(
                              worker_pool = worker_pool,
                              info_level = info_level)
     end
+end
+
+@doc Markdown.doc"""
+    leading_monomials(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
+
+Compute the minimal generators of the leading monomial ideal of `I`
+w.r.t. to the degree reverse lexicographical monomial ordering using
+Faugère's F4 algorithm.
+
+**Note**: At the moment only ground fields of characteristic `p`, `p` prime, `p < 2^{31}` and the rationals are supported.
+
+# Arguments
+- `I::Ideal{T} where T <: MPolyRingElem`: input generators.
+- `initial_hts::Int=17`: initial hash table size `log_2`.
+- `nr_thrds::Int=1`: number of threads for parallel linear algebra.
+- `max_nr_pairs::Int=0`: maximal number of pairs per matrix, only bounded by minimal degree if `0`.
+- `la_option::Int=2`: linear algebra option: exact sparse-dense (`1`), exact sparse (`2`, default), probabilistic sparse-dense (`42`), probabilistic sparse(`44`).
+- `worker_pool::Union{Nothing,AbstractWorkerPool}=nothing`: if not `nothing`, run the core Gröbner-basis array computation on a worker from this pool.
+- `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
+
+# Examples
+```jldoctest
+julia> using AlgebraicSolving
+
+julia> R, (x,y,z) = polynomial_ring(GF(101),["x","y","z"], internal_ordering=:degrevlex)
+(Multivariate polynomial ring in 3 variables over GF(101), FqMPolyRingElem[x, y, z])
+
+julia> I = Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
+FqMPolyRingElem[x + 2*y + 2*z + 100, x^2 + 2*y^2 + 2*z^2 + 100*x, 2*x*y + 2*y*z + 100*y]
+
+julia> leading_monomials(I)
+4-element Vector{FqMPolyRingElem}:
+ x
+ y*z
+ y^2
+ z^3
+```
+"""
+function leading_monomials(
+        I::Ideal{T} where T <: MPolyRingElem;
+        initial_hts::Int=17,
+        nr_thrds::Int=1,
+        max_nr_pairs::Int=0,
+        la_option::Int=2,
+        worker_pool::Union{Nothing,AbstractWorkerPool}=nothing,
+        info_level::Int=0
+        )
+
+    if haskey(I.gb, 0)
+        return [_leading_monomial(g, :degrevlex) for g in I.gb[0]]
+    end
+
+    return _core_leading_monomials(I, initial_hts = initial_hts, nr_thrds = nr_thrds,
+                                   max_nr_pairs = max_nr_pairs, la_option = la_option,
+                                   worker_pool = worker_pool,
+                                   info_level = info_level)
 end
 
 @doc Markdown.doc"""
