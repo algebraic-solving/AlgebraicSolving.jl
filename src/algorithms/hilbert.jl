@@ -12,7 +12,7 @@ Pierre Lairez, Rafael Mohr, Théo Ternier, A data structure for
 monomial ideals with applications to signature Gröbner bases.
 
 **Notes**:
-* This requires a Gröbner basis of `I`, which is computed internally if not already known.
+* This will compute a Gröbner basis of `I` over a field of positive characteristic which is computed internally if not already known.
 * Significantly faster when internal_ordering is :degrevlex.
 
 # Examples
@@ -29,10 +29,8 @@ julia> hilbert_series(I)
 """
 function hilbert_series(I::Ideal{T}; use_mdd = false) where T <: MPolyRingElem
 
-    gb = get!(I.gb, 0) do
-        groebner_basis(I, complete_reduction = true)
-    end
-    lead_exps = [ _lead_exp_ord(g, :degrevlex) for g in gb if !iszero(g) ]
+    lms = leading_monomials(I)
+    lead_exps = [_lead_exp_ord(lm, :degrevlex) for lm in lms]
     if use_mdd
         n = ngens(parent(I))
         diagram = create_diagram([monomial(SVector{n}(e)) for e in lead_exps])

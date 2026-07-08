@@ -58,6 +58,11 @@ function _all_lesseq(a::BitVector, b::BitVector)::Bool
     return true
 end
 
+function _leading_monomial(p::MPolyRingElem, order::Symbol)
+    lexp = _lead_exp_ord(p, order)
+    return prod(gens(parent(p)) .^ lexp) 
+end
+
 function _lead_exp_ord(p::MPolyRingElem, order::Symbol)
     @req !iszero(p) "Zero polynomial does not have a leading term"
     R = parent(p)
