@@ -217,6 +217,26 @@ end
     rmprocs(worker_ids)
 end
 
+@testset "Algorithms -> Leading monomials" begin
+    # positive characteristic
+    R, (x,y,z) = polynomial_ring(GF(101),["x","y","z"], internal_ordering=:degrevlex)
+    I = AlgebraicSolving.Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
+    lms = leading_monomials(I)
+    lms_test = MPolyRingElem[x, y*z, y^2, z^3]
+    @test lms == lms_test
+    I = AlgebraicSolving.Ideal([zero(R)])
+    @test_throws ErrorException leading_monomials(I)
+
+    # over Q
+    R, (x,y,z) = polynomial_ring(QQ,["x","y","z"], internal_ordering=:degrevlex)
+    I = AlgebraicSolving.Ideal([x+2*y+2*z-1, x^2+2*y^2+2*z^2-x, 2*x*y+2*y*z-y])
+    lms = leading_monomials(I)
+    lms_test = MPolyRingElem[x, y*z, y^2, z^3]
+    @test lms == lms_test
+    I = AlgebraicSolving.Ideal([zero(R)])
+    @test_throws ErrorException leading_monomials(I)
+end
+
 @testset "Algorithms -> Sig Gröbner bases" begin
     R, (x,y,z) = polynomial_ring(QQ,["x","y","z"], internal_ordering=:degrevlex)
     F = [x^2+1-3, x*y-z, x*z^2-3*y^2]
