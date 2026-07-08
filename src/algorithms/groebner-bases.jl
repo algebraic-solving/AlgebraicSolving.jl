@@ -148,7 +148,7 @@ end
 @doc Markdown.doc"""
     _core_groebner_basis_array(lens::Vector{Int32}, cfs::Union{Vector{Int32},Vector{BigInt}}, exps::Vector{Int32}, field_char::Int, <keyword arguments>)
 
-Compute a Gröbner basis of the ideal defined by the input data w.r.t. to the degree reverse lexicographical monomial ordering using Faugère's F4 algorithm.
+Compute a Gröbner basis (or the minimal generators of the leading monomial ideal, see the keyword arguments below) of the ideal defined by the input data w.r.t. to the degree reverse lexicographical monomial ordering using Faugère's F4 algorithm.
 
 **Note**: Both the input and output of this function are given as flattened arrays of integers instead of polynomials.
 
@@ -165,6 +165,7 @@ Compute a Gröbner basis of the ideal defined by the input data w.r.t. to the de
 - `complete_reduction::Bool=true`: compute a reduced Gröbner basis for `I`.
 - `truncate_lifting::Int=0`: truncates the lifting process to given number of elements, only applicable when working over the rationals.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
+- `only_leading_monomials::Bool=false`: If `true` return only the minimal generators of the leading monomial ideal of the input ideal. This option is ignored `field_char` is positive.
 ```
 
 **Note**: This is an internal function.
@@ -181,8 +182,10 @@ function _core_groebner_basis_array(
     eliminate::Int=0,
     complete_reduction::Bool=true,
     truncate_lifting::Int=0,
-    info_level::Int=0
-)::Tuple{Vector{Int32},Union{Vector{Int32},Vector{BigInt}},Vector{Int32}}
+    info_level::Int=0,
+    only_leading_monomials::Bool=false, # option is ignored if `field_char != 0`
+    )::Tuple{Vector{Int32},Union{Vector{Int32},Vector{BigInt}},Vector{Int32}}
+
     nr_gens = length(lens)
     nr_vars = length(exps) ÷ sum(lens)
 
@@ -196,13 +199,14 @@ function _core_groebner_basis_array(
     gb_cf = Ref(Ptr{Cvoid}(0))
 
     if field_char == 0
+        print_gb = only_leading_monomials ? 1 : 2
         nr_terms = ccall((:export_groebner_qq, libmsolve), Int,
             (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
                 Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
-                Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+                Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint),
             cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
             field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
-            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, truncate_lifting, info_level)
+            nr_thrds, max_nr_pairs, 0, la_option, print_gb, reduce_gb, 0, truncate_lifting, info_level)
     else
         nr_terms = ccall((:export_f4, libneogb), Int,
             (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
@@ -325,4 +329,54 @@ function _core_groebner_basis(
 
     I.gb[eliminate] = basis
     return I.gb[eliminate]
+end
+
+# compute leading monomials w.r.t. degrevlex ordering
+function _core_leading_monomials(
+        I::Ideal{T} where T <: MPolyRingElem;
+        initial_hts::Int=17,
+        nr_thrds::Int=1,
+        max_nr_pairs::Int=0,
+        la_option::Int=2,
+        worker_pool::Union{Nothing,AbstractWorkerPool}=nothing,
+        info_level::Int=0
+        )
+
+    F = I.gens
+    R  = first(F).parents
+    field_char  = Int(characteristic(R))
+
+    if !iszero(field_char) # positive field characteristic -> just compute a GB
+        gb = _core_groebner_basis(I, initial_hts = initial_hts,
+                                  nr_thrds = nr_thrds,
+                                  max_nr_pairs = max_nr_pairs,
+                                  la_option = la_option,
+                                  worker_pool = worker_pool)
+        return [_leading_monomial(g, :degrevlex) for g in gb]
+    end
+
+    lens, cfs, exps, nr_gens = _convert_to_msolve(F)
+    iszero(nr_gens) && error("Input ideal is zero.")
+
+    run_core_array = () -> _core_groebner_basis_array(
+        lens, cfs, exps, field_char;
+        initial_hts=initial_hts, nr_thrds=nr_thrds,
+        max_nr_pairs=max_nr_pairs, la_option=la_option, 
+        info_level=info_level, only_leading_monomials=true)
+
+    jl_len, _, jl_exp = if isnothing(worker_pool)
+        run_core_array()
+    else
+        remotecall_fetch(run_core_array, worker_pool)
+    end
+
+    jl_ld = Int32(length(jl_len))
+    nr_terms = length(jl_exp) ÷ nvars(R)
+    iszero(nr_terms) && error("Input ideal is zero.")
+
+    jl_cf = [one(QQ) for _ in 1:jl_ld]
+
+    #  convert to monomials
+    return _convert_rational_array_to_abstract_algebra(
+        jl_ld, jl_len, jl_cf, jl_exp, R, normalize, eliminate)
 end
