@@ -59,3 +59,8 @@ import Nemo:
     ZZMatrix,
     ZZRing,
     ZZRingElem
+
+import Nemo.Generic:
+    FracFieldElem,
+    MatSpaceElem,
+    MPoly
