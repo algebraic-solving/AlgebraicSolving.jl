@@ -1,6 +1,6 @@
 @testset "Algorithms -> Curve Parametrization" begin
     R, (x1,x2,x3) = polynomial_ring(QQ, ["x1","x2","x3"])
-    I = Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1])
+    I = AlgebraicSolving.Ideal([x1+2*x2+2*x3-1, x1^2+2*x2^2+2*x3^2-x1])
 
     C, (x,y) = polynomial_ring(QQ, ["x","y"])
     elim  = x^2 + 4//3*x*y - 1//3*x + y^2 - 1//3*y
@@ -20,15 +20,15 @@
 
     R, (x1,x2,x3,x4) = polynomial_ring(QQ, ["x1","x2","x3","x4"])
 
-    I = Ideal([x1^2-x2, x1*x3-x4, x2*x4-12, x4^3-x3^2])
+    I = AlgebraicSolving.Ideal([x1^2-x2, x1*x3-x4, x2*x4-12, x4^3-x3^2])
     rational_curve_parametrization(I)
     @test I.rat_param.vars == Symbol[]
     @test I.rat_param.elim == -one(C)
     @test I.dim == -1
 
-    I = Ideal([x1^2-x2, x1*x3, x2-12])
+    I = AlgebraicSolving.Ideal([x1^2-x2, x1*x3, x2-12])
 	@test_throws AssertionError rational_curve_parametrization(I)
-    @test_throws ErrorException rational_curve_parametrization(Ideal([x1^2-x2, x1*x3, x2-12]), check_gen=false)
+    @test_throws ErrorException rational_curve_parametrization(AlgebraicSolving.Ideal([x1^2-x2, x1*x3, x2-12]), check_gen=false)
 
     elim    = 5041//2500*x^2 - 71//25*x*y - 3834//625*x + y^2 + 108//25*y - 6492//625
     denom   = -71//25*x + 2*y + 108//25
@@ -49,21 +49,21 @@
     @test param.param[4] == p4
     @test I.dim == 1
 
-    I = Ideal([x1^2-x2, x1*x3])
+    I = AlgebraicSolving.Ideal([x1^2-x2, x1*x3])
 	@test_throws AssertionError rational_curve_parametrization(I)
     @test_throws AssertionError rational_curve_parametrization(I, use_lfs=true)
     @test_throws AssertionError rational_curve_parametrization(I, check_gen=false)
 
-    I = Ideal([R(0)])
+    I = AlgebraicSolving.Ideal([R(0)])
     @test_throws AssertionError rational_curve_parametrization(I)
 
-    I = Ideal([R(1)])
+    I = AlgebraicSolving.Ideal([R(1)])
     @test rational_curve_parametrization(I).vars == Symbol[]
 
     # Non-generic variables
     A,(x,t,u) = polynomial_ring(QQ, [:x,:u,:t])
-    I = Ideal([t^2+u, u-x])
+    I = AlgebraicSolving.Ideal([t^2+u, u-x])
 	@test_throws AssertionError rational_curve_parametrization(I)
-    I = Ideal([u^2+t, t-x])
+    I = AlgebraicSolving.Ideal([u^2+t, t-x])
     @test_throws AssertionError rational_curve_parametrization(I)
 end

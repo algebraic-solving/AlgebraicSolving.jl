@@ -12,12 +12,13 @@ library](https://msolve.lip6.fr/) .
 
 ## Installation
 
-To use Nemo we require Julia 1.6 or higher. Please see
+AlgebraicSolving requires Julia 1.10 or higher. Please see
 <https://julialang.org/downloads/> for instructions on
 how to obtain julia for your system.
 
-At the Julia prompt simply type
+To install AlgebraicSolving, simply type
 
 ```
 julia> using Pkg; Pkg.add("AlgebraicSolving")
 ```
+in the Julia prompt.

@@ -16,11 +16,21 @@ include("algorithms/dimension.jl")
 include("algorithms/decomposition.jl")
 include("algorithms/param-curve.jl")
 include("algorithms/hilbert.jl")
+include("algorithms/sampling.jl")
+#= param-ideal =#
+include("algorithms/param-ideal/groebner-bases.jl")
+include("algorithms/param-ideal/multiplication-matrices.jl")
+include("algorithms/param-ideal/hermite-matrices.jl")
+include("algorithms/param-ideal/parametrizations.jl")
 #= siggb =#
 include("siggb/siggb.jl")
 #= connectivity =#
 include("connectivity/polar.jl")
 include("connectivity/roadmap.jl")
+#= progress =#
+include("progress/main.jl")
+#= interp =#
+include("interp/main.jl")
 #= examples =#
 include("examples/katsura.jl")
 include("examples/cyclic.jl")
