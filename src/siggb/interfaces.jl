@@ -64,10 +64,12 @@ function fill_structs!(sys_mons::Vector{Vector{MonIdx}},
                        basis_ht::MonomialHashtable{N};
                        sysl::Int=length(sys_mons),
                        def_tg::Symbol=:seq,
-                       trace::Val{Bl}=Val(false)) where {N, Bl}
+                       trace::Val{Bl}=Val(false),
+                       use_canonical_mdd::Bool=false) where {N, Bl}
 
     # initialize basis
-    basis = new_basis(init_basis_size, init_syz_size, sysl, Val(N))
+    basis = new_basis(init_basis_size, init_syz_size, sysl, Val(N);
+                      use_canonical_mdd=use_canonical_mdd)
     pairset = init_pairset(Val(N))
     tags = Tags()
     ind_order = IndOrder(SigIndex[],
@@ -157,6 +159,13 @@ function add_input_element!(basis::Basis{N},
         for i in basis.basis_offset:basis.basis_load
             push!(basis.mod_rep_known[i], false)
             resize!(basis.mod_reps[i], l)
+        end
+
+        if basis.use_canonical_mdd
+            # Inputs participate in POT canonical rewriting just like
+            # computed basis elements.
+            id = register_basis_id!(basis, l)
+            update_canonical_diagram!(basis, sig, id)
         end
 
         # add child to rewrite root

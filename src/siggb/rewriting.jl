@@ -114,9 +114,9 @@ function find_canonical_rewriter_diagram(basis::Basis,
     return node_ind - 1
 end
 
-function find_canonical_rewriter_rat(basis::Basis,
-                                     sig::Sig,
-                                     sigmask::DivMask)
+function find_canonical_rewriter_rat_scan(basis::Basis,
+                                          sig::Sig,
+                                          sigmask::DivMask)
 
     cand = zero(Int)
     for i in 1:basis.basis_load
@@ -131,6 +131,31 @@ function find_canonical_rewriter_rat(basis::Basis,
         end
     end
     return cand
+end
+
+function find_canonical_rewriter_rat_mdd(basis::Basis,
+                                         sig::Sig,
+                                         sigmask::DivMask)
+    idx = Int(index(sig))
+    iszero(idx) && return zero(Int)
+    idx > length(basis.canonical_diagrams) && return zero(Int)
+    root = @inbounds basis.canonical_diagrams[idx]
+    id = terminal_index(monomial(sig), root)
+    iszero(id) && return zero(Int)
+
+    slot = slot_from_id(basis, id)
+    @assert !iszero(slot) "canonical MDD refers to an inactive basis ID"
+    @assert !basis.is_red[slot] "canonical MDD refers to a red basis element"
+    return slot
+end
+
+function find_canonical_rewriter_rat(basis::Basis,
+                                     sig::Sig,
+                                     sigmask::DivMask)
+    if basis.use_canonical_mdd
+        return find_canonical_rewriter_rat_mdd(basis, sig, sigmask)
+    end
+    return find_canonical_rewriter_rat_scan(basis, sig, sigmask)
 end
 
 function rewriteable(basis::Basis,

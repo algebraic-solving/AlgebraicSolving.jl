@@ -132,6 +132,16 @@ function add_basis_elem!(basis::Basis{N},
     basis.rewrite_nodes[l+1] = [-1, parent_ind+1]
     basis.basis_load = l
 
+    if basis.use_canonical_mdd
+        # Update only after the element really exists in the basis. The unit
+        # case above returns before this point.
+        id = register_basis_id!(basis, l)
+        index_time = @elapsed begin
+            update_canonical_diagram!(basis, new_sig, id)
+        end
+        timer.time_for_mdd += index_time
+    end
+
     # update tracer info
     store_basis_elem!(tr, new_sig, l, basis.basis_size)
     
@@ -373,7 +383,8 @@ function minimize!(basis::Basis{N},
                    basis_ht::MonomialHashtable{N},
                    idx_bound::SigIndex,
                    ind_order::IndOrder,
-                   tags::Tags) where N
+                   tags::Tags,
+                   timer::Timings) where N
 
     if !iszero(idx_bound)
         @info "minimizing up to $(ind_order.ord[idx_bound])"
@@ -423,4 +434,10 @@ function minimize!(basis::Basis{N},
 
     sort!(to_del)
     @info "$(el_killed) elements killed"
+    if !iszero(el_killed) && basis.use_canonical_mdd
+        rebuild_time = @elapsed begin
+            rebuild_canonical_diagrams!(basis)
+        end
+        timer.time_for_mdd += rebuild_time
+    end
 end

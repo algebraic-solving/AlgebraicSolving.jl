@@ -72,13 +72,29 @@ julia> sig_groebner_basis(Fhom, mod_ord = :DPOT)
 ```
 """
 function sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
-                            degbound::Int=0, mod_ord::Symbol=:POT) where {T <: MPolyRingElem}
+                            degbound::Int=0,
+                            mod_ord::Symbol=:POT) where {T <: MPolyRingElem}
+    return _sig_groebner_basis(
+        sys;
+        info_level=info_level,
+        degbound=degbound,
+        mod_ord=mod_ord,
+        use_canonical_mdd=(mod_ord == :POT),
+    )
+end
+
+function _sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
+                             degbound::Int=0,
+                             mod_ord::Symbol=:POT,
+                             use_canonical_mdd::Bool=(mod_ord == :POT)) where {T <: MPolyRingElem}
 
     # data structure setup/conversion
     sys_mons, sys_coeffs, basis_ht, char, shift = input_setup(sys, mod_ord)
 
     # fill basis, pairset, tags
-    basis, pairset, tags, ind_order, tr = fill_structs!(sys_mons, sys_coeffs, basis_ht)
+    basis, pairset, tags, ind_order, tr =
+        fill_structs!(sys_mons, sys_coeffs, basis_ht;
+                      use_canonical_mdd=use_canonical_mdd)
 
     sysl = length(sys)
     # compute divmasks
@@ -96,6 +112,11 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0,
         @info "$(arit_ops) total submul's"
         @info timer
         @info "Size of the mdd: $(number_of_distinct_nodes(basis.lm_diagram))"
+        if basis.use_canonical_mdd
+            canonical_size =
+                number_of_distinct_dag_nodes(basis.canonical_diagrams)
+            @info "Size of the canonical rewriter DAG: $(canonical_size)"
+        end
         @info "Number of insertions: $(basis.hashstate.numberofinsertion)"
         @info "Number of tests: $(basis.hashstate.numberofmembershiptests)"
     end
@@ -207,7 +228,7 @@ function siggb!(basis::Basis{N},
 
             # minimize à la F5c
             min_idx = iszero(p_idx) ? zero(SigIndex) : curr_ind
-            minimize!(basis, basis_ht, min_idx, ind_order, tags)
+            minimize!(basis, basis_ht, min_idx, ind_order, tags, timer)
 
             if !iszero(p_idx)
                 basis.koszul_diagram = basis.lm_diagram

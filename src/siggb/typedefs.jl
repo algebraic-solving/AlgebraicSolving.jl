@@ -8,6 +8,9 @@ const MonIdx = Int32
 const MonHash = UInt32
 const DivMask = UInt64
 const DivMaskSize = 64
+# Stable identifier for a basis element. Physical slots in `Basis` may move,
+# whereas a `BasisId` is never reused.
+const BasisId = Int
 # stuff for matrix
 const ColIdx = UInt32
 const Coeff = UInt32
@@ -67,6 +70,7 @@ const ModCache{N} = Dict{Tuple{Sig{N}, SigIndex}, Polynomial}
 struct Diagram
     id::Int
     edges::Vector{Tuple{Exp, Diagram}}
+    index::Int
 end
 
 # Define an Edge as a tuple of an exponent and a Diagram
@@ -74,14 +78,16 @@ const Edge = Tuple{Exp, Diagram}
 
 # Define a mutable struct to hold the hash state
 mutable struct HashState
-    hashtable::Dict{Vector{Edge}, Diagram}
+    hashtable::Dict{Tuple{Vector{Edge}, Int}, Diagram}
+    leaf::Diagram
+    insertion_memo::Dict{Tuple{Diagram,Int}, Diagram}
     counter::Int64
     numberofinsertion::Int64
     numberofmembershiptests::Int64
 end
 
 # Define a constant for an empty diagram
-const EMPTY_DIAGRAM = Diagram(-1, Tuple{Int,Diagram}[])
+const EMPTY_DIAGRAM = Diagram(-1, Edge[], 0)
 
 mutable struct Basis{N}
     sigs::Vector{Sig{N}}
@@ -102,6 +108,19 @@ mutable struct Basis{N}
     lm_diagram::Diagram
     koszul_diagram::Diagram
     hashstate::HashState
+
+    # One labelled monomial diagram per exact POT signature index.
+    # Terminal 0 means "no rewriter"; other terminals are stable BasisIds.
+    canonical_diagrams::Vector{Diagram}
+    canonical_hashstate::HashState
+
+    # Stable indirection used by canonical-diagram terminals.
+    basis_ids::Vector{BasisId}
+    slot_of_id::Vector{Int}
+    next_basis_id::BasisId
+
+    # Private A/B switch used by tests and benchmarks.
+    use_canonical_mdd::Bool
 
     monomials::Vector{Vector{MonIdx}}
     coefficients::Vector{Vector{Coeff}}

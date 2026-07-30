@@ -2,3 +2,4 @@
 docs/build/*
 docs/make-dep.jl
 Manifest.toml
+benchmark

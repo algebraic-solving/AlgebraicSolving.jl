@@ -3,7 +3,8 @@
 # initialization and memory management
 
 function new_basis(basis_size, syz_size,
-                   input_length, ::Val{N}) where N
+                   input_length, ::Val{N};
+                   use_canonical_mdd::Bool=false) where N
 
     sigs = Vector{Sig{N}}(undef, basis_size)
     sigmasks = Vector{MaskSig}(undef, basis_size)
@@ -13,6 +14,14 @@ function new_basis(basis_size, syz_size,
     koszul_diagram = EMPTY_DIAGRAM
     lm_diagram = EMPTY_DIAGRAM
     hashstate = new_hashstate()
+    canonical_diagrams = use_canonical_mdd ?
+        fill(EMPTY_DIAGRAM, input_length) : Diagram[]
+    canonical_hashstate = use_canonical_mdd ?
+        new_hashstate() : hashstate
+    basis_ids = use_canonical_mdd ?
+        Vector{BasisId}(undef, basis_size) : BasisId[]
+    slot_of_id = Int[]
+    next_basis_id = one(BasisId)
     monomials = Vector{Vector{MonIdx}}(undef, basis_size)
     coeffs = Vector{Vector{Coeff}}(undef, basis_size)
     is_red = Vector{Bool}(undef, basis_size)
@@ -22,6 +31,9 @@ function new_basis(basis_size, syz_size,
     syz_masks = Vector{MaskSig}(undef, syz_size)
     basis = Basis(sigs, sigmasks, sigratios, rewrite_nodes,
                   lm_masks, lm_diagram, koszul_diagram, hashstate,
+                  canonical_diagrams, canonical_hashstate,
+                  basis_ids, slot_of_id, next_basis_id,
+                  use_canonical_mdd,
                   monomials, coeffs, is_red,
                   mod_rep_known, mod_reps,
                   syz_sigs, syz_masks, Exp[],
@@ -34,6 +46,101 @@ function new_basis(basis_size, syz_size,
     basis.rewrite_nodes[1] = [-1, -1]
 
     return basis
+end
+
+@inline function register_basis_id!(basis::Basis, slot::Int)
+    id = basis.next_basis_id
+    @assert !iszero(id)
+    @assert Int(id) == length(basis.slot_of_id) + 1
+    basis.basis_ids[slot] = id
+    push!(basis.slot_of_id, slot)
+    basis.next_basis_id += one(BasisId)
+    return id
+end
+
+@inline function slot_from_id(basis::Basis, id::BasisId)
+    iszero(id) && return 0
+    iid = Int(id)
+    iid > length(basis.slot_of_id) && return 0
+    slot = @inbounds basis.slot_of_id[iid]
+    if iszero(slot) || slot > basis.basis_load
+        return 0
+    end
+    @inbounds return basis.basis_ids[slot] == id ? slot : 0
+end
+
+function ensure_diagram_roots!(roots::Vector{Diagram}, idx::SigIndex)
+    needed = Int(idx)
+    old_length = length(roots)
+    if old_length < needed
+        resize!(roots, needed)
+        @inbounds for i in old_length+1:needed
+            roots[i] = EMPTY_DIAGRAM
+        end
+    end
+    return roots
+end
+
+@inline function canonical_id_is_better(basis::Basis,
+                                        candidate::BasisId,
+                                        current::BasisId)
+    candidate_slot = slot_from_id(basis, candidate)
+    current_slot = slot_from_id(basis, current)
+    @assert !iszero(candidate_slot)
+    @assert !iszero(current_slot)
+
+    candidate_ratio = @inbounds basis.sigratios[candidate_slot]
+    current_ratio = @inbounds basis.sigratios[current_slot]
+    if candidate_ratio == current_ratio
+        # The historical ascending scan keeps the last applicable element.
+        # Stable IDs increase with insertion order.
+        return candidate > current
+    end
+    return lt_drl(candidate_ratio, current_ratio)
+end
+
+function insert_canonical_rewriter!(basis::Basis,
+                                    signature::Sig,
+                                    basis_id::BasisId)
+    idx = index(signature)
+    ensure_diagram_roots!(basis.canonical_diagrams, idx)
+    root = @inbounds basis.canonical_diagrams[Int(idx)]
+    is_better = (candidate, current) ->
+        canonical_id_is_better(basis, candidate, current)
+    @inbounds basis.canonical_diagrams[Int(idx)] =
+        insertion_best(root,
+                       monomial(signature),
+                       basis.canonical_hashstate,
+                       basis_id,
+                       is_better)
+    return basis
+end
+
+function rebuild_canonical_diagrams!(basis::Basis)
+    basis.use_canonical_mdd || return basis
+
+    basis.canonical_hashstate = new_hashstate()
+    fill!(basis.canonical_diagrams, EMPTY_DIAGRAM)
+    @inbounds for slot in 1:basis.input_load
+        basis.is_red[slot] && continue
+        insert_canonical_rewriter!(
+            basis, basis.sigs[slot], basis.basis_ids[slot]
+        )
+    end
+    @inbounds for slot in basis.basis_offset:basis.basis_load
+        basis.is_red[slot] && continue
+        insert_canonical_rewriter!(
+            basis, basis.sigs[slot], basis.basis_ids[slot]
+        )
+    end
+    return basis
+end
+
+function update_canonical_diagram!(basis::Basis,
+                                   signature::Sig,
+                                   basis_id::BasisId)
+    basis.use_canonical_mdd || return basis
+    return insert_canonical_rewriter!(basis, signature, basis_id)
 end
 
 function make_room_new_input_el!(basis::Basis,
@@ -73,6 +180,11 @@ function make_room_new_input_el!(basis::Basis,
             basis.is_red[i] = basis.is_red[i-shift]
             basis.mod_rep_known[i] = basis.mod_rep_known[i-shift]
             basis.mod_reps[i] = basis.mod_reps[i-shift]
+            if basis.use_canonical_mdd
+                id = basis.basis_ids[i-shift]
+                basis.basis_ids[i] = id
+                basis.slot_of_id[id] = i
+            end
 
             # adjust rewrite diagram
             rnodes = basis.rewrite_nodes[i-shift+1]
@@ -118,6 +230,13 @@ function garbage_collect!(basis::Basis{N},
                           del_indices::Vector{Int}) where N
 
     isempty(del_indices) && return
+
+    if basis.use_canonical_mdd
+        @inbounds for i in del_indices
+            id = basis.basis_ids[i]
+            basis.slot_of_id[id] = 0
+        end
+    end
 
     to_del_ps = Int[]
     @inbounds for i in 1:pairset.load
@@ -171,6 +290,11 @@ function garbage_collect!(basis::Basis{N},
         basis.is_red[i-shift] = basis.is_red[i]
         basis.mod_rep_known[i-shift] = basis.mod_rep_known[i]
         basis.mod_reps[i-shift] = basis.mod_reps[i]
+        if basis.use_canonical_mdd
+            id = basis.basis_ids[i]
+            basis.basis_ids[i-shift] = id
+            basis.slot_of_id[id] = i-shift
+        end
 
         # adjust tracer
         if typeof(tr) == SigTracer
@@ -194,6 +318,8 @@ function garbage_collect!(basis::Basis{N},
             end
         end
     end
+
+    basis.use_canonical_mdd && rebuild_canonical_diagrams!(basis)
 end
 
 function resize_basis!(basis::Basis)
@@ -209,6 +335,9 @@ function resize_basis!(basis::Basis)
         resize!(basis.is_red, basis.basis_size)
         resize!(basis.mod_rep_known, basis.basis_size)
         resize!(basis.mod_reps, basis.basis_size)
+        if basis.use_canonical_mdd
+            resize!(basis.basis_ids, basis.basis_size)
+        end
     end
 end
 

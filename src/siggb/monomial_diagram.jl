@@ -1,19 +1,31 @@
 # Function to hash a diagram.
 function Base.hash(diagram::Diagram, h::UInt)
-    return hash(diagram.id, h)
+    return hash(objectid(diagram.edges), hash(diagram.id, h))
 end
 
 # Function to test equality between two diagrams in O(1).
 function Base.:(==)(d1::Diagram, d2::Diagram)
-    return d1.id == d2.id
+    return d1.id == d2.id &&
+           d1.index == d2.index &&
+           d1.edges === d2.edges
 end
 
 function Base.show(io::IO, diagram::Diagram)
-    print(diagram.edges)
+    if diagram == EMPTY_DIAGRAM
+        print(io, "EmptyDiagram")
+    elseif isempty(diagram.edges)
+        print(io, "Terminal(", diagram.index, ")")
+    else
+        print(io, diagram.edges)
+    end
 end
 
 # Function to print the diagram as an n-tree.
 function print_diagram(diagram::Diagram, space::Int=0)
+    if isempty(diagram.edges)
+        println(" " ^ space * "Terminal(", diagram.index, ")")
+        return
+    end
     for edge in diagram.edges
         println(" " ^ space * " ", edge[1])
         print_diagram(edge[2], space + 2)
@@ -22,7 +34,11 @@ end
 
 # This function is to create a new hash state.
 function new_hashstate()
-    return HashState(Dict{Vector{Edge}, Diagram}(), 0, 0, 0)
+    hashtable = Dict{Tuple{Vector{Edge}, Int}, Diagram}()
+    leaf = Diagram(0, Edge[], 0)
+    hashtable[(leaf.edges, leaf.index)] = leaf
+    memo = Dict{Tuple{Diagram,Int}, Diagram}()
+    return HashState(hashtable, leaf, memo, 1, 0, 0)
 end
 
 # Function to troncate a list of edges.
@@ -32,8 +48,32 @@ function truncate!(children::Vector{Edge}, i::Int)
     end
 end
 
+@inline function push_strict_edge!(children::Vector{Edge}, edge::Edge)
+    if isempty(children) || children[end][2] != edge[2]
+        push!(children, edge)
+    end
+    return children
+end
+
+# Intern an already reduced list of edges.
+function intern_diagram(children::Vector{Edge},
+                        hashstate::HashState,
+                        index::Int=0)
+    @assert isempty(children) || iszero(index)
+    key = (children, index)
+    diagram = get(hashstate.hashtable, key, EMPTY_DIAGRAM)
+    diagram != EMPTY_DIAGRAM && return diagram
+
+    diagram = Diagram(hashstate.counter, children, index)
+    hashstate.hashtable[key] = diagram
+    hashstate.counter += 1
+    return diagram
+end
+
 # Function to create a monomial divisibility diagram with hash consing
-function make_diagram(children::Vector{Edge}, hashstate::HashState)
+function make_diagram(children::Vector{Edge},
+                      hashstate::HashState,
+                      index::Int=0)
     i = 0
 
     # In order to keep strict inclusions we remove the edges that are the same keeping the leftmost one.
@@ -48,20 +88,15 @@ function make_diagram(children::Vector{Edge}, hashstate::HashState)
     end
 
     truncate!(children, i)
-    key = get(hashstate.hashtable, children, EMPTY_DIAGRAM)
-
-    if key != EMPTY_DIAGRAM
-        return hashstate.hashtable[children]
-    end
-
-    diagram = Diagram(hashstate.counter, children)
-    hashstate.hashtable[children] = diagram
-    hashstate.counter += 1
-    return diagram
+    return intern_diagram(children, hashstate, index)
 end
 
 # Function to insert a prefix in the diagram
-function insert_aux(diagram::Diagram, m::Monomial, i::Int, hashstate::HashState)
+function insert_aux(diagram::Diagram,
+                    m::Monomial,
+                    i::Int,
+                    hashstate::HashState,
+                    index::Int=0)
     if isempty(m.exps) || i == 1
         return diagram
     end
@@ -69,75 +104,204 @@ function insert_aux(diagram::Diagram, m::Monomial, i::Int, hashstate::HashState)
     i -= 1
     a = m.exps[i]
     new_diagram = Edge[]
+    sizehint!(new_diagram, length(diagram.edges) + 1)
     inserted = false
 
     for edge in diagram.edges
         if edge[1] == a
-            push!(new_diagram, (a,insert_aux(edge[2], m, i, hashstate)))
+            push_strict_edge!(
+                new_diagram,
+                (a, insert_aux(edge[2], m, i, hashstate, index)),
+            )
             inserted = true
         else
-            push!(new_diagram, edge)
+            push_strict_edge!(new_diagram, edge)
         end
     end
     if !inserted
-        push!(new_diagram, (a,insert_aux(make_diagram(Edge[], hashstate),m,i,hashstate)))
+        terminal = make_diagram(Edge[], hashstate, index)
+        push_strict_edge!(
+            new_diagram,
+            (a, insert_aux(terminal, m, i, hashstate, index)),
+        )
     end
-    return make_diagram(new_diagram, hashstate)
+    return intern_diagram(new_diagram, hashstate)
 end
 
-function insert(diagram::Diagram, m::Monomial, hashstate::HashState)
-    return insert_aux(diagram, m, length(m.exps)+1, hashstate)
+function insert(diagram::Diagram,
+                m::Monomial,
+                hashstate::HashState,
+                index::Int=0)
+    return insert_aux(diagram, m, length(m.exps)+1,
+                      hashstate, index)
 end
 
 
 # Function to insert a monomial in the diagram with memoization
-function insertion_aux(diagram::Diagram, m::Monomial, i::Int, memo::Dict{Tuple{Diagram,Int}, Diagram}, hashstate::HashState)
+function insertion_aux(
+    diagram::Diagram,
+    m::Monomial,
+    i::Int,
+    memo::Dict{Tuple{Diagram,Int}, Diagram},
+    hashstate::HashState,
+)
     if diagram == EMPTY_DIAGRAM
-        return insert_aux(make_diagram(Edge[], hashstate), m, i, hashstate)
+        return insert_aux(hashstate.leaf, m, i, hashstate)
     end
     if i == 1
-         return diagram
+        return diagram
     end
     if isempty(diagram.edges)
         return diagram
     end
-    key = get(memo, (diagram, i), EMPTY_DIAGRAM)
+    level = i
+    key = get(memo, (diagram, level), EMPTY_DIAGRAM)
     if key != EMPTY_DIAGRAM
         return key
     end
 
     i -= 1
     new_diagram = Edge[]
+    sizehint!(new_diagram, length(diagram.edges) + 1)
     is_sub_diagram = false
     last_sub_diagram = EMPTY_DIAGRAM
     for edge in diagram.edges
         if edge[1] < m.exps[i]
-            push!(new_diagram, edge)
+            push_strict_edge!(new_diagram, edge)
             last_sub_diagram = edge[2]
         else
             if edge[1] == m.exps[i]
                 is_sub_diagram = true
             end
             if edge[1] > m.exps[i] && !is_sub_diagram
-                push!(new_diagram, (m.exps[i], insertion_aux(last_sub_diagram, m, i, memo, hashstate)))
+                child = insertion_aux(
+                    last_sub_diagram, m, i, memo, hashstate
+                )
+                push_strict_edge!(new_diagram, (m.exps[i], child))
                 is_sub_diagram = true
             end
 
-            push!(new_diagram, (edge[1], insertion_aux(edge[2], m, i, memo, hashstate)))
+            child = insertion_aux(edge[2], m, i, memo, hashstate)
+            push_strict_edge!(new_diagram, (edge[1], child))
         end
     end
 
     if !is_sub_diagram
-        push!(new_diagram, (m.exps[i], insertion_aux(last_sub_diagram, m, i, memo, hashstate)))
+        child = insertion_aux(
+            last_sub_diagram, m, i, memo, hashstate
+        )
+        push_strict_edge!(new_diagram, (m.exps[i], child))
     end
 
-    final_diagram = make_diagram(new_diagram, hashstate)
-    memo[(diagram, i)] = final_diagram
+    final_diagram = intern_diagram(new_diagram, hashstate)
+    memo[(diagram, level)] = final_diagram
     return final_diagram
 end
 
 function insertion(diagram::Diagram, m::Monomial, hashstate::HashState)
-    return insertion_aux(diagram, m, length(m.exps)+1, Dict{Tuple{Diagram,Int}, Diagram}(), hashstate)
+    diagram != EMPTY_DIAGRAM && is_in_diagram(m, diagram) && return diagram
+    empty!(hashstate.insertion_memo)
+    return insertion_aux(
+        diagram,
+        m,
+        length(m.exps) + 1,
+        hashstate.insertion_memo,
+        hashstate,
+    )
+end
+
+@inline function best_terminal(diagram::Diagram,
+                               candidate::Int,
+                               is_better,
+                               hashstate::HashState)
+    if iszero(diagram.index) || is_better(candidate, diagram.index)
+        return make_diagram(Edge[], hashstate, candidate)
+    end
+    return diagram
+end
+
+# Overlay the divisibility cone of `m` with a labelled terminal. Outside the
+# cone the diagram is unchanged; inside it the supplied comparator chooses
+# between the new label and the label already present.
+function insertion_best_aux(
+    diagram::Diagram,
+    m::Monomial,
+    i::Int,
+    memo::Dict{Tuple{Diagram,Int}, Diagram},
+    hashstate::HashState,
+    candidate::Int,
+    is_better,
+)
+    if diagram == EMPTY_DIAGRAM
+        terminal = make_diagram(Edge[], hashstate, candidate)
+        return insert_aux(terminal, m, i, hashstate, candidate)
+    end
+    if i == 1
+        return best_terminal(diagram, candidate, is_better, hashstate)
+    end
+
+    level = i
+    cached = get(memo, (diagram, level), EMPTY_DIAGRAM)
+    cached != EMPTY_DIAGRAM && return cached
+
+    i -= 1
+    new_diagram = Edge[]
+    sizehint!(new_diagram, length(diagram.edges) + 1)
+    has_threshold = false
+    previous = EMPTY_DIAGRAM
+
+    for edge in diagram.edges
+        if edge[1] < m.exps[i]
+            push_strict_edge!(new_diagram, edge)
+            previous = edge[2]
+            continue
+        end
+
+        if edge[1] == m.exps[i]
+            has_threshold = true
+        elseif !has_threshold
+            child = insertion_best_aux(
+                previous, m, i, memo, hashstate, candidate, is_better
+            )
+            push_strict_edge!(new_diagram, (m.exps[i], child))
+            has_threshold = true
+        end
+
+        child = insertion_best_aux(
+            edge[2], m, i, memo, hashstate, candidate, is_better
+        )
+        push_strict_edge!(new_diagram, (edge[1], child))
+    end
+
+    if !has_threshold
+        child = insertion_best_aux(
+            previous, m, i, memo, hashstate, candidate, is_better
+        )
+        push_strict_edge!(new_diagram, (m.exps[i], child))
+    end
+
+    result = intern_diagram(new_diagram, hashstate)
+    memo[(diagram, level)] = result
+    return result
+end
+
+function insertion_best(diagram::Diagram,
+                        m::Monomial,
+                        hashstate::HashState,
+                        candidate::Int,
+                        is_better)
+    candidate > 0 ||
+        throw(ArgumentError("a labelled terminal must have a positive index"))
+    empty!(hashstate.insertion_memo)
+    return insertion_best_aux(
+        diagram,
+        m,
+        length(m.exps) + 1,
+        hashstate.insertion_memo,
+        hashstate,
+        candidate,
+        is_better,
+    )
 end
 
 
@@ -176,6 +340,26 @@ function number_of_distinct_nodes(diagram::Diagram, mem::Dict{Diagram, Diagram} 
     return number
 end
 
+# Count all nodes reachable from several roots, including terminal nodes.
+# EMPTY_DIAGRAM is only a sentinel and is therefore not counted.
+function number_of_distinct_dag_nodes(roots::AbstractVector{Diagram})
+    seen = Set{Diagram}()
+    stack = Diagram[]
+    for root in roots
+        root != EMPTY_DIAGRAM && push!(stack, root)
+    end
+
+    while !isempty(stack)
+        diagram = pop!(stack)
+        diagram in seen && continue
+        push!(seen, diagram)
+        for (_, child) in diagram.edges
+            child != EMPTY_DIAGRAM && push!(stack, child)
+        end
+    end
+    return length(seen)
+end
+
 # Function that determines the largest s such that s <= exp, returns -1 otherwise
 function find_nearest_index(sub_diagram::Vector{Tuple{Exp, Diagram}}, exp::Exp)
     j = -1
@@ -188,20 +372,33 @@ function find_nearest_index(sub_diagram::Vector{Tuple{Exp, Diagram}}, exp::Exp)
     return j
 end
 
-# Function that test if a monomial is represented by a monomial divisibility diagram
-function is_in_diagram(m::Monomial{N}, diagram::Diagram) where N
+# Follow the unique path associated with `m`. The Boolean diagrams end in
+# Terminal(0), whereas labelled diagrams end in Terminal(id).
+function lookup_diagram(m::Monomial{N}, diagram::Diagram) where N
+    diagram == EMPTY_DIAGRAM && return false, 0
     sub_diagram = diagram
 
     @inbounds for j in N:-1:1
         exp = m.exps[j]
         i = find_nearest_index(sub_diagram.edges, exp)
         if i == -1
-            return false
+            return false, 0
         else
             sub_diagram = sub_diagram.edges[i][2]
         end
     end
-    return true
+    return true, sub_diagram.index
+end
+
+# Function that tests if a monomial is represented by a monomial diagram.
+function is_in_diagram(m::Monomial, diagram::Diagram)
+    found, _ = lookup_diagram(m, diagram)
+    return found
+end
+
+function terminal_index(m::Monomial, diagram::Diagram)
+    found, index = lookup_diagram(m, diagram)
+    return found ? index : 0
 end
 
 # Function that converts a monomial::MPolyRingElem into an object of type Monomial{N}
