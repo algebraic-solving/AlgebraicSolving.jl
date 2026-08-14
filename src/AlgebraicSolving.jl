@@ -31,5 +31,6 @@ include("interp/main.jl")
 #= examples =#
 include("examples/katsura.jl")
 include("examples/cyclic.jl")
+include("examples/eco.jl")
 
 end # module AlgebraicSolving
