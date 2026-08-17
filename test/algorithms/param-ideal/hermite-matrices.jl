@@ -5,7 +5,7 @@ import Nemo: zero_matrix
     f = [R(1)]
     g = AlgebraicSolving.groebner_basis(AlgebraicSolving.Ideal(f))
     b = AlgebraicSolving._monomial_basis(g)
-    H₁ = AlgebraicSolving.hermite_matrix(g, b, one(R))
+    H₁ = hermite_matrix(g, b, one(R))
     @test H₁ == zero_matrix(QQ, 0, 0)
 end
 
@@ -14,10 +14,10 @@ end
     f = [x^2 - 2 * x + 1]
     g = AlgebraicSolving.groebner_basis(AlgebraicSolving.Ideal(f))
     b = AlgebraicSolving._monomial_basis(g)
-    H₁ = AlgebraicSolving.hermite_matrix(g, b, one(R))
+    H₁ = hermite_matrix(g, b, one(R))
     @test H₁ == matrix(QQ, [2 2; 2 2])
-    Hₓ = AlgebraicSolving.hermite_matrix(g, b, x)
-    Mₓ = AlgebraicSolving.multiplication_matrix(g, b, x)
+    Hₓ = hermite_matrix(g, b, x)
+    Mₓ = multiplication_matrix(g, b, x)
     @test Hₓ == H₁ * Mₓ
 end
 
@@ -26,7 +26,7 @@ end
     R′, (x,) = polynomial_ring(fraction_field(R), [:x], internal_ordering=:degrevlex)
     f = ParametricIdeal([a * x^2 + b * x + c])
     g = one(R′)
-    H = AlgebraicSolving.hermite_matrix(f, g)
+    H = hermite_matrix(f, g)
     @test H == matrix(fraction_field(R), [2 -b//a; -b//a (b^2-2*a*c)//a^2])
 end
 
@@ -35,6 +35,6 @@ end
     R′, (x,) = polynomial_ring(fraction_field(R), [:x], internal_ordering=:degrevlex)
     f = ParametricIdeal([x^2 - 2 * x + 1])
     g = one(R′)
-    H₁ = AlgebraicSolving.hermite_matrix(f, g)
+    H₁ = hermite_matrix(f, g)
     @test H₁ == matrix(QQ, [2 2; 2 2])
 end
