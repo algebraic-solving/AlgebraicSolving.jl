@@ -17,6 +17,14 @@ include("algorithms/decomposition.jl")
 include("algorithms/curve-param.jl")
 include("algorithms/hilbert.jl")
 include("algorithms/sampling.jl")
+#= param-ideal =#
+include("algorithms/param-ideal/groebner-bases.jl")
+include("algorithms/param-ideal/multiplication-matrices.jl")
+include("algorithms/param-ideal/hermite-matrices.jl")
+include("algorithms/param-ideal/parametrizations.jl")
+include("algorithms/param-ideal/sign-determination.jl")
+include("algorithms/param-ideal/semialgebraic-set.jl")
+include("algorithms/param-ideal/real-root-classification.jl")
 #= siggb =#
 include("siggb/siggb.jl")
 #= progress =#
@@ -26,5 +34,6 @@ include("interp/main.jl")
 #= examples =#
 include("examples/katsura.jl")
 include("examples/cyclic.jl")
+include("examples/eco.jl")
 
 end # module AlgebraicSolving

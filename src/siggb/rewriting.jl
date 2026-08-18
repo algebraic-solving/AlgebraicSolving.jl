@@ -25,27 +25,38 @@ end
                                     sigmask::DivMask,
                                     ind_order::IndOrder,
                                     tags::Tags,
-                                    check::Bool)
+                                    mod_ord::Symbol,
+                                    check::Bool,
+                                    timer::Timings)
+
 
     if !check
         return false
     end
 
-    s_ind = index(sig)
+    if mod_ord == :DPOT
+        s_ind = index(sig)
 
-    @inbounds for i in basis.basis_offset:basis.basis_load
-        basis.is_red[i] && continue
-        b_ind = index(basis.sigs[i])
-        if (ind_order.ord[b_ind] < ind_order.ord[s_ind]
-            && !are_incompat(b_ind, s_ind, ind_order))
-            if divch(basis.lm_masks[i], sigmask)
-                if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
-                    return true
+        @inbounds for i in basis.basis_offset:basis.basis_load
+            basis.is_red[i] && continue
+            b_ind = index(basis.sigs[i])
+            if (ind_order.ord[b_ind] < ind_order.ord[s_ind]
+                && !are_incompat(b_ind, s_ind, ind_order))
+                if divch(basis.lm_masks[i], sigmask)
+                    if divch(leading_monomial(basis, basis_ht, i), monomial(sig))
+                        return true
+                    end
                 end
             end
         end
+        return false
+    else
+        m = monomial(sig)
+        basis.hashstate.numberofmembershiptests += 1
+        tmt = @elapsed begin is_in = is_in_diagram(m, basis.koszul_diagram) end
+        timer.time_for_membership += tmt
+        return is_in
     end
-    return false
 end
 
 @inline function rewriteable_basis(basis::Basis,
@@ -71,13 +82,13 @@ function find_canonical_rewriter(basis::Basis,
                                  mod_ord::Symbol)
 
     if mod_ord == :DPOT
-        return find_canonical_rewriter_tree(basis, sig, sigmask)
+        return find_canonical_rewriter_diagram(basis, sig, sigmask)
     else
         return find_canonical_rewriter_rat(basis, sig, sigmask)
     end
 end
 
-function find_canonical_rewriter_tree(basis::Basis,
+function find_canonical_rewriter_diagram(basis::Basis,
                                       sig::Sig,
                                       sigmask::DivMask)
 
@@ -130,12 +141,13 @@ function rewriteable(basis::Basis,
                      ind_order::IndOrder,
                      tags::Tags,
                      check::Bool,
-                     mod_ord::Symbol)
+                     mod_ord::Symbol,
+                     timer::Timings)
 
     s_ind = index(sig)
 
     rewriteable_syz(basis, sig, sigmask, tags, check) && return true
     rewriteable_basis(basis, idx, sig, sigmask, tags, check, mod_ord) && return true
-    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags, check) && return true
+    rewriteable_koszul(basis, basis_ht, sig, sigmask, ind_order, tags, mod_ord, check, timer) && return true
     return false
 end

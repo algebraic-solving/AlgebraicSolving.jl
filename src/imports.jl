@@ -27,6 +27,7 @@ import Nemo:
     fraction_field,
     GF,
     height,
+    inv,
     is_prime,
     is_probable_prime,
     is_square,
@@ -59,3 +60,8 @@ import Nemo:
     ZZMatrix,
     ZZRing,
     ZZRingElem
+
+import Nemo.Generic:
+    FracFieldElem,
+    MatSpaceElem,
+    MPoly

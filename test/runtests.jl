@@ -4,6 +4,7 @@ using Test
 @testset verbose = true "AlgebraicSolving Tests" begin
 include("interfaces/nemo.jl")
 include("algorithms/groebner-bases.jl")
+include("algorithms/monomial_diagram.jl")
 include("algorithms/normal-forms.jl")
 include("algorithms/solvers.jl")
 include("algorithms/dimension.jl")
@@ -11,8 +12,20 @@ include("algorithms/hilbert.jl")
 include("algorithms/decomposition.jl")
 include("algorithms/curve-param.jl")
 include("algorithms/sampling.jl")
+include("algorithms/param-ideal/groebner-bases.jl")
+include("algorithms/param-ideal/multiplication-matrices.jl")
+include("algorithms/param-ideal/hermite-matrices.jl")
+include("algorithms/param-ideal/parametrizations.jl")
+include("algorithms/param-ideal/sign-determination.jl")
+include("algorithms/param-ideal/semialgebraic-set.jl")
+include("algorithms/param-ideal/real-root-classification.jl")
 include("examples/katsura.jl")
+<<<<<<< HEAD
 include("interp/thiele.jl")
+=======
+include("examples/eco.jl")
+include("interp/thiele.jl") 
+>>>>>>> origin/main
 include("interp/newton.jl")
 include("interp/cuyt_lee.jl")
 include("interp/resultant.jl")
