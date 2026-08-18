@@ -22,6 +22,9 @@ include("algorithms/param-ideal/groebner-bases.jl")
 include("algorithms/param-ideal/multiplication-matrices.jl")
 include("algorithms/param-ideal/hermite-matrices.jl")
 include("algorithms/param-ideal/parametrizations.jl")
+include("algorithms/param-ideal/sign-determination.jl")
+include("algorithms/param-ideal/semialgebraic-set.jl")
+include("algorithms/param-ideal/real-root-classification.jl")
 #= siggb =#
 include("siggb/siggb.jl")
 #= progress =#

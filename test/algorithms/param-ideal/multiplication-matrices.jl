@@ -5,14 +5,14 @@ import Nemo: identity_matrix, matrix
     f = [x^2 - 2 * x + 1]
     g = AlgebraicSolving.groebner_basis(AlgebraicSolving.Ideal(f))
     b = AlgebraicSolving._monomial_basis(g)
-    M₁ = AlgebraicSolving.multiplication_matrix(g, b, one(R))
+    M₁ = multiplication_matrix(g, b, one(R))
     @test M₁ == identity_matrix(QQ, 2)
-    Mₓ = AlgebraicSolving.multiplication_matrix(g, b, x)
+    Mₓ = multiplication_matrix(g, b, x)
     @test Mₓ == matrix(QQ, [0 -1; 1 2])
 end
 
 @testset "Algorithms -> Parametric multiplication matrix" begin
-    M = AlgebraicSolving.multiplication_matrix
+    M = multiplication_matrix
     R, (a, b, c) = polynomial_ring(QQ, [:a, :b, :c])
     R′, (x,) = polynomial_ring(fraction_field(R), [:x], internal_ordering=:degrevlex)
     f = ParametricIdeal([a * x^2 + b * x + c])
