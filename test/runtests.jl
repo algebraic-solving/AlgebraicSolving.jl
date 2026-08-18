@@ -20,12 +20,8 @@ include("algorithms/param-ideal/sign-determination.jl")
 include("algorithms/param-ideal/semialgebraic-set.jl")
 include("algorithms/param-ideal/real-root-classification.jl")
 include("examples/katsura.jl")
-<<<<<<< HEAD
-include("interp/thiele.jl")
-=======
 include("examples/eco.jl")
 include("interp/thiele.jl") 
->>>>>>> origin/main
 include("interp/newton.jl")
 include("interp/cuyt_lee.jl")
 include("interp/resultant.jl")
