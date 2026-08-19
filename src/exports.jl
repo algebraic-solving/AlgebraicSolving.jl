@@ -7,4 +7,4 @@ export polynomial_ring, MPolyRing, GFElem, MPolyRingElem,
        multiplication_matrix, hermite_matrix, real_root_classification,
        equidimensional_decomposition, homogenize, dimension, FqMPolyRingElem,
        hilbert_series, hilbert_dimension, hilbert_degree, hilbert_polynomial,
-       rational_curve_parametrization
+       curve_rational_parametrization, rational_curve_parametrization

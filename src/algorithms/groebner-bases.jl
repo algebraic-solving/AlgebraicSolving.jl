@@ -323,6 +323,6 @@ function _core_groebner_basis(
             jl_ld, jl_len, jl_cf, jl_exp, R, eliminate)
     end
 
-    I.gb[eliminate] = basis
+    I.gb[eliminate] = isempty(basis) ? [R(0)] : basis
     return I.gb[eliminate]
 end
