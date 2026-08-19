@@ -76,7 +76,7 @@
     # Dimension checking guards
     I_high_dim = AlgebraicSolving.Ideal([x1^2 - x2, x1*x3])
     @test_throws AssertionError curve_rational_parametrization(I_high_dim)
-    @test_throws AssertionError curve_rational_parametrization(Ideal([R(0)]))
+    @test_throws AssertionError curve_rational_parametrization(AlgebraicSolving.Ideal([R(0)]))
 
     # Non-generic linear forms
     @test_throws ["failed", "number 2"] curve_rational_parametrization(I, cfs_lfs=[[1,2,3,4], [1,2,3,4]]) # identical (non-generic)
@@ -84,13 +84,13 @@
     @test_throws ["failed", "number 2"] curve_rational_parametrization(I, cfs_lfs=[[0,0,0,1], [0,0,1,0]]) # second is not generic
 
     # Minimal edge cases
-    I_one = Ideal([R(1)])
+    I_one = AlgebraicSolving.Ideal([R(1)])
     @test curve_rational_parametrization(I_one).vars == Symbol[]
 
     # ----------------------------------------------------
     # 6. Very non-generic variables (Fixed assignment bug)
     # ----------------------------------------------------
-    I_nongen = Ideal([x1^2 - x2, x1*x3, x4])
+    I_nongen = AlgebraicSolving.Ideal([x1^2 - x2, x1*x3, x4])
     param = curve_rational_parametrization(I_nongen)
 
     @test param.cfs_lfs == Vector{ZZRingElem}[[1, 1, 1, 1, 0, -1], [2, 1, 1, 1, -1, 0]]
@@ -103,5 +103,5 @@
     ]
 
     # Non radical curve
-    @test_throws ["bad specializations", "radicality"] curve_rational_parametrization(Ideal([x1^2, x2, x3]))
+    @test_throws ["bad specializations", "radicality"] curve_rational_parametrization(AlgebraicSolving.Ideal([x1^2, x2, x3]))
 end
