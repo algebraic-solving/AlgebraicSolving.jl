@@ -29,7 +29,7 @@ makedocs(
                          "solvers.md",
                          "decomposition.md",
                          "connectivity.md"],
-        "Examples" => "katsura.md"
+        "Examples" => ["examples.md"]
         ]
 )
 

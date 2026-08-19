@@ -7,14 +7,14 @@ Computes the parametric rational parametrization associated with the parametric 
 - `retry::Int=10`: the maximum number of consecutive failures allowed when computing the rational parametrization or interpolating the coefficients.
 - `nr_thrds::Int=1`: the number of threads to use for parallel computations.
 - `worker_pool::AbstractWorkerPool=default_worker_pool()`: the worker pool to use for parallel computations.
-- `show_progress::Bool=true`: whether to show a progress bar while computing the rational parametrization.
+- `show_progress::Bool=false`: whether to show a progress bar while computing the rational parametrization.
 """
 function rational_parametrization(
     I::ParametricIdeal{K} where K<:FracFieldElem;
     retry::Int=10,
     nr_thrds::Int=1,
     worker_pool::AbstractWorkerPool=default_worker_pool(),
-    show_progress::Bool=true
+    show_progress::Bool=false
 )
     n = I.num_vars
     R = parent(I.gens[1])

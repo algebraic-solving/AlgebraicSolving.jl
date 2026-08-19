@@ -54,7 +54,7 @@ The underlying engine is provided by msolve.
         precision::Int=32
         )
 
-    rational_curve_parametrization(
+    curve_rational_parametrization(
         I::Ideal{P} where P<:QQMPolyRingElem;
         info_level::Int=0,
         use_lfs::Bool = false,
