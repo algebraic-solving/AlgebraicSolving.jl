@@ -117,7 +117,7 @@ Such a data-structure encodes the curve defined as the Zariski closure of the fo
 According to this definition, the roots of $w$ are exactly the
 values taken by $l$ on this set.
 
-The type `RationalCurveParametrization` therefore caches the following
+The type `CurveRationalParametrization` therefore caches the following
 attributes:
   * `vars::Vector{Symbol}`: variables used for the parametrization the last two
   ones playing the role of the above $(t,s)$ (hence, maybe with up to two more
@@ -128,7 +128,7 @@ attributes:
   * `denom::QQMPolyRingElem`: denominator polynomial (usually $w'$);
   * `param::Vector{QQMPolyRingElem}`: numerators $\rho_i$'s.
 
-See the documentation of the [`rational_curve_parametrization`](@ref) function for
+See the documentation of the [`curve_rational_parametrization`](@ref) function for
 further details.
 
 ## Roadmaps
