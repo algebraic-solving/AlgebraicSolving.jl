@@ -3,7 +3,7 @@
     # 1. Standard intersecting quadrics
     # ----------------------------------------------------
     R, (x1, x2, x3) = polynomial_ring(QQ, ["x1", "x2", "x3"])
-    I = Ideal([x1 + 2*x2 + 2*x3 - 1, x1^2 + 2*x2^2 + 2*x3^2 - x1])
+    I = AlgebraicSolving.Ideal([x1 + 2*x2 + 2*x3 - 1, x1^2 + 2*x2^2 + 2*x3^2 - x1])
 
     C, (x, y) = polynomial_ring(QQ, ["x", "y"])
     elim  = x^2 + 4//3*x*y - 1//3*x + y^2 - 1//3*y
@@ -27,7 +27,7 @@
     # 2. Empty set (Dimension -1)
     # ----------------------------------------------------
     R, (x1, x2, x3, x4) = polynomial_ring(QQ, ["x1", "x2", "x3", "x4"])
-    I_empty = Ideal([x1^2 - x2, x1*x3 - x4, x2*x4 - 12, x4^3 - x3^2])
+    I_empty = AlgebraicSolving.Ideal([x1^2 - x2, x1*x3 - x4, x2*x4 - 12, x4^3 - x3^2])
     curve_rational_parametrization(I_empty)
     @test I_empty.rat_param.vars == Symbol[]
     @test I_empty.rat_param.elim == -one(C)
@@ -36,7 +36,7 @@
     # ----------------------------------------------------
     # 3. Automatic generic linear forms (Dimension 1)
     # ----------------------------------------------------
-    I = Ideal([x1^2 - x2, x1*x3, x2 - 12])
+    I = AlgebraicSolving.Ideal([x1^2 - x2, x1*x3, x2 - 12])
     elim    = y^2 - 12
     denom   = 2*y
     p1, p2, p3, p4 = C(24), 24*y, zero(C), 2*x*y
@@ -74,7 +74,7 @@
     @test_throws AssertionError curve_rational_parametrization(I, cfs_lfs=[[1,2,3,4]])
 
     # Dimension checking guards
-    I_high_dim = Ideal([x1^2 - x2, x1*x3])
+    I_high_dim = AlgebraicSolving.Ideal([x1^2 - x2, x1*x3])
     @test_throws AssertionError curve_rational_parametrization(I_high_dim)
     @test_throws AssertionError curve_rational_parametrization(Ideal([R(0)]))
 
