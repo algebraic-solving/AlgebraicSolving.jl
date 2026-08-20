@@ -51,8 +51,12 @@ function roadmap(
     C::Vector{Vector{Vector{QQFieldElem}}}=Vector{Vector{QQFieldElem}}[],   # query points: interval with rational coefficients
     info_level::Int=0,                                                      # verbosity level
     checks::Bool=false                                                      # perform checks (dimension, regularity, etc.)
-) where (P <: QQMPolyRingElem)
-    return _roadmap_rec(I, QQFieldElem[], C, info_level, checks)
+) where {P <: QQMPolyRingElem}
+    # L_chosen holds the sequence of generic linear forms shared across ALL fibers.
+    L_chosen = P[]
+    empty_base_pt = Tuple{P, QQFieldElem}[]
+
+    return _roadmap_rec(I, empty_base_pt, C, L_chosen, info_level, checks)
 end
 
 @doc Markdown.doc"""
@@ -64,103 +68,106 @@ function roadmap(
     C::Ideal{P};                # ideal defining query points
     info_level::Int=0,          # verbosity level
     checks::Bool=false          # perform checks (dimension, regularity, etc.)
-) where (P <: QQMPolyRingElem)
+) where {P <: QQMPolyRingElem}
     @assert(parent(I)==parent(C), "Equations for variety and query points must live the same ring")
     CI = real_solutions(C, info_level=max(info_level-1,0), nr_thrds=Threads.nthreads())
-    return _roadmap_rec(I, QFieldElem[], CI, info_level, checks)
+    return roadmap(I, CI, info_level, checks)
 end
 
 function _roadmap_rec(
-    I::Ideal{T} where T <: QQMPolyRingElem,     # input ideal
-    q::Vector{QQFieldElem},                     # single base point with rational coefficients
+    I::Ideal{P},     # input ideal
+    base_pt::BasePoint{P},                      # single base point with rational coefficients
     C::Vector{Vector{Vector{QQFieldElem}}},     # query points with rational coefficients
+    L_chosen::Vector{P},
     info_level::Int,                            # verbosity level
     checks::Bool                                # perform checks (dimension, regularity, etc.)
-)
-    # Some base cases
-    if nvars(parent(I))<=2
-        return [I.gens]
+) where {P <: QQMPolyRingElem}
+
+    n = nvars(parent(I))
+    if n <= 2
+        return Roadmap(I, RMnode(base_pt, I.gens, RMnode[]))
     end
 
     # Some preprocessng
     if isnothing(I.dim)
         lucky_prime = _generate_lucky_primes(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-        local INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
-        dimension(INEW)
-        I.dim = INEW.dim
-    end
-    e = length(q)
-
-    ## Fq ##
-    # Genericity assumption (can be checked)
-    if checks
-        local Fnew = _fbr(I,q).gens
-        new_lucky_prime = _generate_lucky_primes(Fnew, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), Fnew))
-        @assert(dimension(INEW) == I.dim - e, "Non-generic coordinates")
+        INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
+        I.dim = dimension(INEW)
     end
 
-    # Terminal case (dim <=1)
+    e = length(base_pt)
+
+    # Base case (dim(I) <= 1)
+    if I.dim <= 1
+        return Roadmap(I, RMnode(base_pt, I.gens, RMnode[]))
+    end
+    # Terminal case (dim(F) <= 1)
     if I.dim - e <= 1
-        return RMnode(q, [], RMnode[])
+        return RMnode(base_pt, P[], RMnode{P}[])
     end
 
-    ## sing(Fq) ##
-    if checks
-        info_level>0 && println("Check smoothness")
-        local FNEW = _fbr(computepolar(1:e, I)|> Ideal, q).gens
-        new_lucky_prime = _generate_lucky_primes(FNEW, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), FNEW))
-        @assert(dimension(INEW) == -1, "Non-empty sing locus!")
+    # If we reach a new depth level, then generate new linear forms
+    if length(L_chosen) < e + 2
+        info_level > 0 && println("Generating generic linear forms for depth $e...")
+        #append_generic_linear_forms!(L_chosen, I, base_pt, info_level, checks)
+        if e == 0
+            push!(L_chosen, gens(parent(I))[1])
+        end
+        push!(L_chosen, gens(parent(I))[e+2])
     end
+    L_e1 = L_chosen[1 : e+1]
+    L_e2 = L_chosen[1 : e+2]
+    L_next = L_chosen[e+1] # The linear form we step along in this iteration
 
-    ## K(pi_1,Fq) ##
-    info_level>0 && println("Compute x1-critical points: K1")
-    K1Fq = computepolar(1:e+1, I) |> Ideal
-    K1Fq = real_solutions(_fbr(K1Fq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
+    ## K(L_e1,Fq) ##
+    info_level > 0 && println("Compute L$(e+1)-critical points: K1")
+    K1Fq_pol = computepolar(1:e+1, I, phi=L_e1) |> Ideal # TODO: reuse for different fiber but same e
+    K1Fq_fiber = vcat(K1Fq_pol.gens, [l - q for (l, q) in base_pt]) |> Ideal
+    K1Fq = real_solutions(K1Fq_fiber, info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
-    ## K(pi_2, Fq) ##
-    info_level>0 && println("Compute (x1,x2)-polar variety: W")
-    K2Fqmins = computepolar(1:e+2, I, only_mins=true)
+    ## W = K(L_e2, Fq) ##
+    info_level>0 && println("Compute L_e2-polar variety: W")
+    K2Fqmins = computepolar(1:e+2, I, phi=L_e2, only_mins=true)
     K2Fq = vcat(I.gens, K2Fqmins) |> Ideal
-    if checks
-        local FNEW = _fbr(K2Fq, q).gens
-        new_lucky_prime = _generate_lucky_primes(FNEW, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
-        local INEW = Ideal(change_base_ring.(Ref(GF(new_lucky_prime)), FNEW))
-        @assert(dimension(INEW) == 1, "Non-generic polar variety")
-    else
-        K2Fq.dim = e + 1
-    end
-    RM = RMnode(q, K2Fqmins, RMnode[])
+    K2Fq.dim = e + 1
+    RM = RMnode(base_pt, K2Fqmins, RMnode{P}[])
 
-    ## Points with vertical tg in K(pi_2, Fq) ##
-    info_level>0 && println("Compute W-critical points with vertical tangent: K1W")
-    K1WmFq = computepolar(1:e+2, K2Fq, dimproj=e) |> Ideal
-    K1WmFq = real_solutions(_fbr(K1WmFq,q), info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
+    ## Points with vertical tangents in W ##
+    info_level>0 && println("Compute W-critical points with <<vertical>> tangent: K1W")
+    K1WmFq_pol = computepolar(1:e+2, K2Fq, phi=L_e2, dimproj=e) |> Ideal
+    K1WmFq_fiber = Ideal(vcat(K1WmFq_pol.gens, [l - q for (l, q) in base_pt]))
+    K1WmFq = real_solutions(K1WmFq_fiber, info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
     ## New base and query points ##
-    Cq = isempty(q) ? C : [ c for c in C if q[e] in c[e]]
+    # Cq = isempty(q) ? C : [ c for c in C if q[e] in c[e]]
+    Cq = isempty(base_pt) ? C : [c for c in C if base_pt[e][2] in _linear_interval_eval(L_chosen[e], c)]
+
     K1W = vcat(K1Fq, K1WmFq)
+
     # Heuristic to be proven (Reeb's th)
     #K1W = K1W[2:end-1]
     ##########
-    K1WRat = _mid_rational_points_inter(getindex.(K1W,e+1), unique(getindex.(Cq, e+1)))
-    newQ = vcat.(Ref(q), K1WRat)
 
-    # Recursively compute roadmap of possible fibers
+    # Evaluate L_{e+1} on the n-dimensional points to project them down to the line
+    K1W_proj = [_linear_interval_eval(L_next, pt) for pt in K1W]
+    Cq_proj  = unique([_linear_interval_eval(L_next, c) for c in Cq])
+
+    K1WRat = _mid_rational_points_inter(K1W_proj, Cq_proj)
+
+    # Construct the generalized base points for the children
+    newQ = [vcat(base_pt, [(L_next, r)]) for r in K1WRat]
+
+    # --- 6. Recurse ---
     if !isempty(newQ)
         for newq in newQ
-            RMFq = _roadmap_rec(I, newq, Cq, info_level, checks)
+            RMFq = _roadmap_rec(I, newq, Cq, L_chosen, info_level, checks)
             push!(RM.children, RMFq)
         end
     end
 
-    if e == 0
-        return Roadmap(I, RM)
-    else
-        return RM
-    end
+    return e == 0 ? Roadmap(I, RM) : RM
 end
+
 
 function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} = Vector{T}[]) where {T <: QQFieldElem}
     # * S is a list of [ [l_1,r_1], ..., [l_n, r_n] ]
@@ -224,3 +231,24 @@ function _open_simplest_between(a::QQFieldElem, b::QQFieldElem, eps::QQFieldElem
 end
 
 
+
+function _linear_interval_eval(L::QQMPolyRingElem,
+                       I::Vector{Vector{QQFieldElem}})
+    R = parent(L)
+    x = gens(R)
+
+    lo = hi = zero(QQ)
+
+    for (xi, (a, b)) in zip(x, I)
+        c = coeff(L, xi)
+        if c >= 0
+            lo += c*a
+            hi += c*b
+        else
+            lo += c*b
+            hi += c*a
+        end
+    end
+
+    return [lo, hi]
+end

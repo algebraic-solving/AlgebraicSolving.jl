@@ -78,15 +78,19 @@ Base.getindex(I::Ideal, idx::Union{Int, UnitRange}) = I.gens[idx]
 
 Base.lastindex(I::Ideal) = lastindex(I.gens)
 
-mutable struct RMnode
-    base_pt::Vector{QQFieldElem}
-    polar_eqs::Vector{QQMPolyRingElem}
-    children::Vector{RMnode}
+# A base point is a list of (LinearForm, Value) pairs
+# defining the successive fiber cuts.
+const BasePoint{T} = Vector{Tuple{T, QQFieldElem}} where {T <: QQMPolyRingElem}
+
+mutable struct RMnode{T <: QQMPolyRingElem}
+    base_pt::BasePoint{T}
+    polar_eqs::Vector{T}
+    children::Vector{RMnode{T}}
 end
 
-mutable struct Roadmap
-    initial_ideal::Ideal{QQMPolyRingElem}
-    root::RMnode
+mutable struct Roadmap{T <: QQMPolyRingElem}
+    initial_ideal::Ideal{T}
+    root::RMnode{T}
 end
 
 function _collect_roadmap(RMn::RMnode, F)
@@ -97,6 +101,7 @@ function _collect_roadmap(RMn::RMnode, F)
     return data
 end
 
+## To adapt to the new base points form ##
 function _fbr(I::Ideal{P} where P <: QQMPolyRingElem, Q::Vector{QQFieldElem})
     @assert(!isempty(I.gens), "Empty polynomial vector")
     vars = gens(parent(first(I.gens)))
@@ -107,6 +112,7 @@ function all_eqs(RM::Roadmap)
     func(s) = _fbr(vcat(RM.initial_ideal.gens, s.polar_eqs) |> Ideal, s.base_pt)
     return _collect_roadmap(RM.root, func)
 end
+###
 
 function all_base_pts(RM::Roadmap)
     return _collect_roadmap(RM.root, s->s.base_pt)

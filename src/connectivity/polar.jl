@@ -52,6 +52,8 @@ julia> computepolar(1:3, I, dimproj=1, phi=[x1^2+x2^2+x3^2+x4^2])
  -2*x4
 ```
 """
+# TODO: do we really get something from truncating the jacobian in the projection case? 
+# If yes, automatically detect it (and others). If no, handle everything like the general case
 function computepolar(
         J::Union{Vector{Int},UnitRange{Int}},   # coordinate images of [phi,proj] (as above)
         V::Ideal{P};                            # input ideal
