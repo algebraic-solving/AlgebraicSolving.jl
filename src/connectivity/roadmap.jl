@@ -107,6 +107,7 @@ function _roadmap_rec(
     end
 
     # If we reach a new depth level, then generate new linear forms
+    # TODO: currently just put next projection
     if length(L_chosen) < e + 2
         info_level > 0 && println("Generating generic linear forms for depth $e...")
         #append_generic_linear_forms!(L_chosen, I, base_pt, info_level, checks)
@@ -157,7 +158,6 @@ function _roadmap_rec(
     # Construct the generalized base points for the children
     newQ = [vcat(base_pt, [(L_next, r)]) for r in K1WRat]
 
-    # --- 6. Recurse ---
     if !isempty(newQ)
         for newq in newQ
             RMFq = _roadmap_rec(I, newq, Cq, L_chosen, info_level, checks)
@@ -230,16 +230,16 @@ function _open_simplest_between(a::QQFieldElem, b::QQFieldElem, eps::QQFieldElem
     end
 end
 
-
-
+# Compute the image of a hyperbox B though a linear map L
+# the intervals in B are supposed to be ordered as the variables in parent(L)
 function _linear_interval_eval(L::QQMPolyRingElem,
-                       I::Vector{Vector{QQFieldElem}})
+                       B::Vector{Vector{QQFieldElem}})
     R = parent(L)
     x = gens(R)
 
     lo = hi = zero(QQ)
 
-    for (xi, (a, b)) in zip(x, I)
+    for (xi, (a, b)) in zip(x, B)
         c = coeff(L, xi)
         if c >= 0
             lo += c*a
@@ -251,4 +251,133 @@ function _linear_interval_eval(L::QQMPolyRingElem,
     end
 
     return [lo, hi]
+end
+
+# -------------------------------------------------------------------------
+# Genericity Tests & Generation (Completely Extracted)
+# -------------------------------------------------------------------------
+
+"""
+    append_generic_linear_forms!(L_chosen, I, base_pt, info_level, checks)
+
+Deterministically searches for and appends one linear form to `L_chosen` (two if empty)
+so that all genericity conditions pass for the current fiber.
+"""
+function append_generic_linear_forms!(
+    L_chosen::Vector{P},
+    I::Ideal{P},
+    base_pt::BasePoint{P},
+    info_level::Int
+) where {P <: QQMPolyRingElem}
+
+    R = parent(I.gens[1])
+    n = nvars(R)
+    v = gens(R)
+
+    # Simple deterministic search for coefficients
+    idx = 1
+    while true
+        # Generate two candidates deterministically based on idx
+        nb = isempty(L_chosen) ? 2 : 1
+
+        # TODO: Coefficient generation
+        cfs = [[(hash((idx, i, 1)) % 7) - 3 for i in 1:n] for _ in 1:nb]
+        L_next = [ sum(cfs[i][j] * v[j] for j in 1:n) for i in 1:nb ]
+
+        L_test = vcat(L_chosen, L_next)
+
+        if check_genericity(I, base_pt, L_test)
+            append!(L_chosen, L_next)
+            return
+        end
+        idx += 1
+    end
+end
+
+"""
+    check_genericity(I, base_pt, L_test, checks)
+
+Validates all generic roadmap assumptions
+Returns true if `L_test` satisfies the geometric requirements.
+"""
+function check_genericity(
+    I::Ideal{P},
+    base_pt::BasePoint{P},
+    L_test::Vector{P},
+) where {P <: QQMPolyRingElem}
+
+    lucky_prime = first(_generate_lucky_primes(gens, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
+    Kp = GF(lucky_prime)
+    Ip = change_base_ring.(Ref(Kp), I.gens)
+    Lp = change_base_ring.(Ref(Kp), L_test)
+    fib_p = [ change_base_ring(Kp, l) - Kp(q) for (l, q) in base_pt]
+
+    e = length(base_pt)
+    Lp_e  = Lp[1 : e]
+    Lp_e1 = Lp[1 : e+1]
+    Lp_e2 = Lp[1 : e+2]
+
+    # Test 1: Fiber dimension
+    if dimension(vcat(Ip, fib_p)) != I.dim - e
+        return false
+    end
+
+    # Test 2: Singularity of the fiber
+    polar_e = computepolar(1:e, Ip, phi=Lp_e)
+    if dimension(vcat(polar_e, fib_p)) != -1
+        return false
+    end
+
+    # Test 3: K1Fq must be finite
+    K1Fq_pol = computepolar(Lp_e1, Ip)
+    if dimension(vcat(K1Fq_pol, fib_p)) > 0
+        return false
+    end
+
+    # Test 4: K2Fq must have dimension 1
+    K2Fq_gens = computepolar(Lp_e2, Ip)
+    if dimension(vcat(K2Fq_gens, fib_p)) != 1
+        return false
+    end
+
+    # Test 5: Points with vertical tangents in W must be finite
+    K1Wm = computepolar(Lp_e2, Ideal(K2Fq_gens), dimproj=e)
+    if dimension(vcat(K1Wm, fib_p)) > 0
+        return false
+    end
+
+    return true
+end
+
+# Generate N random primes between low and up
+# that do not divide any numerator/denominator
+# of any coefficient in polynomials from LP
+function _generate_lucky_primes(
+    LF::Vector{<:MPolyRingElem},
+    low::ZZRingElem,
+    up::ZZRingElem,
+    N::Int64
+    )
+    # Using a Set avoids resizing and `unique!` shifting overhead
+    CF_set = Set{ZZRingElem}()
+    for f in LF, c in coefficients(f)
+        !isone(numerator(c)) && push!(CF_set, numerator(c))
+        !isone(denominator(c)) && push!(CF_set, denominator(c))
+    end
+
+    CF = sort!(collect(CF_set), rev=true)
+    Lprim = ZZRingElem[]
+
+    while length(Lprim) < N
+        cur_prim = next_prime(rand(low:up))
+        is_lucky = !(cur_prim in Lprim)
+        idx = firstindex(CF)
+        # Exploit decreasing order of CF
+        while is_lucky && idx <= lastindex(CF) && CF[idx] > cur_prim
+            is_lucky = !is_divisible_by(CF[idx], cur_prim)
+            idx += 1
+        end
+        is_lucky && push!(Lprim, cur_prim)
+    end
+    return Lprim
 end
