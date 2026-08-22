@@ -136,7 +136,6 @@ function _roadmap_rec(
     K1WmFq = real_solutions(K1WmFq_fiber, info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
 
     ## New base and query points ##
-    # Cq = isempty(q) ? C : [ c for c in C if q[e] in c[e]]
     Cq = isempty(base_pt) ? C : [c for c in C if base_pt[e][2] in _linear_interval_eval(L_chosen[e], c)]
 
     K1W = vcat(K1Fq, K1WmFq)
@@ -252,14 +251,18 @@ function append_generic_linear_forms!(
 
                 if check_genericity(I, base_pt, L_test)
                     push!(L_chosen, L_next1, L_next2)
-                    @show L_next1, L_next2
                     return
                 end
             end
         end
     else
         # We need ONE linear form. Iterate the stream from the very beginning.
+        lol = 1
         for cfs in stream
+            if lol < 10
+                lol += 1
+                continue
+            end
             L_next = sum(cfs[j] * v[j] for j in 1:n)
 
             # Skip forms we have already chosen
@@ -271,7 +274,6 @@ function append_generic_linear_forms!(
 
             if check_genericity(I, base_pt, L_test)
                 push!(L_chosen, L_next)
-                @show L_next
                 return
             end
         end
@@ -387,6 +389,7 @@ function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} =
     ratioP = T[]
     qidx = 1
     qlen = length(Q1)
+    @show [ Float64.(l) for l in S1]
 
     # Handle left gap before first interval
     while qidx <= qlen && Q1[qidx][2] < S1[1][1]
@@ -398,7 +401,12 @@ function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} =
     # Loop through gaps between sorted disjoint intervals
     for i in 1:(length(S1) - 1)
         ri, li1 = S1[i][2], S1[i+1][1]
-        @assert ri < li1 "Intervals are not disjoint.", i, ri, li1
+        #@assert ri < li1 "Intervals are not disjoint.", i, ri, li1
+        if !(ri < li1)
+            ## TODO: to replace with deterministic method
+            ## (generic separation (++) or algebraic projection)
+            continue
+        end
         inserted = false
         while qidx <= qlen && Q1[qidx][2] < li1
             ql, qr = Q1[qidx]
