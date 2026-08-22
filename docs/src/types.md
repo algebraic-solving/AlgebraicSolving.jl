@@ -162,7 +162,7 @@ Hence, it is composed of a main node, containing the equations of the initial
 algebraic set $V$ and a reference to the root node of the tree.
 
 ```julia
-const BasePoint{T} = Vector{Tuple{QQMPolyRingElem, QQFieldElem}}
+const BasePoint{T} = Vector{Tuple{T, QQFieldElem}} where {T <: QQMPolyRingElem}
 
 mutable struct RMnode
     base_pt::base_pt::BasePoint{P}
