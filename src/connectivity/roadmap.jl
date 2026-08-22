@@ -166,11 +166,56 @@ end
 
 
 # -------------------------------------------------------------------------
-# Genericity Tests & Generation (Completely Extracted)
+# Genericity Tests & Generation
 # -------------------------------------------------------------------------
 
+# A stateful, lazy generator for candidate linear forms with n vars.
+function _candidate_stream(n::Int)
+    Channel{Vector{Int}}() do ch
+        # 1. Quick coordinate projection check backward from the last variable
+        for i in n:-1:1
+            coeffs = zeros(Int, n)
+            coeffs[i] = 1
+            put!(ch, coeffs)
+        end
+
+        # 2. Bitmask Layering Search
+        # Safeguard for n=1 (though roadmap typically requires n >= 2)
+        sorted_masks = n > 1 ? sort(collect(1:(1 << (n-1)) - 1), by=count_ones) : [1]
+
+        queue = [ones(Int, n)]
+        tested = Set{Vector{Int}}([queue[1]])
+
+        while true
+            # Yield the current layer's candidates one by one
+            for coeffs in queue
+                put!(ch, coeffs)
+            end
+
+            # Generate the next layer
+            new_L = [
+                l .+ [(mask >> (k-1)) & 1 for k in 1:n]
+                for mask in sorted_masks
+                for l in queue
+            ]
+
+            queue = Vector{Vector{Int}}()
+            for coeffs in new_L
+                if !(coeffs in tested)
+                    push!(tested, coeffs)
+                    push!(queue, coeffs)
+                end
+            end
+
+            # Failsafe
+            isempty(queue) && break
+        end
+    end
+end
+
+
 """
-    append_generic_linear_forms!(L_chosen, I, base_pt, info_level, checks)
+    append_generic_linear_forms!(L_chosen, I, base_pt)
 
 Deterministically searches for and appends one linear form to `L_chosen` (two if empty)
 so that all genericity conditions pass for the current fiber.
@@ -185,24 +230,51 @@ function append_generic_linear_forms!(
     n = nvars(R)
     v = gens(R)
 
-    # Simple deterministic search for coefficients
-    idx = 1
-    while true
-        # Generate nb candidates deterministically based on idx
-        nb = isempty(L_chosen) ? 2 : 1
+    # Instantiate a fresh stream starting from simplest projections
+    stream = _candidate_stream(n)
 
-        # TODO: Coefficient generation
-        cfs = [[convert(Int64, hash((idx, j, i + length(L_chosen))) % 7) - 3 for j in 1:n] for i in 1:nb]
-        @show cfs
-        L_next = [ sum(cfs[i][j] * v[j] for j in 1:n) for i in 1:nb ]
-        ####
+    if isempty(L_chosen)
+        # We need TWO linear forms.
+        cache = Vector{Vector{Int}}()
 
-        L_test = vcat(L_chosen, L_next)
-        if check_genericity(I, base_pt, L_test)
-            append!(L_chosen, L_next)
-            return
+        # First candidate
+        push!(cache, take!(stream))
+        while true
+            # Next candidate
+            push!(cache, take!(stream))
+            max_idx = length(cache)
+
+            # Pair it with all previous candidates
+            L_next2 = sum(cache[max_idx][j] * v[j] for j in 1:n)
+            for i in 1:(max_idx - 1)
+                L_next1 = sum(cache[i][j] * v[j] for j in 1:n)
+                L_test = [L_next1, L_next2]
+
+                if check_genericity(I, base_pt, L_test)
+                    push!(L_chosen, L_next1, L_next2)
+                    @show L_next1, L_next2
+                    return
+                end
+            end
         end
-        idx += 1
+    else
+        # We need ONE linear form. Iterate the stream from the very beginning.
+        for cfs in stream
+            L_next = sum(cfs[j] * v[j] for j in 1:n)
+
+            # Skip forms we have already chosen
+            if L_next in L_chosen
+                continue
+            end
+
+            L_test = vcat(L_chosen, L_next)
+
+            if check_genericity(I, base_pt, L_test)
+                push!(L_chosen, L_next)
+                @show L_next
+                return
+            end
+        end
     end
 end
 
@@ -361,7 +433,7 @@ end
 
 # Compute the image of a hyperbox B though a linear map L
 # the intervals in B are supposed to be ordered as the variables in parent(L)
-function _linear_interval_eval(L::QQMPolyRingElem,
+function _linear_interval_eval(L::P where P <: QQMPolyRingElem,
                        B::Vector{Vector{QQFieldElem}})
     R = parent(L)
     x = gens(R)
