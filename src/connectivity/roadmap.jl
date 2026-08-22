@@ -13,8 +13,6 @@ Moreover it is linked to fibers, that share the same base point.
 - `I::Ideal{T} where T <: QQMPolyRingElem`: input generators.
 - `C::Vector{Vector{QQFieldElem}}=Vector{QQFieldElem}[]`: query points with rational coefficients
 - `info_level::Int=0`: verbosity level
-- `checks::Bool=false`: whether perform checks (dimension, regularity, etc.)
-- 'generic_change=false": whether it performs a prior random linear change of variables (TODO)
 )
 
 # Examples
@@ -27,51 +25,50 @@ julia> R,(x1,x2,x3,x4) = polynomial_ring(QQ, ["x1","x2","x3","x4"])
 julia> I = Ideal([(x1^2+x2^2+x3^2+x4^2+9-1)^2-4*9*(x1^2+x2^2+x3^2) + 1])
 QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65]
 
-julia> RM = roadmap(I, checks=true)
-Vector{QQFieldElem}[[], [-3], [-3, -2], [-2], [-2, -1], [-2, 0], [-2, 1], [3], [3, 2]]
+julia> RM = roadmap(I)
+Vector{Tuple{QQMPolyRingElem, QQFieldElem}}[[], [(x3, -3)], [(x3, -3), (x2, -1)], [(x3, -3), (x2, 0)], [(x3, -3), (x2, 1)], [(x3, -2)], [(x3, -2), (x2, -3)], [(x3, -2), (x2, -1)], [(x3, -2), (x2, 0)], [(x3, -2), (x2, 1)], [(x3, -2), (x2, 3)], [(x3, 3)], [(x3, 3), (x2, -1)], [(x3, 3), (x2, 0)], [(x3, 3), (x2, 1)]]
 
 julia> nb_nodes(RM)
-9
+15
 
 julia> all_eqs(RM)
-9-element Vector{Ideal{QQMPolyRingElem}}:
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^2*x3 - 4*x2^2*x3 - 4*x3^3 - 4*x3*x4^2 + 40*x3, -4*x1^2*x4 - 4*x2^2*x4 - 4*x3^2*x4 - 4*x4^3 - 32*x4]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^2*x4 - 4*x2^2*x4 - 4*x3^2*x4 - 4*x4^3 - 32*x4, x1 + 3]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 + 3, x2 + 2]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^2*x4 - 4*x2^2*x4 - 4*x3^2*x4 - 4*x4^3 - 32*x4, x1 + 2]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 + 2, x2 + 1]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 + 2, x2]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 + 2, x2 - 1]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^2*x4 - 4*x2^2*x4 - 4*x3^2*x4 - 4*x4^3 - 32*x4, x1 - 3]
- QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x1 - 3, x2 - 2]
+15-element Vector{Ideal{QQMPolyRingElem}}:
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, 4*x1^3 + 4*x1*x2^2 + 4*x1*x3^2 + 4*x1*x4^2 - 40*x1, 0, 0, 4*x1^2*x4 + 4*x2^2*x4 + 4*x3^2*x4 + 4*x4^3 + 32*x4]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^3 - 4*x1*x2^2 - 4*x1*x3^2 - 4*x1*x4^2 + 40*x1, x3 + 3]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x3 + 3, x2 + 1]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x3 + 3, x2]
+ ⋮
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, -4*x1^3 - 4*x1*x2^2 - 4*x1*x3^2 - 4*x1*x4^2 + 40*x1, x3 - 3]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x3 - 3, x2 + 1]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x3 - 3, x2]
+ QQMPolyRingElem[x1^4 + 2*x1^2*x2^2 + 2*x1^2*x3^2 + 2*x1^2*x4^2 - 20*x1^2 + x2^4 + 2*x2^2*x3^2 + 2*x2^2*x4^2 - 20*x2^2 + x3^4 + 2*x3^2*x4^2 - 20*x3^2 + x4^4 + 16*x4^2 + 65, x3 - 3, x2 - 1]
 ```
 """
 function roadmap(
     I::Ideal{P};                                                            # input ideal
     C::Vector{Vector{Vector{QQFieldElem}}}=Vector{Vector{QQFieldElem}}[],   # query points: interval with rational coefficients
-    info_level::Int=0,                                                      # verbosity level
-    checks::Bool=false                                                      # perform checks (dimension, regularity, etc.)
+    info_level::Int=0                                                       # verbosity level
 ) where {P <: QQMPolyRingElem}
+
     # L_chosen holds the sequence of generic linear forms shared across ALL fibers.
     L_chosen = P[]
     empty_base_pt = Tuple{P, QQFieldElem}[]
-
-    return _roadmap_rec(I, empty_base_pt, C, L_chosen, info_level, checks)
+    return _roadmap_rec(I, empty_base_pt, C, L_chosen, info_level)
 end
 
 @doc Markdown.doc"""
-    roadmap(I::Ideal{T} where T <: MPolyRingElem, I::Ideal{P}, C::Ideal{P}; info_level::Int=0, checks::Bool=false)
+    roadmap(I::Ideal{T} where T <: MPolyRingElem, I::Ideal{P}, C::Ideal{P}; info_level::Int=0)
 ```
 """
 function roadmap(
     I::Ideal{P},                # input ideal
     C::Ideal{P};                # ideal defining query points
-    info_level::Int=0,          # verbosity level
-    checks::Bool=false          # perform checks (dimension, regularity, etc.)
+    info_level::Int=0           # verbosity level
 ) where {P <: QQMPolyRingElem}
+
     @assert(parent(I)==parent(C), "Equations for variety and query points must live the same ring")
     CI = real_solutions(C, info_level=max(info_level-1,0), nr_thrds=Threads.nthreads())
-    return roadmap(I, CI, info_level, checks)
+    return roadmap(I, CI, info_level)
 end
 
 function _roadmap_rec(
@@ -79,8 +76,7 @@ function _roadmap_rec(
     base_pt::BasePoint{P},                      # single base point with rational coefficients
     C::Vector{Vector{Vector{QQFieldElem}}},     # query points with rational coefficients
     L_chosen::Vector{P},
-    info_level::Int,                            # verbosity level
-    checks::Bool                                # perform checks (dimension, regularity, etc.)
+    info_level::Int                             # verbosity level
 ) where {P <: QQMPolyRingElem}
 
     n = nvars(parent(I))
@@ -155,7 +151,7 @@ function _roadmap_rec(
 
     if !isempty(newQ)
         for newq in newQ
-            RMFq = _roadmap_rec(I, newq, Cq, L_chosen, info_level, checks)
+            RMFq = _roadmap_rec(I, newq, Cq, L_chosen, info_level)
             push!(RM.children, RMFq)
         end
     end
@@ -222,7 +218,7 @@ so that all genericity conditions pass for the current fiber.
 function append_generic_linear_forms!(
     L_chosen::Vector{P},
     I::Ideal{P},
-    base_pt::BasePoint{P},
+    base_pt::BasePoint{P}
 ) where {P <: QQMPolyRingElem}
 
     R = parent(I.gens[1])
@@ -257,12 +253,7 @@ function append_generic_linear_forms!(
         end
     else
         # We need ONE linear form. Iterate the stream from the very beginning.
-        lol = 1
         for cfs in stream
-            if lol < 10
-                lol += 1
-                continue
-            end
             L_next = sum(cfs[j] * v[j] for j in 1:n)
 
             # Skip forms we have already chosen
@@ -281,7 +272,7 @@ function append_generic_linear_forms!(
 end
 
 """
-    check_genericity(I, base_pt, L_test, checks)
+    check_genericity(I, base_pt, L_test)
 
 Validates all generic roadmap assumptions
 Returns true if `L_test` satisfies the geometric requirements.
@@ -389,7 +380,6 @@ function _mid_rational_points_inter(S::Vector{Vector{T}}, Q::Vector{Vector{T}} =
     ratioP = T[]
     qidx = 1
     qlen = length(Q1)
-    @show [ Float64.(l) for l in S1]
 
     # Handle left gap before first interval
     while qidx <= qlen && Q1[qidx][2] < S1[1][1]

@@ -101,18 +101,16 @@ function _collect_roadmap(RMn::RMnode, F)
     return data
 end
 
-## To adapt to the new base points form ##
-function _fbr(I::Ideal{P} where P <: QQMPolyRingElem, Q::Vector{QQFieldElem})
+function _fbr(I::Ideal{P}, base_pt::BasePoint{P}) where {P <: QQMPolyRingElem}
     @assert(!isempty(I.gens), "Empty polynomial vector")
-    vars = gens(parent(first(I.gens)))
-    return Ideal(vcat(I.gens, [vars[i] - Q[i] for i in 1:min(length(vars),length(Q))]))
+    fb_eqs = [l - q for (l, q) in base_pt]
+    return Ideal(vcat(I.gens, fb_eqs))
 end
 
 function all_eqs(RM::Roadmap)
     func(s) = _fbr(vcat(RM.initial_ideal.gens, s.polar_eqs) |> Ideal, s.base_pt)
     return _collect_roadmap(RM.root, func)
 end
-###
 
 function all_base_pts(RM::Roadmap)
     return _collect_roadmap(RM.root, s->s.base_pt)
