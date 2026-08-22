@@ -74,7 +74,56 @@ Base.parent(I::Ideal) = Nemo.parent(I.gens[1])
 
 Base.show(io::IO, I::Ideal) = print(io, I.gens)
 
-Base.getindex(I::Ideal, idx::Int) = I.gens[idx]
+Base.getindex(I::Ideal, idx::Union{Int, UnitRange}) = I.gens[idx]
+
+Base.lastindex(I::Ideal) = lastindex(I.gens)
+
+# A base point is a list of (LinearForm, Value) pairs
+# defining the successive fiber cuts.
+const BasePoint{T} = Vector{Tuple{T, QQFieldElem}} where {T <: QQMPolyRingElem}
+
+mutable struct RMnode{T <: QQMPolyRingElem}
+    base_pt::BasePoint{T}
+    polar_eqs::Vector{T}
+    children::Vector{RMnode{T}}
+end
+
+mutable struct Roadmap{T <: QQMPolyRingElem}
+    initial_ideal::Ideal{T}
+    root::RMnode{T}
+end
+
+function _collect_roadmap(RMn::RMnode, F)
+    data = [F(RMn)]
+    for child in RMn.children
+        append!(data, _collect_roadmap(child, F))
+    end
+    return data
+end
+
+function _fbr(I::Ideal{P}, base_pt::BasePoint{P}) where {P <: QQMPolyRingElem}
+    @assert(!isempty(I.gens), "Empty polynomial vector")
+    fb_eqs = [l - q for (l, q) in base_pt]
+    return Ideal(vcat(I.gens, fb_eqs))
+end
+
+function all_eqs(RM::Roadmap)
+    func(s) = _fbr(vcat(RM.initial_ideal.gens, s.polar_eqs) |> Ideal, s.base_pt)
+    return _collect_roadmap(RM.root, func)
+end
+
+function all_base_pts(RM::Roadmap)
+    return _collect_roadmap(RM.root, s->s.base_pt)
+end
+
+function nb_nodes(RM::Roadmap)
+    return length(_collect_roadmap(RM.root, s -> true))
+end
+
+Base.show(io::IO, RM::Roadmap) = print(io, all_base_pts(RM))
+Base.getindex(RM::Roadmap, idx::Union{Int, UnitRange}) = all_eqs(RM)[idx]
+Base.lastindex(RM::Roadmap) = nb_nodes(RM)
+Base.length(RM::Roadmap) = nb_nodes(RM)
 
 mutable struct ParametricIdeal{K<:FracFieldElem}
     base_frac_field::FracField

@@ -27,6 +27,9 @@ include("algorithms/param-ideal/semialgebraic-set.jl")
 include("algorithms/param-ideal/real-root-classification.jl")
 #= siggb =#
 include("siggb/siggb.jl")
+#= connectivity =#
+include("connectivity/polar.jl")
+include("connectivity/roadmap.jl")
 #= progress =#
 include("progress/main.jl")
 #= interp =#
