@@ -45,7 +45,7 @@ julia> all_eqs(RM)
 ```
 """
 function roadmap(
-    I::Ideal{P};                                                            # input ideal
+    I::Ideal{P},                                                            # input ideal
     C::Vector{Vector{Vector{QQFieldElem}}}=Vector{Vector{QQFieldElem}}[],   # query points: interval with rational coefficients
     info_level::Int=0                                                       # verbosity level
 ) where {P <: QQMPolyRingElem}
@@ -67,7 +67,7 @@ function roadmap(
 ) where {P <: QQMPolyRingElem}
 
     @assert(parent(I)==parent(C), "Equations for variety and query points must live the same ring")
-    CI = real_solutions(C, info_level=max(info_level-1,0), nr_thrds=Threads.nthreads())
+    CI = real_solutions(C, info_level=max(info_level-1,0), nr_thrds=Threads.nthreads(), interval=true)
     return roadmap(I, CI, info_level)
 end
 
@@ -86,7 +86,7 @@ function _roadmap_rec(
 
     # Some preprocessng
     if isnothing(I.dim)
-        lucky_prime = _generate_lucky_primes(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
+        lucky_prime = _generate_lucky_primes_rm(I.gens, one(ZZ)<<30, one(ZZ)<<31-1, 1) |> first
         INEW = Ideal(change_base_ring.(Ref(GF(lucky_prime)), I.gens))
         I.dim = dimension(INEW)
     end
@@ -95,7 +95,7 @@ function _roadmap_rec(
 
     # Base case (dim(I) <= 1)
     if I.dim <= 1
-        return Roadmap(I, RMnode(base_pt, I.gens, RMnode[]))
+        return Roadmap(I, RMnode(base_pt, I.gens, RMnode{P}[]))
     end
     # Terminal case (dim(F) <= 1)
     if I.dim - e <= 1
@@ -164,8 +164,8 @@ end
 # Genericity Tests & Generation
 # -------------------------------------------------------------------------
 
-# A stateful, lazy generator for candidate linear forms with n vars.
-function _candidate_stream(n::Int)
+# Generator for candidate linear forms with n vars.
+function _candidate_stream_roadmap(n::Int)
     Channel{Vector{Int}}() do ch
         # 1. Quick coordinate projection check backward from the last variable
         for i in 1:n
@@ -226,7 +226,7 @@ function append_generic_linear_forms!(
     v = gens(R)
 
     # Instantiate a fresh stream starting from simplest projections
-    stream = _candidate_stream(n)
+    stream = _candidate_stream_roadmap(n)
 
     if isempty(L_chosen)
         # We need TWO linear forms.
@@ -283,7 +283,7 @@ function check_genericity(
     L_test::Vector{P},
 ) where {P <: QQMPolyRingElem}
 
-    lucky_prime = first(_generate_lucky_primes(I.gens, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
+    lucky_prime = first(_generate_lucky_primes_rm(I.gens, one(ZZ)<<30, (one(ZZ)<<31)-1, 1))
     Kp = GF(lucky_prime)
     Ip = Ideal(change_base_ring.(Ref(Kp), I.gens))
     Lp = change_base_ring.(Ref(Kp), L_test)
@@ -334,7 +334,7 @@ end
 # Generate N random primes between low and up
 # that do not divide any numerator/denominator
 # of any coefficient in polynomials from LP
-function _generate_lucky_primes(
+function _generate_lucky_primes_rm(
     LF::Vector{<:MPolyRingElem},
     low::ZZRingElem,
     up::ZZRingElem,
