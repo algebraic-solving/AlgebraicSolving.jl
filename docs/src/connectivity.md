@@ -30,8 +30,7 @@ The underlying engine is provided by msolve.
     roadmap(
       I::Ideal{P} where P <: QQMPolyRingElem;
       C::Vector{Vector{Vector{QQFieldElem}}}=Vector{Vector{QQFieldElem}}[],
-      info_level::Int=0,
-      checks::Bool=false
+      info_level::Int=0
     )
 ```
 

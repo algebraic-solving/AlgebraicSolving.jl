@@ -162,8 +162,10 @@ Hence, it is composed of a main node, containing the equations of the initial
 algebraic set $V$ and a reference to the root node of the tree.
 
 ```julia
+const BasePoint{T} = Vector{Tuple{QQMPolyRingElem, QQFieldElem}}
+
 mutable struct RMnode
-    base_pt::Vector{QQFieldElem}
+    base_pt::base_pt::BasePoint{P}
     polar_eqs::Vector{QQMPolyRingElem}
     children::Vector{RMnode}
 end
@@ -172,14 +174,13 @@ end
 Each roadmap node (including the root) correspond to a curve component of the
 roadmap. More precisely, they are defined by as an algebraic subset $W$ (called
 polar variety) of a fiber $F$ of the initial variety $V$ such that:
-  * if `base_pt` contains $\mathbf{q}=(q_1,\dotsc,q_e) \in \mathbb{Q}^e$ then
-    *  $F = V \cap \left\{x_1=q_1,\,\dotsc,\, x_e=q_e\right\}$;
-  * if `polar_eqs` contains the polynomials $g_1,\dotsc,g_s \in   \mathbb{Q}[x_1,\dotsc,x_n]$ then 
-    *  $W = F \cap \{g_1=0,\, \ldots,\, g_s = 0\}$.
+  * if `base_pt` contains the sequence of pairs $((L_1, q_1), \dotsc, (L_e, q_e))$, where $L_i \in \mathbb{Q}[x_1,\dotsc,x_n]$ and $q_i \in \mathbb{Q}$, then
+    *  $F = V \cap \left\{L_1=q_1,\,\dotsc,\, L_e=q_e\right\}$;
 
-Moreover, `children` rassembles all the tree nodes that contains curves
-component for which their attribute `base_pt` contains a point $\mathbf{q}'$
-that shares the same first $e$ coordinates with $\mathbf{q}$.
+  * if `polar_eqs` contains the polynomials $g_1,\dotsc,g_s \in \mathbb{Q}[x_1,\dotsc,x_n]$ then
+    * $W = F \cap \{g_1=0,\, \ldots,\, g_s = 0\}$.
+
+Moreover, `children` assembles all the tree nodes containing curve components for which their attribute `base_pt` strictly extends the current one. That is, a child's base point shares the exact same sequence of $e$ linear forms and scalar values $((L_1, q_1), \dotsc, (L_e, q_e))$ as its parent, while appending a new pair $(L_{e+1}, q_{e+1})$.
 
 The reason of this tree arrangement is mainly because of the following property:
 *two roadmap components intersect if, and only if, one's node is a descendant

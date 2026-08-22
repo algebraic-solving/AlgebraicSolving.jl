@@ -80,7 +80,7 @@ Base.lastindex(I::Ideal) = lastindex(I.gens)
 
 # A base point is a list of (LinearForm, Value) pairs
 # defining the successive fiber cuts.
-const BasePoint{T} = Vector{Tuple{T, QQFieldElem}} where {T <: QQMPolyRingElem}
+const BasePoint{T} = Vector{Tuple{QQMPolyRingElem, QQFieldElem}}
 
 mutable struct RMnode{T <: QQMPolyRingElem}
     base_pt::BasePoint{T}
