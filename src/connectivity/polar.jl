@@ -52,8 +52,6 @@ julia> computepolar(1:3, I, dimproj=1, phi=[x1^2+x2^2+x3^2+x4^2])
  -2*x4
 ```
 """
-# TODO: do we really get something from truncating the jacobian in the projection case? 
-# If yes, automatically detect it (and others). If no, handle everything like the general case
 function computepolar(
         J::Union{Vector{Int},UnitRange{Int}},   # coordinate images of [phi,proj] (as above)
         V::Ideal{P};                            # input ideal
@@ -76,7 +74,7 @@ function computepolar(
 
     # Construct the truncated Jacobian matrix
     psi = vcat(V.gens, phi[Jphi])
-    JW = matrix(R, QQMPolyRingElem[ derivative(f, k) for f in psi, k in setdiff(1:n, Jproj)])
+    JW = matrix(R, P[ derivative(f, k) for f in psi, k in setdiff(1:n, Jproj)])
     # Compute the minors
     sizeminors = c + length(Jphi) + min(dimproj, length(J)-1) - (length(J)-1)
     minors = _compute_minors(sizeminors, JW)
