@@ -167,7 +167,7 @@ end
 # Generator for candidate linear forms with n vars.
 function _candidate_stream_roadmap(n::Int)
     Channel{Vector{Int}}() do ch
-        # 1. Quick coordinate projection check backward from the last variable
+        # 1. Quick coordinate projection check onwards from the first variable
         for i in 1:n
             coeffs = zeros(Int, n)
             coeffs[i] = 1
