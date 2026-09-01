@@ -207,7 +207,7 @@ The reason of this tree arrangement is mainly because of the following property:
 of the other's*. In many cases, one can even replace "descendant" by "parent".
 
 
-See the documentation of the [roadmap](@ref) function for further details.
+See the documentation of the [`roadmap`](@ref) function for further details.
 
 # Graph Data Structures & Visualization
 
@@ -215,7 +215,7 @@ See the documentation of the [roadmap](@ref) function for further details.
 
 The `CurveGraph{T}` structure represents a planar straight-line graph
 that is homeomorphic to a real algebraic curve. It is the output of
-algorithms [curve_graph](@ref), which compute the planar projection
+algorithms [`curve_graph`](@ref), which compute the planar projection
 of curves while resolving apparent singularities.
 
 These real algebraic curves are typically output of roadmap algorithms
@@ -232,7 +232,7 @@ The type `CurveGraph{T}` (where `T` is typically `Float64` or `QQFieldElem`) cac
 
   * `edges::Vector{Tuple{Int, Int}}`: a list of index pairs defining the undirected edges connecting the vertices in `vertices`.
 
-  * `control_nodes::Dict{Int, Vector{Int}}`: a dictionary mapping user-defined control point IDs to their corresponding local vertex indices in the `vertices` array. These IDs typically refer to other `CurveGraph{T}` and the associated vertices: their mutual intersection. This is useful when computing arrangement of curves using [merge_graphs](@ref).
+  * `control_nodes::Dict{Int, Vector{Int}}`: a dictionary mapping user-defined control point IDs to their corresponding local vertex indices in the `vertices` array. These IDs typically refer to other `CurveGraph{T}` and the associated vertices: their mutual intersection. This is useful when computing arrangement of curves using [`merge_graphs`](@ref).
 
 ```julia
 struct CurveGraph{T}
@@ -290,7 +290,7 @@ plot_graph(build_graphs_data(G))
 ```
 
 If one has `CG` a list of `CurveGraph{T}` (typically the connected
-components of `G` obtained with [connected_components](@ref)).
+components of `G` obtained with [`connected_components`](@ref)).
 
 ```julia
 # How to plot:
