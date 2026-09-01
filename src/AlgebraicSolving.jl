@@ -25,6 +25,7 @@ include("algorithms/param-ideal/parametrizations.jl")
 include("algorithms/param-ideal/sign-determination.jl")
 include("algorithms/param-ideal/semialgebraic-set.jl")
 include("algorithms/param-ideal/real-root-classification.jl")
+include("algorithms/param-ideal/solve-lmi.jl")
 #= siggb =#
 include("siggb/siggb.jl")
 #= progress =#
