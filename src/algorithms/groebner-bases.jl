@@ -146,7 +146,7 @@ function groebner_basis(
 end
 
 @doc Markdown.doc"""
-    leading_monomials(I::Ideal{T} where T <: MPolyRingElem, <keyword arguments>)
+    leading_monomials(I::Ideal{T}, <keyword arguments>) where {T <: MPolyRingElem}
 
 Compute the minimal generators of the leading monomial ideal of `I`
 w.r.t. to the degree reverse lexicographical monomial ordering using
@@ -182,14 +182,18 @@ julia> leading_monomials(I)
 ```
 """
 function leading_monomials(
-        I::Ideal{T} where T <: MPolyRingElem;
+        I::Ideal{T};
         initial_hts::Int=17,
         nr_thrds::Int=1,
         max_nr_pairs::Int=0,
         la_option::Int=2,
         worker_pool::Union{Nothing,AbstractWorkerPool}=nothing,
         info_level::Int=0
-        )
+        )  where {T <: MPolyRingElem}
+
+    if all(iszero, I.gens)
+        return T[]
+    end
 
     if haskey(I.gb, 0)
         return [_leading_monomial(g, :degrevlex) for g in I.gb[0]]
