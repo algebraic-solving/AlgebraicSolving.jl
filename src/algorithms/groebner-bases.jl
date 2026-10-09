@@ -196,13 +196,17 @@ function _core_groebner_basis_array(
     gb_cf = Ref(Ptr{Cvoid}(0))
 
     if field_char == 0
+        # print_gb = 2 exports full basis coefficients/exponents (as opposed to
+        # 0/1, which only export leading monomials); required as of msolve's
+        # `export_groebner_qq` signature change adding this parameter.
+        print_gb = 2
         nr_terms = ccall((:export_groebner_qq, libmsolve), Int,
             (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
                 Ptr{Cint}, Ptr{Cint}, Ptr{Cvoid}, Cint, Cint, Cint, Cint, Cint, Cint,
-                Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint),
+                Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint, Cint),
             cglobal(:jl_malloc), gb_ld, gb_len, gb_exp, gb_cf, lens, exps, cfs,
             field_char, mon_order, elim_block_size, nr_vars, nr_gens, initial_hts,
-            nr_thrds, max_nr_pairs, 0, la_option, reduce_gb, 0, truncate_lifting, info_level)
+            nr_thrds, max_nr_pairs, 0, la_option, print_gb, reduce_gb, 0, truncate_lifting, info_level)
     else
         nr_terms = ccall((:export_f4, libneogb), Int,
             (Ptr{Nothing}, Ptr{Cint}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
