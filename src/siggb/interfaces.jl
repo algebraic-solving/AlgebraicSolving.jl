@@ -33,8 +33,8 @@ function input_setup(sys::Vector{<:MPolyRingElem}, mod_ord::Symbol=:DPOT)
     end
 
     # constants for fast arithmetic
-    char = Val(Coeff(Rchar.d))
-    shift = Val(maxshift(char))
+    char = Coeff(Rchar.d)
+    shift = maxshift(char)
 
     # convert to and initialize our data structures
     nv = nvars(R)
@@ -102,9 +102,9 @@ end
 
 function convert_to_ht(f::MPolyRingElem,
                        ht::MonomialHashtable{N},
-                       char::Val{Char};
+                       char::Coeff;
                        normalise::Bool=true,
-                       kwargs...) where {N, Char}
+                       kwargs...) where N
 
     lf = length(f)
 

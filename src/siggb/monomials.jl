@@ -170,7 +170,7 @@ function sort_poly!(pol::Polynomial; kwargs...)
 end
 
 function normalize_cfs!(cfs::Vector{Coeff},
-                        char::Val{Char}) where Char
+                        char::Coeff)
 
     isone(first(cfs)) && return
     inver = inv(first(cfs), char)
@@ -188,9 +188,9 @@ function add_pols(coeffs1::Vector{Coeff},
                   mons1::Vector{MonIdx},
                   coeffs2::Vector{Coeff},
                   mons2::Vector{MonIdx},
-                  vch::Val{Char},
+                  char::Coeff,
                   scalar1::Coeff=one(Coeff),
-                  scalar2::Coeff=one(Coeff)) where {Char}
+                  scalar2::Coeff=one(Coeff))
 
     l1 = length(mons1)
     l2 = length(mons2)
@@ -206,18 +206,18 @@ function add_pols(coeffs1::Vector{Coeff},
         m2 = mons2[ind2]
         if m1 == m2
             mons_res[new_l] = m1
-            coeffs_res[new_l] = add(mul(scalar1, coeffs1[ind1], vch),
-                                    mul(scalar2, coeffs2[ind2], vch),
-                                    vch)
+            coeffs_res[new_l] = add(mul(scalar1, coeffs1[ind1], char),
+                                    mul(scalar2, coeffs2[ind2], char),
+                                    char)
             ind1 += 1
             ind2 += 1
         elseif m1 < m2
             mons_res[new_l] = m1
-            coeffs_res[new_l] = mul(scalar1, coeffs1[ind1], vch)
+            coeffs_res[new_l] = mul(scalar1, coeffs1[ind1], char)
             ind1 += 1
         else
             mons_res[new_l] = m2
-            coeffs_res[new_l] = mul(scalar2, coeffs2[ind2], vch)
+            coeffs_res[new_l] = mul(scalar2, coeffs2[ind2], char)
             ind2 += 1
         end
     end
@@ -225,14 +225,14 @@ function add_pols(coeffs1::Vector{Coeff},
     while ind1 <= l1
         new_l += 1
         mons_res[new_l] = mons1[ind1]
-        coeffs_res[new_l] = mul(scalar1, coeffs1[ind1], vch)
+        coeffs_res[new_l] = mul(scalar1, coeffs1[ind1], char)
         ind1 += 1
     end
 
     while ind2 <= l2 
         new_l += 1
         mons_res[new_l] = mons2[ind2]
-        coeffs_res[new_l] = mul(scalar2, coeffs2[ind2], vch)
+        coeffs_res[new_l] = mul(scalar2, coeffs2[ind2], char)
         ind2 += 1
     end
 
@@ -249,8 +249,7 @@ end
 function mult_pols(exps1::Vector{Monomial{N}},
                    exps2::Vector{Monomial{N}},
                    cfs1::Vector{Coeff},
-                   cfs2::Vector{Coeff},
-                   char::Val{Char}) where {N, Char}
+                   cfs2::Vector{Coeff}) where N
 
     R, vrs = polynomial_ring(GF(Int(Char)), ["x$i" for i in 1:N],
                              ordering = :degrevlex)
@@ -286,21 +285,21 @@ end
 
 function mul_by_coeff(coeffs::Vector{Coeff},
                       c::Coeff,
-                      vchar::Val{Char}) where Char 
+                      char::Coeff)
 
     coeffs_res = Vector{Coeff}(undef, length(coeffs))
     @inbounds for i in 1:length(coeffs)
-        coeffs_res[i] = mul(c, coeffs[i], vchar)
+        coeffs_res[i] = mul(c, coeffs[i], char)
     end
     return coeffs_res
 end
 
 function mul_by_coeff!(coeffs::Vector{Coeff},
                        c::Coeff,
-                       vchar::Val{Char}) where Char 
+                       char::Coeff)
 
     @inbounds for i in 1:length(coeffs)
-        coeffs[i] = mul(c, coeffs[i], vchar)
+        coeffs[i] = mul(c, coeffs[i], char)
     end
 end
 

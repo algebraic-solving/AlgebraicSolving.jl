@@ -15,9 +15,9 @@ function normal_form(f::T, gb::Vector{T}) where {T <: MPolyRingElem}
 end
 
 function normal_form(mons::Vector{MonIdx},
-                        coeffs::Vector{Coeff},
-                        ht::MonomialHashtable{N},
-                        gb::Vector{<:MPolyRingElem}) where N
+                     coeffs::Vector{Coeff},
+                     ht::MonomialHashtable{N},
+                     gb::Vector{<:MPolyRingElem}) where N
     
 
     R = parent(first(gb))

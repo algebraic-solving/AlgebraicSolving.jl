@@ -182,10 +182,10 @@ function garbage_collect!(basis::Basis{N},
     
     @inbounds if typeof(tr) == SigTracer
         for mat in tr.mats
-            for sig in keys(mat.rows)
-                row_ind, rewr_ind = mat.rows[sig]
+            for row_ind in eachindex(mat.rows)
+                sg, rewr_ind, is_piv = mat.rows[row_ind]
                 shc = compute_shift(rewr_ind, del_indices)
-                mat.rows[sig] = (row_ind, shc != -1 ? rewr_ind-shc : 0)
+                mat.rows[row_ind] = (sg, shc != -1 ? rewr_ind-shc : 0, is_piv)
             end
             for r_ind in keys(mat.is_basis_row)
                 b_ind = mat.is_basis_row[r_ind]
@@ -234,18 +234,22 @@ function resize_pairset!(pairset::Pairset, nnew::Int)
     end
 end
 
-function initialize_matrix(::Val{N}) where {N}
-    rows = Vector{Vector{MonIdx}}(undef, 0)
-    pivots = Vector{Int}(undef, 0)
-    pivot_size = 0
-    sigs = Vector{Sig{N}}(undef, 0)
-    parent_inds = Vector{Int}(undef, 0)
+function initialize_matrix(::Val{N}, nrows=0::Int) where {N}
+    rows = Vector{Vector{MonIdx}}(undef, nrows)
+    pivots = Vector{Int}(undef, nrows)
+    pivot_size = nrows
+    sigs = Vector{Sig{N}}(undef, nrows)
+    parent_inds = Vector{Int}(undef, nrows)
     sig_order = Vector{Int}(undef, 0)
     col2hash = Vector{ColIdx}(undef, 0)
-    coeffs = Vector{Vector{Coeff}}(undef, 0)
-    toadd = Vector{Int}(undef, 0)
+    coeffs = Vector{Vector{Coeff}}(undef, nrows)
+    toadd = Vector{Int}(undef, nrows)
 
-    size = 0
+    for i in 1:nrows
+        toadd[i] = 0
+    end
+
+    size = nrows
     nrows = 0
     ncols = 0
     toadd_length = 0
@@ -269,7 +273,7 @@ function reinitialize_matrix!(matrix::MacaulayMatrix, npairs::Int)
     resize!(matrix.parent_inds, matrix.size)
     resize!(matrix.coeffs, matrix.size)
     resize!(matrix.toadd, matrix.size)
-    for i in 1:npairs
+    for i in 1:2*npairs
         matrix.toadd[i] = 0
     end
     return matrix
@@ -404,7 +408,8 @@ function homogenize(F::Vector{P}) where {P <: MPolyRingElem}
             enew = push!(e, d - sum(e))
             push_term!(ctx, c, e)
         end
-        push!(res, finish(ctx))
+        p = finish(ctx)
+        push!(res, leading_coefficient(p)^(-1) * p)
     end
     return res
 end

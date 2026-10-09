@@ -12,7 +12,6 @@ function select_normal!(pairset::Pairset{N},
     min_pair_ind = 0
     deg = Exp(-1) 
     sigind = zero(SigIndex)
-    compat_ind = zero(SigIndex)
     dont_sel = Int[]
     for i in 1:pairset.load
         pe = pairset.elems[i]
@@ -20,16 +19,8 @@ function select_normal!(pairset::Pairset{N},
             deg = mod_ord == :DPOT ? pe.deg : monomial(pe.top_sig).deg
             sigind = index(pe.top_sig)
             npairs += 1
-            continue
-        end
-        if should_select(pairset, i, deg, sigind, mod_ord)
+        elseif should_select(pairset, i, deg, sigind, mod_ord)
             npairs += 1
-            top_s_idx = index(pe.top_sig)
-            if iszero(compat_ind) && gettag(tags, top_s_idx) == :sat
-                compat_ind = top_s_idx
-            elseif are_incompat(top_s_idx, compat_ind, ind_order)
-                push!(dont_sel, i)
-            end
         else
             break
         end
@@ -109,7 +100,6 @@ function select_normal!(pairset::Pairset{N},
                     pair2 = pairset.elems[j]
                     pair2.bot_sig == curr_top_sig && continue
                     iszero(pair2.bot_index) && continue
-                    are_incompat(index(pair2.bot_sig), compat_ind, ind_order) && continue
                     if iszero(reducer_ind) || lt_pot(pair2.bot_sig, reducer_sig, ind_order)
                         !lt_pot(pair2.bot_sig, curr_top_sig, ind_order) && continue
                         new_red = false
@@ -184,7 +174,7 @@ function select_normal!(pairset::Pairset{N},
         pairset.elems[i] = pairset.elems[i+npairs-l+1]
     end
     pairset.load -= npairs
-    return deg, compat_ind, sigind
+    return deg, sigind
 end
 
 function symbolic_pp!(timer::Timings,
@@ -195,7 +185,6 @@ function symbolic_pp!(timer::Timings,
                       ind_order::IndOrder,
                       tags::Tags,
                       sigind::SigIndex=zero(SigIndex),
-                      compat_ind::SigIndex=zero(SigIndex),
                       mod_ord::Symbol=:DPOT) where N
 
     i = one(MonIdx)
@@ -253,11 +242,6 @@ function symbolic_pp!(timer::Timings,
             end
 
             cand_sig = basis.sigs[j]
-            if !iszero(compat_ind) && are_incompat(index(cand_sig),
-                                                   compat_ind, ind_order)
-                j += 1
-                @goto target
-            end
 
             if mod_ord == :POT && cmp_ind_str(sigind, index(cand_sig), ind_order)
                 j += 1
@@ -318,9 +302,6 @@ function symbolic_pp!(timer::Timings,
         # write to matrix
         if !iszero(red_ind)
             mm = monomial(SVector(mult))
-            if iszero(compat_ind) && gettag(tags, index(mul_red_sig)) == :sat
-                compat_ind = index(mul_red_sig)
-            end
             @inbounds lead_idx = write_to_matrix_row!(matrix, basis,
                                                       red_ind, symbol_ht,
                                                       ht, mm,
@@ -334,9 +315,7 @@ end
 
 function finalize_matrix!(matrix::MacaulayMatrix,
                           symbol_ht::MonomialHashtable,
-                          ind_order::IndOrder,
-                          sigind::SigIndex=zero(SigIndex),
-                          mod_ord::Symbol=:DPOT)
+                          ind_order::IndOrder)
     
     # store indices into hashtable in a sorted way
     ncols = symbol_ht.load
@@ -363,18 +342,7 @@ function finalize_matrix!(matrix::MacaulayMatrix,
     matrix.sig_order = Vector{Int}(undef, matrix.nrows)
     # sort signatures
 
-    lt_mat = (sig1, sig2) -> begin
-        if mod_ord == :POT
-            i1, i2 = index(sig1), index(sig2)
-            if cmp_ind_str(i1, sigind, ind_order) && cmp_ind_str(i2, sigind, ind_order)
-                true
-            else
-                lt_pot(sig1, sig2, ind_order)
-            end
-        else
-            lt_pot(sig1, sig2, ind_order)
-        end
-    end
+    lt_mat = (sig1, sig2) -> lt_pot(sig1, sig2, ind_order)
     
     @inbounds sortperm!(matrix.sig_order, matrix.sigs[1:matrix.nrows],
                         lt = lt_mat)

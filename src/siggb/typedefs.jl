@@ -16,6 +16,8 @@ const Cbuf = UInt64
 # module order
 const ModOrd = Symbol
 
+const INFOONE = LogLevel(1)
+
 struct Monomial{N}
     deg::Exp
     exps::SVector{N, Exp}
@@ -179,17 +181,24 @@ end
 
 abstract type TracerMatrix end
 
+# Dummy type if no tracing is needed
 struct NoTracerMatrix <: TracerMatrix end
 
 # struct to remember the row reductions we did
 mutable struct SigTracerMatrix
-    # first index row index, second one rewr ind
-    rows::Dict{Sig, Tuple{Int, Int}}
-    # if row i has been added to basis
+    # row signature, basis index row came from, whether it was premarked as a pivot
+    rows::Vector{Tuple{Sig, Int, Bool}}
+    # signature to row index
+    sig_to_row::Dict{Sig, Int}
+    # first index row index, second index basis index where new element is stored
     is_basis_row::Dict{Int, Int}
-    row_ind_to_sig::Dict{Int, Sig}
+    row_ind_to_sig::Dict{Int, Sig} # row signatures
     diagonal::Vector{Coeff}
     col_inds_and_coeffs::Vector{Vector{Tuple{Int, Coeff}}}
+    # degree selected for this matrix
+    deg::Exp
+    # rows that went into the basis
+    toadd::Vector{Int}
 end
 
 abstract type Tracer end
@@ -202,6 +211,9 @@ mutable struct SigTracer <: Tracer
     syz_ind_to_mat::Vector{Int}
     load::Int
     size::Int
+    is_complete::Bool # this is `true` if data from a complete sigGB run is stored
+    # index into `mats` that is being replayed, only meaningful once complete
+    curr_mat::Int
 end
 
 # For Index ordering
@@ -220,13 +232,13 @@ const SyzInfo = Tuple{SigIndex, Dict{SigIndex, Bool}}
 # For syzygy processing in nondegenerate locus
 const IndConn = Dict{SigIndex, Vector{SigIndex}}
 
-# For output of decomp algorithms
+# internal struct for decomp algorithms
 mutable struct LocClosedSet{T<:MPolyRingElem}
-    seq::Vector{T}
+    seq::Vector{Tuple{T, Int}} # second entry is a potential index into a table for rational reconstruction
     codim_upper_bound::Int
     gbs::Vector{Vector{T}}
+    ineqns::Vector{Vector{Int}}
 end
-
 
 # for benchmarking
 mutable struct Timings
@@ -239,4 +251,92 @@ mutable struct Timings
     comp_lc_time::Float32
     time_for_mdd::Float32
     time_for_membership::Float32
+end
+
+# for rational reconstruction during equidim
+
+mutable struct ReconstructPol
+    exps::Vector{Vector{Exp}}
+    coeff_cands::Vector{QQFieldElem}
+    mod_coeffs::Vector{ZZRingElem}
+    is_stable::Vector{Bool}
+end
+
+abstract type Registry end
+
+# coefficients for random linear combinations, drawn in order and replayed from
+# the start for every prime so that each modular run meets the image of one and
+# the same combination over QQ
+mutable struct RandCoeffs
+    coeffs::Vector{Int}
+    ind::Int
+end
+
+RandCoeffs() = RandCoeffs(Int[], 1)
+
+# which syz_queue entry and which cofactor index produced the zero divisor in
+# one call of process_syz_for_split!, traced in multimodular equidim
+struct SyzSplit
+    found::Bool
+    queue_ind::Int
+    cofac_ind::SigIndex
+    to_del::Vector{Int}
+end
+
+# Tracers of the components visited by sig_decomp!, one entry per
+# component, in the order in which the components are processed.
+# `ranges` says which of a tracer's matrices belong to which
+# component.
+mutable struct TracerStore
+    tracers::Vector{SigTracer}
+    ranges::Vector{UnitRange{Int}}
+    ind::Int
+    recorded::Bool
+    syz_splits::Vector{SyzSplit}
+    syz_ind::Int
+end
+
+TracerStore() = TracerStore(SigTracer[], UnitRange{Int}[], 1, false, SyzSplit[], 1)
+
+mutable struct ReconstructRegistry <: Registry
+    R::QQMPolyRing
+    pols::Vector{ReconstructPol}
+    curr_ind::Int
+    primes::Vector{ZZRingElem}
+    current_prime::ZZRingElem
+    pprod::ZZRingElem
+    n_unstable::Int
+    rand_coeffs::RandCoeffs
+    tracers::TracerStore
+end
+
+ReconstructRegistry(R::QQMPolyRing, pols::Vector{ReconstructPol}, curr_ind::Int,
+                    primes::AbstractVector, current_prime) =
+    ReconstructRegistry(R, pols, curr_ind, ZZRingElem.(primes), ZZRingElem(current_prime),
+                        one(ZZ), 0, RandCoeffs(), TracerStore())
+
+mutable struct ModularRegistry{T <: MPolyRingElem} <: Registry
+    pols::Vector{T}
+    rand_coeffs::RandCoeffs
+    tracers::TracerStore
+end
+
+ModularRegistry(pols::Vector{T}) where {T <: MPolyRingElem} =
+    ModularRegistry{T}(pols, RandCoeffs(), TracerStore())
+
+# for user level output of equidimensional decomposition
+mutable struct LocallyClosedSet{T <: MPolyRingElem}
+    eqns::Vector{T}
+    ineqns::Vector{T}
+    dim::Int
+    ideal::Union{Ideal{T}, Missing}
+
+    function LocallyClosedSet(eqns::Vector{T}, ineqns::Vector{T},
+                              dim::Int) where {T <: MPolyRingElem}
+        return new{T}(eqns, ineqns, dim, missing)
+    end
+
+    function LocallyClosedSet(eqns::Vector{T}, dim::Int) where {T <: MPolyRingElem}
+        return new{T}(eqns, T[], dim, missing)
+    end
 end

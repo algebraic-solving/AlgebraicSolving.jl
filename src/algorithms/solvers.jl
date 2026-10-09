@@ -163,10 +163,10 @@ function _core_msolve_array(
     jl_sols_den = Vector{Int32}(Base.unsafe_wrap(Array, jl_sols_den_ptr, len))
 
     ccall((:free_msolve_julia_result_data, libmsolve), Nothing,
-        (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}},
-            Ptr{Ptr{Cvoid}}, Ptr{Ptr{Cint}}, Cint, Cint, Cint),
-        cglobal(:jl_free), res_len, res_cf, sols_num, sols_den,
-        jl_ld, jl_nb_sols, field_char)
+        (Ptr{Nothing}, Ptr{Ptr{Cint}}, Ptr{Ptr{Cvoid}}, Ptr{Ptr{Cvoid}},
+            Ptr{Ptr{Cvoid}}, Ptr{Ptr{Cint}}, Clonglong, Clonglong, Clonglong, Clonglong, Clonglong),
+        cglobal(:jl_free), res_len, res_cf, res_cf_lf, sols_num, sols_den,
+        jl_ld, jl_rp_nr_vars, nr_vars, jl_nb_sols, field_char)
 
     return jl_len, jl_vnames, jl_cf_lf, jl_cf, jl_sols_num, jl_sols_den
 end

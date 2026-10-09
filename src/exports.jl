@@ -10,4 +10,4 @@ export polynomial_ring, MPolyRing, GFElem, MPolyRingElem,
        curve_rational_parametrization, roadmap, computepolar, all_eqs,
        all_base_pts, nb_nodes, connected_components, number_of_connected_components,
        group_by_component, merge_graphs, build_graph_data,curve_graph,
-       curve_arrangement_graph
+       curve_arrangement_graph, equations, inequations
