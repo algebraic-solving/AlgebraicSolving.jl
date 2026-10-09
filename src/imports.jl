@@ -56,6 +56,7 @@ import Nemo:
     root,
     to_univariate,
     unit,
+    unsafe_reconstruct,
     vars,
     ZZ,
     ZZMatrix,

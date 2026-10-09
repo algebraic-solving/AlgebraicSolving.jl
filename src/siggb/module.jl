@@ -3,14 +3,14 @@ function construct_module_wrap(sig::Sig{N},
                                basis_ht::MonomialHashtable{N},
                                mat_index::Int,
                                tr::SigTracer,
-                               vchar::Val{Char},
+                               char::Coeff,
                                ind_ord::IndOrder,
-                               idx::SigIndex) where {N, Char}
+                               idx::SigIndex) where N
 
     cofac_coeffs, cofac_mons_hsh = construct_module(sig, basis,
                                                     basis_ht,
                                                     mat_index,
-                                                    tr, vchar,
+                                                    tr, char,
                                                     ind_ord, idx)
 
     if !isempty(cofac_coeffs)
@@ -18,7 +18,7 @@ function construct_module_wrap(sig::Sig{N},
                    by = midx -> basis_ht.exponents[midx],
                    lt = lt_drl, rev = true)
         # normalize cofac coefficients
-        normalize_cfs!(cofac_coeffs, vchar)
+        normalize_cfs!(cofac_coeffs, char)
     end
 
     return cofac_coeffs, cofac_mons_hsh
@@ -29,9 +29,9 @@ function construct_module(basis::Basis{N},
                           basis_ht::MonomialHashtable{N},
                           basis_index::Int,
                           tr::SigTracer,
-                          vchar::Val{Char},
+                          char::Coeff,
                           ind_order::IndOrder,
-                          idx::SigIndex) where {N, Char}
+                          idx::SigIndex) where N
 
     @inbounds sig = basis.sigs[basis_index]
 
@@ -44,7 +44,7 @@ function construct_module(basis::Basis{N},
         @inbounds mat_ind = tr.basis_ind_to_mat[basis_index]
         res = construct_module_core(sig, basis, basis_ht,
                                     mat_ind, tr,
-                                    vchar, 
+                                    char, 
                                     ind_order, idx)
 
         basis.mod_rep_known[basis_index][idx] = true
@@ -67,9 +67,9 @@ function construct_module(sig::Sig{N},
                           basis_ht::MonomialHashtable{N},
                           mat_index::Int,
                           tr::SigTracer,
-                          vchar::Val{Char},
+                          char::Coeff,
                           ind_ord::IndOrder,
-                          idx::SigIndex) where {N, Char}
+                          idx::SigIndex) where N
     
     if ind_ord.ord[index(sig)] < ind_ord.ord[idx]
         return Coeff[], MonIdx[]
@@ -77,17 +77,18 @@ function construct_module(sig::Sig{N},
 
     tr_mat = tr.mats[mat_index]
 
-    row_ind, rewr_basis_ind = tr_mat.rows[sig]
+    row_ind = tr_mat.sig_to_row[sig]
+    rewr_basis_ind = tr_mat.rows[row_ind][2]
 
     basis_ind = get(tr_mat.is_basis_row, row_ind, 0)
     if !iszero(basis_ind)
         @assert basis.sigs[basis_ind] == sig
         return construct_module(basis, basis_ht, basis_ind,
-                                tr, vchar, ind_ord, idx)
+                                tr, char, ind_ord, idx)
     end
 
     return construct_module_core(sig, basis, basis_ht, mat_index,
-                                 tr, vchar, ind_ord, idx)
+                                 tr, char, ind_ord, idx)
 end
 
 function construct_module_core(sig::Sig{N},
@@ -95,9 +96,9 @@ function construct_module_core(sig::Sig{N},
                                basis_ht::MonomialHashtable{N},
                                mat_index::Int,
                                tr::SigTracer,
-                               vchar::Val{Char},
+                               char::Coeff,
                                ind_ord::IndOrder,
-                               idx::SigIndex) where {N, Char}
+                               idx::SigIndex) where N
 
     if ind_ord.ord[index(sig)] < ind_ord.ord[idx]
         return Coeff[], MonIdx[]
@@ -105,12 +106,13 @@ function construct_module_core(sig::Sig{N},
 
     tr_mat = tr.mats[mat_index]
 
-    row_ind, rewr_basis_ind = tr_mat.rows[sig]
+    row_ind = tr_mat.sig_to_row[sig]
+    rewr_basis_ind = tr_mat.rows[row_ind][2]
 
     # construct module representation of canonical rewriter
     rewr_mod_cfs, rewr_mod_mns = construct_module(basis, basis_ht,
                                                   rewr_basis_ind,
-                                                  tr, vchar,
+                                                  tr, char,
                                                   ind_ord, idx)
 
     # multiply by monomial
@@ -138,20 +140,20 @@ function construct_module_core(sig::Sig{N},
         cmp_ind_str(index(j_sig), idx, ind_ord) && continue
         j_sig_mod = construct_module(j_sig, basis, basis_ht,
                                      mat_index,
-                                     tr, vchar,
+                                     tr, char,
                                      ind_ord,
                                      idx)
         j_mod_coeffs = j_sig_mod[1]
-        mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, vchar),
-                                        vchar)
+        mul_j_mod_coeffs = mul_by_coeff(j_mod_coeffs, addinv(coeff, char),
+                                        char)
         j_mod_mons = j_sig_mod[2]
         res_mod_cfs, res_mod_mns = add_pols(res_mod_cfs, res_mod_mns,
                                             mul_j_mod_coeffs, j_mod_mons,
-                                            vchar)
+                                            char)
     end
 
     diag_coeff = tr_mat.diagonal[row_ind]
-    mul_by_coeff!(res_mod_cfs, diag_coeff, vchar)
+    mul_by_coeff!(res_mod_cfs, diag_coeff, char)
 
     return res_mod_cfs, res_mod_mns
 end
