@@ -225,7 +225,7 @@ end
     lms_test = MPolyRingElem[x, y*z, y^2, z^3]
     @test lms == lms_test
     I = AlgebraicSolving.Ideal([zero(R)])
-    @test_throws ErrorException leading_monomials(I)
+    @test isempty(leading_monomials(I))
 
     # over Q
     R, (x,y,z) = polynomial_ring(QQ,["x","y","z"], internal_ordering=:degrevlex)
@@ -234,7 +234,7 @@ end
     lms_test = MPolyRingElem[x, y*z, y^2, z^3]
     @test lms == lms_test
     I = AlgebraicSolving.Ideal([zero(R)])
-    @test_throws ErrorException leading_monomials(I)
+    @test isempty(leading_monomials(I))
 end
 
 @testset "Algorithms -> Sig Gröbner bases" begin
