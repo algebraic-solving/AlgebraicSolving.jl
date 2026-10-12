@@ -26,3 +26,35 @@ end
     # This is why the real root classification is only guaranteed to be correct generically.
     @test !evaluate(rrc, [QQ(1)])
 end
+
+@testset "Algorithms -> Real root classification, degenerate inputs" begin
+    R, (u,) = polynomial_ring(QQ, [:u])
+    R′, (x,) = polynomial_ring(fraction_field(R), [:x], internal_ordering=:degrevlex)
+    # Non-radical ideal: the classification is computed with the radical <(x-u)*(x+1)>,
+    # which has one root with x > 0 iff u > 0.
+    f = ParametricIdeal([(x - u)^2 * (x + 1)])
+    rrc = real_root_classification(f, [x])
+    @test evaluate(rrc, [QQ(2)])
+    @test evaluate(rrc, [QQ(1 // 2)])
+    @test !evaluate(rrc, [QQ(-1 // 2)])
+    @test !evaluate(rrc, [QQ(-2)])
+    @test f.radicalize
+    # Keyword arguments are passed to the retry
+    f = ParametricIdeal([(x - u)^2 * (x + 1)])
+    rrc = real_root_classification(f, [x]; output_form=:matrix)
+    @test rrc isa AlgebraicSolving.MatEnum
+    @test size(rrc.hm, 1) == 2
+    # x-1 vanishes at the root x = 1: the classification is computed with the saturation <x-u>,
+    # whose root satisfies x-1 > 0 and x+2 > 0 iff u > 1.
+    f = ParametricIdeal([(x - 1) * (x - u)])
+    rrc = real_root_classification(f, [x - 1, x + 2])
+    @test evaluate(rrc, [QQ(2)])
+    @test !evaluate(rrc, [QQ(1 // 2)])
+    @test !evaluate(rrc, [QQ(-3)])
+    @test f.sats == [x - 1]
+    # A polynomial in the ideal vanishes at every root, so it is never positive.
+    f = ParametricIdeal([x^2 - u])
+    @test real_root_classification(f, [x^2 - u, x]) == AlgebraicSolving.Empty()
+    @test real_root_classification(f, [x, x^2 - u]) == AlgebraicSolving.Empty()
+    @test_throws ArgumentError real_root_classification(f, [x]; output_form=:foo)
+end

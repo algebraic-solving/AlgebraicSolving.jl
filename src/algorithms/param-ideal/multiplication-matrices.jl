@@ -46,7 +46,7 @@ function multiplication_matrix(
     worker_pool::AbstractWorkerPool=default_worker_pool(),
     show_progress::Bool=false
 )::MatSpaceElem{K} where {K<:FracFieldElem}
-    input_hash = hash((I.gens, g))
+    input_hash = hash((I.gens, I.sats, I.radicalize, g))
     if haskey(I.mm, input_hash)
         return I.mm[input_hash]
     end
@@ -68,7 +68,7 @@ function multiplication_matrix(
     R₁, _ = polynomial_ring(QQ, I.symbols, internal_ordering=:degrevlex)
     R₂ = base_ring(I.base_frac_field)
     function bb(v)
-        mm_spec_hash = hash((I.gens, g, v))
+        mm_spec_hash = hash((I.gens, I.sats, I.radicalize, g, v))
         if haskey(I.mm_spec, mm_spec_hash)
             return I.mm_spec[mm_spec_hash]
         end
