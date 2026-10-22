@@ -89,7 +89,7 @@ function groebner_basis(
     vals::Vector{QQFieldElem};
     worker_pool::AbstractWorkerPool=default_worker_pool()
 )::Vector{QQMPolyRingElem} where {K<:FracFieldElem}
-    gb_spec_hash = hash((I.gens, vals))
+    gb_spec_hash = hash((I.gens, I.sats, I.radicalize, vals))
     if haskey(I.gb_spec, gb_spec_hash)
         return I.gb_spec[gb_spec_hash]
     end
@@ -185,7 +185,7 @@ function groebner_basis(
     worker_pool::AbstractWorkerPool=default_worker_pool(),
     show_progress::Bool=false
 )::Vector{Generic.MPoly{FracFieldElem{QQMPolyRingElem}}} where {K<:FracFieldElem}
-    input_hash = hash(I.gens)
+    input_hash = hash((I.gens, I.sats, I.radicalize))
     if haskey(I.gb, input_hash)
         return I.gb[input_hash]
     end

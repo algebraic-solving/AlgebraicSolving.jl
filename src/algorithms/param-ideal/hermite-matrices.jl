@@ -40,7 +40,7 @@ function hermite_matrix(
     worker_pool::AbstractWorkerPool=default_worker_pool(),
     show_progress::Bool=false
 )::MatSpaceElem{K} where {K<:FracFieldElem}
-    input_hash = hash((I.gens, g))
+    input_hash = hash((I.gens, I.sats, I.radicalize, g))
     if haskey(I.hm, input_hash)
         return I.hm[input_hash]
     end
@@ -62,7 +62,7 @@ function hermite_matrix(
     R₁, _ = polynomial_ring(QQ, I.symbols, internal_ordering=:degrevlex)
     R₂ = base_ring(I.base_frac_field)
     function bb(v)
-        hm_spec_hash = hash((I.gens, g, v))
+        hm_spec_hash = hash((I.gens, I.sats, I.radicalize, g, v))
         if haskey(I.hm_spec, hm_spec_hash)
             return I.hm_spec[hm_spec_hash]
         end

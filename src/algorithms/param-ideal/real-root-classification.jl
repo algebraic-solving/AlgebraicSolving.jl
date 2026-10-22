@@ -82,6 +82,9 @@ function real_root_classification(
     output_form::Symbol=:sign,
     ignore_no_real_roots::Bool=false,
 )::SemialgebraicSet
+    if !(output_form in (:sign, :signature, :matrix))
+        throw(ArgumentError("output_form must be one of :sign, :signature or :matrix, got :$(output_form)"))
+    end
     R = base_ring(I.base_frac_field)
     # We first handle the case where a certain Hermite matrix is singular.
     # This can be handle by ideal saturation/radicalization.
@@ -95,24 +98,22 @@ function real_root_classification(
         @warn "The Hermite matrix associated to one has zero determinant."
         @warn "Trying again with the radical ideal."
         I.radicalize = true
-        return real_root_classification(I, g; nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=show_progress)
+        return real_root_classification(I, g; nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level, show_progress=show_progress, output_form=output_form, ignore_no_real_roots=ignore_no_real_roots)
     end
     M = Vector{MatSpaceElem{FracFieldElem{QQMPolyRingElem}}}()
     m = Vector{FracFieldElem{QQMPolyRingElem}}()
     for i in 1:length(g)
         M_α = multiplication_matrix(I, g[i]; nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=show_progress)
-        if M_α == zero_matrix(QQ, size(M_α, 1), size(M_α, 2)) && i == 1
-            @warn "The multiplication matrix associated to the first polynomial is zero."
-            @warn "This indicates an additional rank deficiency."
-            @warn "Trying again by removing the first polynomial."
-            return real_root_classification(I, g[2:end]; nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=show_progress)
+        if is_zero(M_α)
+            # g[i] vanishes at every solution, so g[i] > 0 is never satisfied.
+            return Empty()
         end
         m_α = det(M_α)
         if is_zero(m_α)
             @warn "The multiplication matrix associated to one polynomial has zero determinant."
             @warn "Trying again with the saturation ideal."
-            push!(I.sats, g)
-            return real_root_classification(I, g; nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=show_progress)
+            push!(I.sats, g[i])
+            return real_root_classification(I, g; nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level, show_progress=show_progress, output_form=output_form, ignore_no_real_roots=ignore_no_real_roots)
         end
         push!(M, M_α)
         push!(m, m_α)
