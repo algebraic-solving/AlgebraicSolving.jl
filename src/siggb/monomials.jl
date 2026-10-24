@@ -314,7 +314,3 @@ mask(a::MaskSig) = @inbounds a[2]
 function one_monomial(::Type{Monomial{N}}) where N
     return Monomial{N}(zero(Exp), SVector{N}(zeros(Exp, N)))
 end
-
-function Base.show(io::IO, s::Sig)
-    show(io, (Int(index(s)), Vector{Int}(monomial(s).exps)))
-end
