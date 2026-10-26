@@ -30,6 +30,81 @@ function _unique_by_sign(points::Vector{Vector{QQFieldElem}}, f::Vector{QQMPolyR
 end
 
 @doc Markdown.doc"""
+    _specializes_well(I::ParametricIdeal{K}, vals::Vector{QQFieldElem}; <keyword arguments>) -> Bool
+
+Returns whether the parameter values `vals` lie outside the set `Z` of parameters at which the reduced Gröbner basis of `I` over the field of parameters, as computed by `groebner_basis(I)`, does not specialize to the reduced Gröbner basis of the ideal specialized at these parameters.
+In other words, `vals` lies outside `Z` if and only if no denominator of the parametric Gröbner basis vanishes at `vals`, and the parametric Gröbner basis evaluated at `vals` coincides with the reduced Gröbner basis of the specialized ideal.
+
+# Arguments
+- `nr_thrds::Int=1`: the number of threads to use for parallel computations.
+- `worker_pool::AbstractWorkerPool=default_worker_pool()`: the worker pool to use for parallel computations.
+- `show_progress::Bool=false`: whether to show progress bars during computations.
+
+**Note**: This is an internal function.
+"""
+function _specializes_well(
+    I::ParametricIdeal{K},
+    vals::Vector{QQFieldElem};
+    nr_thrds::Int=1,
+    worker_pool::AbstractWorkerPool=default_worker_pool(),
+    show_progress::Bool=false
+)::Bool where {K<:FracFieldElem}
+    @assert length(vals) == I.num_params
+    pgb = groebner_basis(I; nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=show_progress)
+    gb = groebner_basis(I, vals; worker_pool=worker_pool)
+    R₁, _ = polynomial_ring(QQ, I.symbols, internal_ordering=:degrevlex)
+    pgb_spec = try
+        map(p -> map_coefficients(c -> evaluate(numerator(c), vals) // evaluate(denominator(c), vals), p; parent=R₁), pgb)
+    catch e
+        # A denominator of the parametric Gröbner basis vanishes at vals
+        e isa DivideError || rethrow()
+        return false
+    end
+    # Both bases are reduced, so they coincide if and only if they are equal as sets
+    return length(pgb_spec) == length(gb) && all(q -> q in gb, pgb_spec) && all(q -> q in pgb_spec, gb)
+end
+
+@doc Markdown.doc"""
+    _sample_witnesses(I::ParametricIdeal{K}, f::Vector{QQMPolyRingElem}; <keyword arguments>) -> Vector{Vector{QQFieldElem}}
+
+Returns a list of points meeting all connected components of the non-vanishing set of `f`.
+
+# Arguments
+- `select::Function=identity`: the function selecting the points to check and return among the sample points.
+- `check_witnesses::Bool=true`: whether to check that the Gröbner basis of `I` specializes well at the selected points.
+- `retry::Int=10`: the maximum number of random samplings.
+- `nr_thrds::Int=1`: the number of threads to use for parallel computations.
+- `worker_pool::AbstractWorkerPool=default_worker_pool()`: the worker pool to use for parallel computations.
+- `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
+- `show_progress::Bool=false`: whether to show progress bars during computations.
+
+**Note**: This is an internal function.
+"""
+function _sample_witnesses(
+    I::ParametricIdeal{K},
+    f::Vector{QQMPolyRingElem};
+    select::Function=identity,
+    check_witnesses::Bool=true,
+    retry::Int=10,
+    nr_thrds::Int=1,
+    worker_pool::AbstractWorkerPool=default_worker_pool(),
+    info_level::Int=0,
+    show_progress::Bool=false
+)::Vector{Vector{QQFieldElem}} where {K<:FracFieldElem}
+    for k in 0:retry
+        p = select(_pick_points(points_per_components(QQMPolyRingElem[], QQMPolyRingElem[], f; nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level, randomize=k > 0)))
+        # Since the unlucky set is a proper algebraic set, random points avoid it with high probability
+        if !check_witnesses || all(y -> _specializes_well(I, y; nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=show_progress), p)
+            return p
+        end
+        if info_level >= 1
+            @warn "A sample point lies in the unlucky set; sampling again at random."
+        end
+    end
+    error("Could not find sample points at which the Gröbner basis specializes well after $(retry) random samplings.")
+end
+
+@doc Markdown.doc"""
     _identity_matrix(m::Int) -> Matrix{Int}
 
 Returns the identity matrix of size `m x m`.
@@ -71,6 +146,7 @@ Computes the real root classification of the polynomials `g` with respect to the
 - `show_progress::Bool=info_level >= 1`: whether to show progress bars during computations.
 - `output_form::Symbol=:sign`: the output form of the real root classification, can be either polynomials accompanied by their signs (`:sign`), Hermite matrices accompanied by their signatures (`:signature`), or Hermite matrices and multiplication matrices (`:matrix`).
 - `ignore_no_real_roots::Bool=false`: whether to ignore sign conditions with no real roots.
+- `check_witnesses::Bool=true`: whether to check that the reduced Gröbner basis of `I` specializes well at the witness points.
 """
 function real_root_classification(
     I::ParametricIdeal{K} where {K<:FracFieldElem},
@@ -81,6 +157,7 @@ function real_root_classification(
     show_progress::Bool=info_level >= 1,
     output_form::Symbol=:sign,
     ignore_no_real_roots::Bool=false,
+    check_witnesses::Bool=true,
 )::SemialgebraicSet
     if !(output_form in (:sign, :signature, :matrix))
         throw(ArgumentError("output_form must be one of :sign, :signature or :matrix, got :$(output_form)"))
@@ -98,7 +175,7 @@ function real_root_classification(
         @warn "The Hermite matrix associated to one has zero determinant."
         @warn "Trying again with the radical ideal."
         I.radicalize = true
-        return real_root_classification(I, g; nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level, show_progress=show_progress, output_form=output_form, ignore_no_real_roots=ignore_no_real_roots)
+        return real_root_classification(I, g; nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level, show_progress=show_progress, output_form=output_form, ignore_no_real_roots=ignore_no_real_roots, check_witnesses=check_witnesses)
     end
     M = Vector{MatSpaceElem{FracFieldElem{QQMPolyRingElem}}}()
     m = Vector{FracFieldElem{QQMPolyRingElem}}()
@@ -113,7 +190,7 @@ function real_root_classification(
             @warn "The multiplication matrix associated to one polynomial has zero determinant."
             @warn "Trying again with the saturation ideal."
             push!(I.sats, g[i])
-            return real_root_classification(I, g; nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level, show_progress=show_progress, output_form=output_form, ignore_no_real_roots=ignore_no_real_roots)
+            return real_root_classification(I, g; nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level, show_progress=show_progress, output_form=output_form, ignore_no_real_roots=ignore_no_real_roots, check_witnesses=check_witnesses)
         end
         push!(M, M_α)
         push!(m, m_α)
@@ -160,7 +237,7 @@ function real_root_classification(
     # defined by the non-vanishing of the polynomials in w.
     # This allows us to determine the sign conditions of g at each connected component,
     # and thus to determine the adapted family of Hermite matrices that we need to consider.
-    p = _pick_points(points_per_components(QQMPolyRingElem[], QQMPolyRingElem[], w; nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level))
+    p = _sample_witnesses(I, w; check_witnesses=check_witnesses, nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level, show_progress=show_progress)
     if info_level >= 1
         println("Number of sample points: ", length(p))
     end
@@ -253,7 +330,7 @@ function real_root_classification(
         end
     end
     h = filter(!is_constant, h)
-    p = _unique_by_sign(_pick_points(points_per_components(QQMPolyRingElem[], QQMPolyRingElem[], [w; h]; nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level)), h)
+    p = _sample_witnesses(I, [w; h]; select=q -> _unique_by_sign(q, h), check_witnesses=check_witnesses, nr_thrds=nr_thrds, worker_pool=worker_pool, info_level=info_level, show_progress=show_progress)
     if info_level >= 1
         println("Number of refined sample points: ", length(p))
     end

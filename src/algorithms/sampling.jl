@@ -15,13 +15,30 @@ function _to_multivariate(R::QQMPolyRing, p::QQPolyRingElem)::QQMPolyRingElem
 end
 
 @doc Markdown.doc"""
-    _sample_points(f::Vector{QQPolyRingElem}; worker_pool::AbstractWorkerPool=default_worker_pool())::Vector{QQFieldElem}
+    _random_unit()::QQFieldElem
 
-Given a vector of univariate polynomials, returns a vector of rational numbers such that each connected component of the non-vanishing set of the polynomials contains at least one of the returned points.
+Returns a random rational number in the open interval `(0, 1)` with denominator `2^8`.
 
 **Note**: This is an internal function.
 """
-function _sample_points(f::Vector{QQPolyRingElem}; worker_pool::AbstractWorkerPool=default_worker_pool())::Vector{QQFieldElem}
+function _random_unit()::QQFieldElem
+    N = 2^8
+    return QQ(rand(1:N-1), N)
+end
+
+@doc Markdown.doc"""
+    _sample_points(f::Vector{QQPolyRingElem}; randomize::Bool=false, worker_pool::AbstractWorkerPool=default_worker_pool())::Vector{QQFieldElem}
+
+Given a vector of univariate polynomials, returns a vector of rational numbers such that each connected component of the non-vanishing set of the polynomials contains at least one of the returned points.
+If `randomize` is `true`, the points are chosen at random in their connected components instead of at fixed positions.
+
+**Note**: This is an internal function.
+"""
+function _sample_points(
+    f::Vector{QQPolyRingElem};
+    randomize::Bool=false,
+    worker_pool::AbstractWorkerPool=default_worker_pool()
+)::Vector{QQFieldElem}
     R, _ = polynomial_ring(QQ, [:x])
     fₓ = map(p -> _to_multivariate(R, p), f)
     factors = unique([p for fₓ′ in fₓ for (p, _) in factor(fₓ′)])
@@ -58,17 +75,21 @@ function _sample_points(f::Vector{QQPolyRingElem}; worker_pool::AbstractWorkerPo
         end
         roots = sort(collect(keys(factors_by_root)), by=r -> r[1][1])
     end
-    # Now the intervals are properly ordered, we can sample points
+    # Now the intervals are properly ordered, we can sample points.
+    # Random points are taken in (-1, 1) if there are no roots, at distance between 1 and 2
+    # from the integer bounds of the roots on the unbounded components,
+    # and in the open gap between two consecutive isolating intervals.
     points = Vector{QQFieldElem}()
     if length(roots) == 0
-        push!(points, QQ(0))
+        push!(points, randomize ? 2 * _random_unit() - 1 : QQ(0))
         return points
     end
-    push!(points, floor(roots[1][1][1]) - 1)
+    push!(points, floor(roots[1][1][1]) - 1 - (randomize ? _random_unit() : 0))
     for i in 1:length(roots)-1
-        push!(points, (roots[i][1][2] + roots[i+1][1][1]) // 2)
+        lo, hi = roots[i][1][2], roots[i+1][1][1]
+        push!(points, randomize && lo < hi ? lo + (hi - lo) * _random_unit() : (lo + hi) // 2)
     end
-    push!(points, ceil(roots[end][1][2]) + 1)
+    push!(points, ceil(roots[end][1][2]) + 1 + (randomize ? _random_unit() : 0))
     return points
 end
 
@@ -77,10 +98,14 @@ function _sample_points_0(f::Vector{QQMPolyRingElem})::Vector{Vector{QQFieldElem
     return [Vector{QQFieldElem}()]
 end
 
-function _sample_points_1(f::Vector{QQMPolyRingElem}; worker_pool::AbstractWorkerPool=default_worker_pool())::Vector{Vector{QQFieldElem}}
+function _sample_points_1(
+    f::Vector{QQMPolyRingElem};
+    randomize::Bool=false,
+    worker_pool::AbstractWorkerPool=default_worker_pool()
+)::Vector{Vector{QQFieldElem}}
     @assert all(map(is_univariate, f))
     R, _ = polynomial_ring(QQ, :x)
-    return [[p] for p in _sample_points(map(p -> to_univariate(R, p), f); worker_pool=worker_pool)]
+    return [[p] for p in _sample_points(map(p -> to_univariate(R, p), f); randomize=randomize, worker_pool=worker_pool)]
 end
 
 function _sample_points_desc(n::Int)::String
@@ -100,6 +125,7 @@ end
 function _sample_points_2(
     f::Vector{QQMPolyRingElem},
     xs::Vector{QQMPolyRingElem};
+    randomize::Bool=false,
     nr_thrds::Int=1,
     worker_pool::AbstractWorkerPool=default_worker_pool(),
     show_progress::Bool=false,
@@ -126,16 +152,16 @@ function _sample_points_2(
         end
     end
     p₁ = if length(xs) == 2
-        _sample_points_1(v; worker_pool=worker_pool)
+        _sample_points_1(v; randomize=randomize, worker_pool=worker_pool)
     else
-        _sample_points_2(v, x₁; show_progress=show_progress, worker_pool=worker_pool)
+        _sample_points_2(v, x₁; randomize=randomize, show_progress=show_progress, worker_pool=worker_pool)
     end
     prog = Progress.ProgressBar(total=length(p₁); desc=desc, enabled=show_progress)
     Progress.update!(prog, 0)
     function _points_chunk(p::Vector{Vector{QQFieldElem}})::Vector{Vector{QQFieldElem}}
         res_chunk = Vector{Vector{QQFieldElem}}()
         for i in eachindex(p)
-            p₂ = _sample_points_1(map(p′ -> evaluate(p′, x₁, p[i]), f); worker_pool=worker_pool)
+            p₂ = _sample_points_1(map(p′ -> evaluate(p′, x₁, p[i]), f); randomize=randomize, worker_pool=worker_pool)
             for j in eachindex(p₂)
                 push!(res_chunk, [p[i]; p₂[j][1]])
             end
@@ -152,14 +178,16 @@ function _sample_points_2(
 end
 
 @doc Markdown.doc"""
-    _sample_points(f::Vector{QQMPolyRingElem}; nr_thrds::Int=1, worker_pool::AbstractWorkerPool=default_worker_pool(), show_progress::Bool=false)::Vector{Vector{QQFieldElem}}
+    _sample_points(f::Vector{QQMPolyRingElem}; randomize::Bool=false, nr_thrds::Int=1, worker_pool::AbstractWorkerPool=default_worker_pool(), show_progress::Bool=false)::Vector{Vector{QQFieldElem}}
 
 Given a vector of multivariate polynomials, returns a vector of points such that each connected component of the non-vanishing set of the polynomials contains at least one of the returned points.
+If `randomize` is `true`, the points are chosen at random in their connected components instead of at fixed positions.
 
 **Note**: This is an internal function.
 """
 function _sample_points(
     f::Vector{QQMPolyRingElem};
+    randomize::Bool=false,
     nr_thrds::Int=1,
     worker_pool::AbstractWorkerPool=default_worker_pool(),
     show_progress::Bool=false
@@ -171,15 +199,15 @@ function _sample_points(
     if length(gens(parent(f[1]))) == 0
         p = _sample_points_0(f)
     elseif length(gens(parent(f[1]))) == 1
-        p = _sample_points_1(f; worker_pool=worker_pool)
+        p = _sample_points_1(f; randomize=randomize, worker_pool=worker_pool)
     else
-        p = _sample_points_2(f, gens(parent(f[1])); nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=show_progress)
+        p = _sample_points_2(f, gens(parent(f[1])); randomize=randomize, nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=show_progress)
     end
     return p
 end
 
 @doc Markdown.doc"""
-    points_per_components(eqs::Vector{QQMPolyRingElem}, pos::Vector{QQMPolyRingElem}, ineqs::Vector{QQMPolyRingElem}; nr_thrds::Int=1, worker_pool::AbstractWorkerPool=default_worker_pool(), info_level::Int=0)::Vector{Vector{Vector{QQFieldElem}}}
+    points_per_components(eqs::Vector{QQMPolyRingElem}, pos::Vector{QQMPolyRingElem}, ineqs::Vector{QQMPolyRingElem}; nr_thrds::Int=1, worker_pool::AbstractWorkerPool=default_worker_pool(), info_level::Int=0, randomize::Bool=false)::Vector{Vector{Vector{QQFieldElem}}}
 
 Given a semi-algebraic set defined by equations `eqs`, positivity constraints `pos`, and non-vanishing constraints `ineqs`, returns a vector of points meeting all connected components of the set.
 Each point is represented by an isolating box, i.e., a vector of intervals represented by pairs of rational numbers.
@@ -193,6 +221,7 @@ Each point is represented by an isolating box, i.e., a vector of intervals repre
 - `nr_thrds::Int=1`: the number of threads to use for parallel computations.
 - `worker_pool::AbstractWorkerPool=default_worker_pool()`: the worker pool to use for parallel computations.
 - `info_level::Int=0`: info level printout: off (`0`, default), summary (`1`), detailed (`2`).
+- `randomize::Bool=false`: whether to choose the points at random in the connected components. By default, the points are chosen deterministically.
 
 # Examples
 
@@ -212,12 +241,13 @@ function points_per_components(
     ineqs::Vector{QQMPolyRingElem};
     nr_thrds::Int=1,
     worker_pool::AbstractWorkerPool=default_worker_pool(),
-    info_level::Int=0
+    info_level::Int=0,
+    randomize::Bool=false
 )::Vector{Vector{Vector{QQFieldElem}}}
     if !isempty(eqs)
         throw(ArgumentError("Sampling points per components is not implemented for systems involving equations"))
     end
-    points = _sample_points([pos; ineqs]; nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=info_level > 0)
+    points = _sample_points([pos; ineqs]; randomize=randomize, nr_thrds=nr_thrds, worker_pool=worker_pool, show_progress=info_level > 0)
     res = Vector{Vector{Vector{QQFieldElem}}}()
     for point in points
         if all(evaluate(constraint, point) > 0 for constraint in pos)
