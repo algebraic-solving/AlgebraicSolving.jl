@@ -14,3 +14,10 @@ end
     _, (x,) = polynomial_ring(QQ, [:x])
     @test cuyt_lee(R, t -> coeff(divrem(x^3, [t[1] * x^2 + t[2] * x + t[3]])[2], 1)) == (b^2 - a * c) // a^2
 end
+
+@testset "Interpolation -> Cuyt-Lee (trivariate)" begin
+    R, (a, b, c) = polynomial_ring(QQ, [:a, :b, :c])
+    f = (a^2 * b - c^3 + 2 * a * b * c + 5) // (b^2 - a * c + 3 * a + 1)
+    @test cuyt_lee(R, t -> evaluate(f, t)) == f
+    @test cuyt_lee(R, t -> evaluate(f, t); nr_thrds=4) == f
+end

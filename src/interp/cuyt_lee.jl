@@ -105,79 +105,93 @@ function cuyt_lee_shifted(
     end
     R_z, _ = polynomial_ring(QQ, :z)
     d_den, d_num = _estimate_total_degree(R, bb; show_progress=show_progress)
-    d = [0; fill(max(d_den, d_num), t - 1)...]
-    x = Vector{Vector{ZZRingElem}}()
-    coeffs_den = []
-    coeffs_num = []
-    data_lock = ReentrantLock()
-    prog = ProgressBar(total=prod(d .+ 1); desc=desc, enabled=show_progress)
+    D = max(d_den, d_num)
+    m = t - 1
+    idx = _simplex_indices(m, D)
+    N = length(idx)
+    nodes = [ZZ.(1:D+1) for _ in 1:m]
+    point(a) = [ZZ(1); _simplex_point(nodes, a)]
+    used = Vector{Union{Nothing,Vector{ZZRingElem}}}(nothing, N)
+    coeffs_den = Vector{Vector{QQFieldElem}}(undef, N)
+    coeffs_num = Vector{Vector{QQFieldElem}}(undef, N)
+    done = falses(N)
+    prog = ProgressBar(total=N; desc=desc, enabled=show_progress)
     update!(prog, 0)
-    function populate(cur::Vector{ZZRingElem}, dim::Int; num_threads::Int=1, offset=1)::Bool
-        if dim > t
-            f = nothing
-            try
-                f = thiele(R_z, k -> bb(k .* cur); retry=retry, show_progress=show_progress, offset=offset)
-            catch e
-                if isa(e, BoundsError) || isa(e, ThieleError)
-                    return false
-                else
-                    rethrow(e)
-                end
-            end
-            if degree(denominator(f)) != d_den || degree(numerator(f)) != d_num
+    prog_lock = ReentrantLock()
+    # Returns whether the evaluation at the k-th lattice point succeeded.
+    function evaluate_point(k::Int, offset::Int)::Bool
+        cur = point(idx[k])
+        used[k] = cur
+        f = nothing
+        try
+            f = thiele(R_z, z -> bb(z .* cur); retry=retry, show_progress=show_progress, offset=offset)
+        catch e
+            if isa(e, BoundsError) || isa(e, ThieleError)
                 return false
-            end
-            c = constant_coefficient(denominator(f))
-            if c == 0
-                return false
-            end
-            lock(data_lock) do
-                push!(x, copy(cur))
-                push!(coeffs_den, collect(coefficients(denominator(f))) ./ c)
-                push!(coeffs_num, collect(coefficients(numerator(f))) ./ c)
-                update!(prog, length(x))
-            end
-            return true
-        end
-        total = Atomic(0)
-        failures = Atomic(0)
-        i = 1
-        while total.x < d[dim] + 1
-            num_threads_chunk = min(num_threads, d[dim] + 1 - total.x)
-            Threads.@threads for j in 0:num_threads_chunk-1
-                if populate([cur; ZZ(i + j)], dim + 1; num_threads=1, offset=max(offset, j + 1))
-                    @atomic total.x += 1
-                    @atomic failures.x = 0
-                else
-                    @atomic failures.x += 1
-                end
-            end
-            i += num_threads_chunk
-            if failures.x >= retry
-                return false
+            else
+                rethrow(e)
             end
         end
+        if degree(denominator(f)) != d_den || degree(numerator(f)) != d_num
+            return false
+        end
+        c = constant_coefficient(denominator(f))
+        if c == 0
+            return false
+        end
+        coeffs_den[k] = collect(coefficients(denominator(f))) ./ c
+        coeffs_num[k] = collect(coefficients(numerator(f))) ./ c
         return true
     end
-    res = populate([ZZ(1)], 2; num_threads=nr_thrds)
-    if !res
-        finish!(prog)
-        throw(CuytLeeError("Failed to collect enough data points for interpolation. This could happen if the black box function is singular at zero, or if the expected total degree is incorrect."))
+    # A failing point is unlucky for one of its coordinates,
+    # so we replace one of its nodes and recompute the lattice points sharing that node.
+    max_repairs = retry * (D + 1)
+    repairs = 0
+    while true
+        pending = findall(!, done)
+        isempty(pending) && break
+        ok = falses(length(pending))
+        nt = max(1, min(nr_thrds, length(pending)))
+        Threads.@threads for c in 1:nt
+            for l in c:nt:length(pending)
+                ok[l] = evaluate_point(pending[l], c)
+                if ok[l]
+                    lock(() -> next!(prog), prog_lock)
+                end
+            end
+        end
+        done[pending[ok]] .= true
+        for l in findall(!, ok)
+            k = pending[l]
+            a = idx[k]
+            # skip points whose coordinates were already changed by an earlier repair
+            used[k] == point(a) || continue
+            repairs += 1
+            # with a single variable there is no node to change: retry with another shift
+            if m == 0 || repairs > max_repairs
+                finish!(prog)
+                throw(CuytLeeError("Failed to collect enough data points for interpolation. This could happen if the black box function is singular at zero, or if the expected total degree is incorrect."))
+            end
+            j, aj = _replace_node!(nodes, a)
+            for k′ in 1:N
+                if idx[k′][j] == aj && done[k′]
+                    done[k′] = false
+                end
+            end
+        end
+        update!(prog, count(done))
     end
-    perm = sortperm(x)
-    x = x[perm]
-    coeffs_den = coeffs_den[perm]
-    coeffs_num = coeffs_num[perm]
-    # We interpolate the denominator and numerator separately
+    # We interpolate the homogeneous parts of the denominator and numerator separately,
+    # each on the sub-lattice of the matching total degree.
     den = zero(R)
     num = zero(R)
     for i in 0:d_den
-        y = [coeffs_den[j][i+1] for j in 1:length(x)]
-        den += _homogenize(newton(R, x, y, d), i)
+        y = [coeffs_den[k][i+1] for k in 1:binomial(m + i, m)]
+        den += _homogenize(_newton_simplex(R, collect(2:t), nodes, y, i), i)
     end
     for i in 0:d_num
-        y = [coeffs_num[j][i+1] for j in 1:length(x)]
-        num += _homogenize(newton(R, x, y, d), i)
+        y = [coeffs_num[k][i+1] for k in 1:binomial(m + i, m)]
+        num += _homogenize(_newton_simplex(R, collect(2:t), nodes, y, i), i)
     end
     finish!(prog)
     return num // den
