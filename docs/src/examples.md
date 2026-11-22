@@ -46,3 +46,18 @@ corresponding system.
     eco(n::Int)
     eco(R::MPolyRing)
 ```
+
+## Chandra-n
+
+These systems come from a discretization of Chandrasekhar's H-equation, which
+appears in radiative transfer. For a given $n \geq 1$ `chandra(n)` is defined in a
+polynomial ring with $n$ variables and has $2^{n-1}$ solutions. The parameter `c`
+is usually chosen as $0.51234$. For a given polynomial ring `R` with $n$ variables,
+`chandra(R)` defines the corresponding system.
+
+### Functionality
+
+```@docs
+    chandra(n::Int, characteristic::Int=0)
+    chandra(R::MPolyRing)
+```
