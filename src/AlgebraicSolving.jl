@@ -39,6 +39,7 @@ include("connectivity/polar.jl")
 include("examples/katsura.jl")
 include("examples/cyclic.jl")
 include("examples/eco.jl")
+include("examples/chandra.jl")
 
 
 end # module AlgebraicSolving
