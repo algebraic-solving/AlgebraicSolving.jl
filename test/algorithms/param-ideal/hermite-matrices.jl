@@ -30,6 +30,14 @@ end
     @test H == matrix(fraction_field(R), [2 -b//a; -b//a (b^2-2*a*c)//a^2])
 end
 
+@testset "Algorithms -> Parametric Hermite matrix (unlucky points)" begin
+    R, (a, b, c) = polynomial_ring(QQ, [:a, :b, :c])
+    R′, (x,) = polynomial_ring(fraction_field(R), [:x], internal_ordering=:degrevlex)
+    f = ParametricIdeal([a * x^2 + b * x + c]; prefer_gb=false)
+    f.shift = [-2, 1, 1]
+    @test hermite_matrix(f, one(R′)) == matrix(fraction_field(R), [2 -b//a; -b//a (b^2-2*a*c)//a^2])
+end
+
 @testset "Algorithms -> Parametric Hermite matrix with zero parameters" begin
     R, () = polynomial_ring(QQ, Symbol[])
     R′, (x,) = polynomial_ring(fraction_field(R), [:x], internal_ordering=:degrevlex)

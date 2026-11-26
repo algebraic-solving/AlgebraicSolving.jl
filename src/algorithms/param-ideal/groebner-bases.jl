@@ -198,7 +198,7 @@ function groebner_basis(
         if !isnothing(gb_shift_mons)
             gb_mons = [collect(monomials(p)) for p in gb]
             if gb_mons != gb_shift_mons
-                error("Error evaluating black box function: the Gröbner basis has unexpected monomial structure at parameter values $(v).")
+                throw(Interpolation.UnluckyPointError("Error evaluating black box function: the Gröbner basis has unexpected monomial structure at parameter values $(v)."))
             end
         end
         gb

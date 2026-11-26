@@ -36,7 +36,7 @@ function rational_parametrization(
                degree(param[3]) != degree(param_shift[3]) ||
                degree(param[4]) != degree(param_shift[4]) ||
                degree.(param[5]) != degree.(param_shift[5])
-                error("Error evaluating black box function: the rational parametrization has different monomial structure at different parameter values.")
+                throw(Interpolation.UnluckyPointError("Error evaluating black box function: the rational parametrization has different monomial structure at different parameter values."))
             end
         end
         param

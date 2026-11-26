@@ -75,7 +75,7 @@ function multiplication_matrix(
         gb = groebner_basis(I, v; worker_pool=worker_pool)
         b = _monomial_basis(gb)
         if length(b) != δ
-            error("Error evaluating black box function: the ideal has unexpected degree at parameter values $(v).")
+            throw(Interpolation.UnluckyPointError("Error evaluating black box function: the ideal has unexpected degree at parameter values $(v)."))
         end
         gₓ = _change_ring(map_coefficients(k -> evaluate(k, v), g), R₁)
         Mₓ = multiplication_matrix(gb, b, gₓ)

@@ -20,7 +20,7 @@ function _random_point(n::Int)::Vector{Int}
 end
 
 @doc Markdown.doc"""
-    _estimate_total_degree(R::QQMPolyRing, bb::Function; samples=5, show_progress=false)
+    _estimate_total_degree(R::QQMPolyRing, bb::Function; samples=5, retry=10, show_progress=false)
 
 Estimate the total degree of the rational function corresponding to the black box function `bb` by evaluating it at random points and performing univariate Thiele interpolation.
 
@@ -30,6 +30,7 @@ function _estimate_total_degree(
     R::QQMPolyRing,
     bb::Function;
     samples::Int=5,
+    retry::Int=10,
     show_progress::Bool=false
 )::Tuple{Int,Int}
     t = length(gens(R))
@@ -37,18 +38,24 @@ function _estimate_total_degree(
     R_z, _ = polynomial_ring(QQ, :z)
     total_degree_counts = Dict{Tuple{Int,Int},Int}()
     total = 0
+    failures = 0
     while total < samples
         x = _random_point(t)
         try
-            f = thiele(R_z, k -> bb(k .* x); show_progress=show_progress, offset=1)
+            f = thiele(R_z, k -> bb(k .* x); retry=retry, show_progress=show_progress, offset=1)
             total_degree = (degree(denominator(f)), degree(numerator(f)))
             total_degree_counts[total_degree] = get(total_degree_counts, total_degree, 0) + 1
             total += 1
+            failures = 0
             if findmax(total_degree_counts)[1] > samples ÷ 2
                 break
             end
         catch e
-            if isa(e, ThieleError)
+            if isa(e, ThieleError) || isa(e, UnluckyPointError)
+                failures += 1
+                if failures >= retry
+                    throw(CuytLeeError("Failed to estimate the total degree: univariate interpolation failed on $(retry) consecutive random lines. Last error: $(sprint(showerror, e))"))
+                end
                 continue
             else
                 rethrow(e)
@@ -104,7 +111,7 @@ function cuyt_lee_shifted(
         return R(bb(Vector{QQFieldElem}())) // one(R)
     end
     R_z, _ = polynomial_ring(QQ, :z)
-    d_den, d_num = _estimate_total_degree(R, bb; show_progress=show_progress)
+    d_den, d_num = _estimate_total_degree(R, bb; retry=retry, show_progress=show_progress)
     d = [0; fill(max(d_den, d_num), t - 1)...]
     x = Vector{Vector{ZZRingElem}}()
     coeffs_den = []
@@ -118,7 +125,7 @@ function cuyt_lee_shifted(
             try
                 f = thiele(R_z, k -> bb(k .* cur); retry=retry, show_progress=show_progress, offset=offset)
             catch e
-                if isa(e, BoundsError) || isa(e, ThieleError)
+                if isa(e, BoundsError) || isa(e, ThieleError) || isa(e, UnluckyPointError)
                     return false
                 else
                     rethrow(e)
@@ -253,11 +260,13 @@ function cuyt_lee(
         return R(bb(Vector{QQFieldElem}())) // one(R)
     end
     shift = initial_shift
+    last_error = nothing
     for i in 1:retry
         try
             return cuyt_lee_with_shift(R, bb, shift; retry=retry, nr_thrds=nr_thrds, show_progress=show_progress, desc=desc)
         catch e
             if isa(e, CuytLeeError)
+                last_error = e
                 if show_progress
                     @warn "Interpolation failed, retrying with a different shift... Retries left: $(retry - i)"
                 end
@@ -267,5 +276,6 @@ function cuyt_lee(
             end
         end
     end
-    throw(CuytLeeError("Interpolation failed after maximum number of retries."))
+    throw(CuytLeeError("Interpolation failed after maximum number of retries." *
+                       (isnothing(last_error) ? "" : " Last error: $(last_error.msg)")))
 end
