@@ -9,6 +9,7 @@ import ..AlgebraicSolving: _map_exponent_vectors, _change_ring
 export thiele, newton, cuyt_lee
 
 # Interpolation algorithms
+include("errors.jl")
 include("thiele.jl")
 include("newton.jl")
 include("cuyt_lee.jl")

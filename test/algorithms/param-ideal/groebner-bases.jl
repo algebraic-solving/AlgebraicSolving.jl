@@ -8,6 +8,14 @@ import Nemo: fraction_field
     @test gb == [(a * x^2 + b * x + c) / a]
 end
 
+@testset "Algorithms -> Parametric Gröbner basis (unlucky points)" begin
+    R, (a, b, c) = polynomial_ring(QQ, [:a, :b, :c])
+    R′, (x,) = polynomial_ring(fraction_field(R), [:x], internal_ordering=:degrevlex)
+    f = ParametricIdeal([a * x^2 + b * x + c])
+    f.shift = [-2, 1, 1]
+    @test groebner_basis(f) == [(a * x^2 + b * x + c) / a]
+end
+
 @testset "Algorithms -> Monomial basis" begin
     R, (x,) = polynomial_ring(QQ, [:x])
     f = [x^2 - 2 * x + 1]

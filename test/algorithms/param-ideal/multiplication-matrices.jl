@@ -23,3 +23,12 @@ end
     @test M(f, x^2) == matrix(fraction_field(R),
         [-c//a (b*c)//a^2; -b//a (b^2-a*c)//a^2])
 end
+
+@testset "Algorithms -> Parametric multiplication matrix (unlucky points)" begin
+    R, (a, b, c) = polynomial_ring(QQ, [:a, :b, :c])
+    R′, (x,) = polynomial_ring(fraction_field(R), [:x], internal_ordering=:degrevlex)
+    f = ParametricIdeal([a * x^2 + b * x + c]; prefer_gb=false)
+    f.shift = [-2, 1, 1]
+    @test multiplication_matrix(f, x) == matrix(fraction_field(R),
+        [0 -c//a; 1 -b//a])
+end

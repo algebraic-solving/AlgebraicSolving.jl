@@ -85,10 +85,10 @@ function thiele(
         yᵢ = try
             bb(xᵢ)
         catch e
-            if isa(e, DivideError)
+            if isa(e, DivideError) || isa(e, UnluckyPointError)
                 failures += 1
                 if failures >= retry
-                    throw(ThieleError("Too many consecutive failures evaluating the black box function."))
+                    throw(ThieleError("Too many consecutive failures evaluating the black box function. Last error: $(sprint(showerror, e))"))
                 end
                 continue
             else
@@ -132,16 +132,23 @@ function thiele(
     end
     # We verify that the interpolating formula is correct
     # for an additional point.
+    failures = 0
+    yᵢ = nothing
     while true
         xᵢ = xᵢ + 1
-        if !iszero(evaluate(denominator(f), xᵢ))
-            break
+        if iszero(evaluate(denominator(f), xᵢ))
+            continue
         end
-    end
-    yᵢ = try
-        bb(xᵢ)
-    catch _
-        throw(ThieleError("Verification failed."))
+        yᵢ = try
+            bb(xᵢ)
+        catch e
+            if (isa(e, DivideError) || isa(e, UnluckyPointError)) && failures + 1 < retry
+                failures += 1
+                continue
+            end
+            throw(ThieleError("Verification failed."))
+        end
+        break
     end
     if evaluate(f, xᵢ) != yᵢ
         throw(ThieleError("Verification failed."))
